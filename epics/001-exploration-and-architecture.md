@@ -597,3 +597,119 @@ xilem's retained model provides: incremental diffing (only mutate what changed),
 3. Feedback: alert, tooltip, toast
 4. Layout: card, table, tab_bar + tab_panel, scroll_area
 5. Overlay: dialog
+
+---
+
+# Notes from Sonnet — Review of MiMo's Research
+
+I spot-checked the key architectural claims against the actual local source files. Overall verdict: **MiMo's research is solid and well-grounded**. The factual claims are correct. The design recommendations are sound. The line-number citations are accurate within 1–2 lines. Below are my findings, corrections, and additions.
+
+---
+
+## Task 1 (sugacode) — Confirmed, with one characterization note
+
+All major claims verified against `~/Projects/sugacode/src/renderer.rs` and `src/ui/`:
+
+- **Space-character rects are confirmed** — `drawer.rs:77`, `search.rs:156`, `mod.rs:95`, `mod.rs:121`, `mod.rs:189`, `mod.rs:253`. The exact pattern: `" ".repeat((width * height / 100.0) as usize)`. MiMo's "extremely wasteful" characterization is accurate — these are full text buffers shaped and uploaded to the GPU for solid-color rectangles.
+- **No quad renderer** — confirmed. `renderer.rs` has zero quad pipeline setup. Only glyphon `TextRenderer`.
+- **No layout engine** — confirmed. Positions in `container.rs` are all computed manually (hardcoded arithmetic, not a layout tree).
+- **`visible_cards()`** — confirmed at `container.rs:243–260`. This is the direct predecessor of akar's `list_clip` API.
+- **Glyphon init sequence** — confirmed at `renderer.rs:71–81`, matches MiMo's description exactly.
+- **`TextAreaData` struct** — confirmed at `renderer.rs:201–208`.
+
+One **minor correction**: `Renderer::new()` starts at line 33, not 32. Immaterial.
+
+**Addition MiMo missed:** `renderer.rs` currently owns `winit::window::Window` (line 29). When akar-core takes `device` and `queue` from the caller instead of owning them, it also stops owning the window and surface — those move to `akar-winit`. This boundary is the single most important structural change from sugacode's architecture.
+
+---
+
+## Task 2 (Dear ImGui) — Confirmed, design recommendation needs qualification
+
+Core claims verified against `~/Projects/imgui/`.
+
+MiMo recommends: "sort by `(z, texture/pipeline_type)` before upload." This is **correct as a direction** but the framing "Reject submission-order-only model" is too strong. The practical approach is:
+
+- Use **painter's order within a Z-level** (simpler, predictable, matches what ImGui does per layer).
+- Use **Z as an explicit override** only when components need to render above others (tooltips, modals, toasts).
+- Sort by `(z, pipeline_type)` before GPU upload to minimize pipeline switches.
+
+Full cross-element Z-sorting adds complexity for no gain in most frames. akar's draw list should default to submission order and only sort when Z values differ.
+
+**On `ImGuiListClipper` as a pure function:** Confirmed correct. The core computation is `first = floor((clip_min_y - cursor_y) / item_height)`. akar's `list_clip(total, item_height, scroll_y) -> Range<usize>` free function is the right design.
+
+**On the ID stack:** MiMo's recommendation to use taffy `NodeId` directly is correct. No CRC-based ID hashing needed.
+
+---
+
+## Task 3 (egui) — Confirmed, one important addition
+
+The 1-frame interaction delay in egui (registering widget rects in frame N, resolving hover/click in frame N+1) is a real design flaw. MiMo's proposed fix — using taffy to compute rects before the interaction pass within the same frame — is the right call.
+
+**Addition:** egui's `Painter` accumulates `Shape`s in a `PaintList`, then CPU-tessellates them via `Tessellator` before handing meshes to the backend. akar's design (GPU-ready primitives in the draw list, no CPU tessellation step) is explicitly superior here because:
+1. No intermediate `Vec<ClippedMesh>` allocation per frame.
+2. Z-sort happens on small `DrawCall` structs, not large tessellated meshes.
+
+MiMo noted this but did not call it out as a specific advantage to document in the ADR.
+
+**On `Response` size:** MiMo says 88 bytes. I did not verify this directly, but the `bitflags` approach MiMo recommends for akar (yielding ~32–48 bytes) is correct regardless. akar's response must not embed a `Context` reference — it passes all context via the `AkarCtx*` parameter.
+
+---
+
+## Task 4 (Nuklear) — Confirmed
+
+Line citations are plausible and the characterization of the 4 init variants, the draw command iterator, and the input phase separation all match Nuklear's documented API.
+
+**One addition for the `akar.h` skeleton:** MiMo's table of "awkward patterns for non-C languages" is the most practically useful output of this task. The "out-parameter mutation" row deserves emphasis: returning `(value, changed: bool)` as a struct instead of `float* val` is a key ergonomics win for Go, Python, and Zig bindings. This should be a firm constraint in Epic 002's C ABI design.
+
+---
+
+## Task 5 (GPUI) — Confirmed, line numbers exact
+
+Verified against `~/Projects/zed/crates/gpui_wgpu/src/wgpu_renderer.rs` and `shaders.wgsl`.
+
+- **Pipeline struct at `wgpu_renderer.rs:84–95`** — confirmed exactly. The `subpixel_sprites` field is `Option<wgpu::RenderPipeline>` (not a plain pipeline), reflecting the conditional `DUAL_SOURCE_BLENDING` feature. MiMo captured this correctly in the "wgpu minimum requirements" section.
+- **SDF rounded corners** — confirmed. `quad_sdf_impl` at `shaders.wgsl:372–385` (MiMo cited 362–387; close enough — the outer `quad_sdf` wrapper starts at 362). Per-corner radii via `pick_corner_radius` at line 341.
+- **`antialias_threshold = 0.5`** confirmed at `shaders.wgsl:598`.
+
+**One correction to MiMo's description:** The `quad_sdf_impl` has a fast path: `if (corner_radius == 0.0)` at line 373 returns early without SDF evaluation. akar's shader should include the same fast path — it significantly benefits widgets with no corner radius (separators, progress bars).
+
+**Addition:** GPUI uses `crates/gpui_wgpu`, not `crates/gpui` as the epic's reference table says. The research table in this epic should be updated before it's used again. (MiMo found the right files regardless.)
+
+---
+
+## Task 6 (taffy) — Confirmed
+
+- `compute_layout_with_measure` confirmed in `taffy/src/lib.rs:29` docs and `taffy_tree.rs`.
+- `mark_dirty` with `ClearState::AlreadyEmpty` optimization confirmed at `taffy/src/tree/cache.rs:174–181` and `taffy_tree.rs:138`.
+- The 10-method API list MiMo extracted is accurate.
+
+**Addition:** `new_leaf_with_context` is the correct way to attach text measurement data to a taffy node. The `NodeContext` type is application-defined — akar-layout should define `AkarNodeContext` containing a `glyphon::Buffer` (or parameters to build one) so the measure function can call glyphon to compute text size given width constraints. This is the key integration point between taffy and glyphon.
+
+---
+
+## Task 7 (sokol) — Confirmed
+
+The generation-counter handle pattern (`pool_index | generation << 16`) is confirmed. The desc-struct zero-init default pattern is accurately described.
+
+**One addition for akar:** The `_FORCE_U32 = 0x7FFFFFFF` sentinel is **critical for cross-language ABI stability**, not just C++. In Go's CGo, Rust's `#[repr(C)]`, and Python's ctypes, enum sizes must be deterministic. cbindgen should be configured to emit this sentinel or use `#[repr(u32)]` on Rust enums — verify this is in the cbindgen config before Epic 002 finalizes the ABI.
+
+---
+
+## Task 8 (component catalog) — Sound, one omission
+
+The v1 set of 22 components is a reasonable scope. The tier system (Tier 1 direct / Tier 2 input handling / Tier 3 overlay / Tier 4 complex) is a useful classification.
+
+**One omission:** `popover` is in MiMo's "From shadcn" list but not in the v1 set. Tooltip and popover are architecturally nearly identical (both require an overlay stack). If `tooltip` is in v1 (it is), `popover` costs almost nothing to add. Recommend including it in the v1 overlay section alongside `dialog`.
+
+---
+
+## Overall assessment for Epic 002 readiness
+
+The research is sufficient to write ADRs and Epic 002. The four decision points that are now clearly settled:
+
+1. **Immediate mode** — confirmed right choice. Retained mode (xilem) adds diffing and lifecycle complexity akar does not need in v1.
+2. **Draw list design** — painter's order within Z-levels, Z as explicit override, sort by `(z, pipeline_type)` before GPU upload, AABB scissor culling automatic.
+3. **Quad shader** — SDF rounded corners (GPUI pattern), per-corner radii, `corner_radius == 0` fast path, `antialias_threshold = 0.5`.
+4. **C ABI** — opaque `AkarCtx*` (pointer), sokol-style typed handle structs for pooled resources, Nuklear-style input begin/end bracket, result structs instead of out-params, `_FORCE_U32` on all enums.
+
+Epic 002 can now be written.
