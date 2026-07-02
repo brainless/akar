@@ -15,19 +15,38 @@ A GPU-accelerated immediate-mode UI component library with a C ABI. The Rust cra
 
 ## Local source access
 
-All reference projects are cloned locally. Prefer reading these over web searches:
+All reference projects are cloned locally. Prefer reading these over web searches — they are the authoritative source for internals and undocumented behavior.
 
-```
-~/Projects/wgpu/          — wgpu 29 source
-~/Projects/glyphon/src/   — text renderer (TextRenderer, TextAtlas, Viewport)
-~/Projects/glam-rs/src/   — math types
-~/Projects/sugacode/src/  — predecessor app; rendering pattern reference
-~/Projects/xilem/         — mature Rust retained-mode UI (reference only)
-~/Projects/daisyui/       — CSS component library (naming/token reference)
-~/Projects/shadcn_ui/     — React component library (API ergonomics reference)
-```
+| Project | Local path | Read first |
+|---|---|---|
+| **sugacode** | `~/Projects/sugacode/src/` | `renderer.rs`, `src/ui/` — predecessor app, rendering pattern reference |
+| **glyphon** | `~/Projects/glyphon/src/` | `text_render.rs`, `text_atlas.rs` — text renderer akar wraps |
+| **wgpu** | `~/Projects/wgpu/` | GPU pipeline, render passes, buffer management (wgpu 29 internals) |
+| **glam** | `~/Projects/glam-rs/src/` | Math types (Vec2, Vec4, Mat4) |
+| **xilem** | `~/Projects/xilem/` | Mature Rust retained-mode UI (reference only) |
+| **daisyui** | `~/Projects/daisyui/` | CSS component library (naming/token reference) |
+| **shadcn_ui** | `~/Projects/shadcn_ui/` | React component library (API ergonomics reference) |
 
 Do not fetch URLs for these projects. Read files locally.
+
+## What NOT to do
+
+- Do not write implementation code before Epic 001 is `Status: Done`. Epic 001 is research and design — its output is Epic 002, where implementation begins.
+- Do not impose an event loop — akar is driven by the developer's loop.
+- Do not impose an async runtime — all akar APIs are synchronous.
+- Do not add windowing (winit, SDL, GLFW) to `akar-core` or `akar-components`. Windowing belongs in `akar-winit` and is always optional.
+- Do not add accessibility scaffolding in v1. Document the punt if relevant.
+- Do not edit `akar.h` directly — it is always `cbindgen`-generated from `akar-c-api`.
+
+## Crate responsibility boundaries
+
+| Crate | Owns | Must NOT touch |
+|---|---|---|
+| `akar-core` | wgpu pipelines, draw list, scissor, input state struct | Layout, components, windowing, C API |
+| `akar-layout` | taffy wrapper, flex tree → pixel rect resolution | Rendering, components |
+| `akar-components` | All UI components; calls core + layout | wgpu directly, windowing |
+| `akar-c-api` | `extern "C"` surface, `AkarCtx` opaque handle | Business logic (delegates to components) |
+| `akar-winit` | winit event → akar input bridge | Everything else |
 
 ## C ABI contract
 
@@ -40,21 +59,6 @@ Once `akar-c-api` exists, agents integrating akar from non-Rust languages must:
 5. Call `akar_ctx_free(ctx)` on shutdown.
 
 No heap allocations are expected on the caller side beyond the context handle. All internal buffers are owned by the context.
-
-## Constraints agents must respect
-
-**Never impose on the developer:**
-- An event loop — akar is driven by the developer's loop
-- An async runtime — all akar APIs are synchronous
-- A message-passing model — no channels, no callbacks unless explicitly opted into
-- A windowing library — the developer supplies device/queue/surface
-
-**Never add to `akar-core` or `akar-components`:**
-- winit, SDL, or any windowing dependency
-- tokio, async-std, or any async runtime
-- Accessibility scaffolding (deferred, document the punt)
-
-**Never edit `akar.h` directly.** Regenerate it with `cbindgen`.
 
 ## Draw list contract (for `akar-core` contributors)
 
@@ -89,3 +93,9 @@ For scroll containers and list components:
 - A `MockDrawList` that records submitted calls is the primary unit-test tool.
 - Visual regression tests (screenshot comparison) are manual for now.
 - C ABI tests are written in C and compiled as integration tests under `crates/akar-c-api/tests/`.
+
+## Style
+
+- Follow the conventions in `DEVELOP.md` → Coding Conventions.
+- No emojis in source or docs unless explicitly requested.
+- No comments unless the WHY is non-obvious. Code should be self-documenting.

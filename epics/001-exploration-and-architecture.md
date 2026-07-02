@@ -245,7 +245,355 @@ Epic 002 covers the first implementation milestone: a working quad renderer + dr
 Each Epic 002 task must include file-level details (which file, which struct, which method signature) so a coding agent can execute it without additional research.
 
 **Acceptance Criteria for Epic 001:**
-- [ ] Tasks 1–8 each have a written output section appended to this epic (or linked from it).
+- [x] Tasks 1–8 each have a written output section appended to this epic (or linked from it).
 - [ ] Four ADRs are written and internally consistent.
 - [ ] `epics/002-core-renderer-and-draw-list.md` exists and contains tasks detailed enough for a coding agent to implement without further research.
 - [ ] No code has been written.
+
+---
+
+# Notes from MiMo — Research Output (Tasks 1–8)
+
+All research below was conducted by reading local source code from `~/Projects/`.
+
+---
+
+## Task 1: sugacode Baseline Analysis
+
+### 1. What sugacode's renderer does that akar-core must replicate or generalize
+
+Sugacode's `Renderer::new()` (`renderer.rs:32-96`) performs a standard wgpu bootstrap: instance creation, adapter request, device+queue request, surface creation, surface configuration with hardcoded `Bgra8UnormSrgb` format and `Fifo` present mode, and glyphon text pipeline init. All GPU resources are owned in one monolithic struct (`renderer.rs:16-30`).
+
+**What akar-core must replicate:**
+- The glyphon initialization pipeline (FontSystem, SwashCache, Cache, Viewport, Atlas, TextRenderer).
+- Surface resize handling (`renderer.rs:98-102`).
+- The frame lifecycle: viewport update -> collect text areas -> prepare text -> acquire surface texture -> render pass -> submit -> present -> trim atlas (`renderer.rs:104-198`).
+
+**What akar-core must NOT replicate:**
+- Device/queue ownership. akar-core accepts device/queue from the caller (per C ABI contract), not own the device creation.
+- Surface creation tied to winit. This must move to `akar-winit`.
+
+### 2. Exact glyphon API surface used
+
+Initialization sequence (`renderer.rs:71-81`):
+1. `FontSystem::new()`
+2. `SwashCache::new()`
+3. `Cache::new(&Device)`
+4. `Viewport::new(&Device, &Cache)`
+5. `TextAtlas::new(&Device, &Queue, &Cache, TextureFormat)`
+6. `TextRenderer::new(&mut TextAtlas, &Device, MultisampleState, Option<DepthStencilState>)`
+
+Per-frame: `Viewport::update(&Queue, Resolution)` -> `Buffer::new(FontSystem, Metrics)` -> `Buffer::set_size()` -> `Buffer::set_text()` -> `Buffer::shape_until_scroll()` -> `TextRenderer::prepare(...)` -> `TextRenderer::render(...)` -> `TextAtlas::trim()`.
+
+The `TextAreaData` struct (`renderer.rs:201-208`) is the bridge between UI and renderer: `{ buffer, left, top, scale, bounds, color }`.
+
+### 3. What is missing
+
+- **No quad/rect renderer — CONFIRMED.** Every rectangle is faked with `" ".repeat(...)` text buffers filled with space characters. This is extremely wasteful and must be replaced with an instanced quad pipeline.
+- **No layout engine — CONFIRMED.** All positions are hardcoded pixel coordinates computed procedurally.
+- **No input focus/hover state machine — CONFIRMED.** Hover is inline `is_mouse_over_rect()` checks. No click dispatch, no keyboard focus, no active/pressed state.
+- **Additional:** No scissor/clip stack (manual clip calculations), no z-ordering, no draw list abstraction, no border/rounded corner rendering.
+
+### 4. What can be ported vs. what needs redesign
+
+**Port:** Glyphon init sequence, `TextAreaData` collect pattern (generalize to `DrawCall`), `create_text_buffer()` helper, frame lifecycle structure, surface error handling, container virtualization pattern (`visible_cards()`), zoom/pan coordinate transforms.
+
+**Redesign:** Monolithic Renderer struct (split), space-character rectangles (replace with quad renderer), hardcoded pixel layout (replace with taffy), no draw list abstraction (build `DrawList` with `DrawCall` enum), input handler tightly coupled to app state (abstract to generic `InputState`), hit testing positional not tree-based.
+
+---
+
+## Task 2: Dear ImGui Draw List and List Clipper Analysis
+
+### 1. How ImGui's DrawList batches and sorts
+
+ImGui does **not** sort by Z. It uses strict **painter's order** (submission order). Batching is done by `_TryMergeDrawCmds()` (`imgui_draw.cpp:578-587`): consecutive draw calls with the same `(ClipRect, TexRef, VtxOffset)` are merged into one GPU draw call. Changing clip rect or texture creates a new `ImDrawCmd`.
+
+The `ImDrawListSplitter` (channels API) lets tables batch interleaved column draws by merging adjacent commands with matching headers on `Merge()`.
+
+**What akar should do:** Adopt the merge-adjacent-with-same-state optimization. Reject submission-order-only model. akar should sort by `(z, texture/pipeline_type)` before upload.
+
+### 2. ImGuiListClipper — what it computes
+
+`ImGuiListClipper` (`imgui.h:2869-2905`) computes a visible item index range `[DisplayStart, DisplayEnd)` given total count, item height, and the window's clip rect. The core formula: `first = (clip_min_y - cursor_y) / item_height`, `last = (clip_max_y - cursor_y) / item_height`. It also adds extra ranges for navigation targets and focused items.
+
+**Can it be a pure function?** Yes. The core computation is pure: `list_clip(total_items, item_height, scroll_y, viewport_top, viewport_bottom) -> (first, last)`. akar should make this a free function in `akar-core`. No state, no context, no object.
+
+### 3. ID stack — how it works
+
+ImGui uses `IDStack` per window (`imgui_internal.h:2746`). `PushID/PopID` hashes against the current stack top using CRC32. `GetID(str)` produces a unique `ImGuiID` per widget. The global context stores `HoveredId`, `ActiveId`, `NavId` — two `uint32_t` fields tracking interaction state across frames.
+
+**akar should:** Use explicit integer node IDs from the taffy layout tree (stable, unique by construction, zero-cost to compare). Keep `PushID/PopID` for hierarchy. Skip the `###` label/id separator. Skip per-window ID stacks.
+
+### 4. ImGuiIO input model
+
+`ImGuiIO` (`imgui.h:2409-2636`) is populated **before** `NewFrame()` via `Add*()` functions: `AddKeyEvent`, `AddMousePosEvent`, `AddMouseButtonEvent`, `AddMouseWheelEvent`, `AddInputCharacter`. Rising/falling edge detection (`MouseClicked`, `MouseReleased`) is computed from `MouseDown` state. Output flags `WantCaptureMouse`/`WantCaptureKeyboard` tell the app when to suppress game input.
+
+**akar should adopt:** The event queue pattern (`akar_set_mouse_pos`, `akar_push_mouse_button`, etc.), edge detection, `WantCapture*` output flags. Skip the trickle mechanism and per-key data array.
+
+### 5. C types that translate to akar.h
+
+| ImGui Type | akar Equivalent |
+|---|---|
+| `ImGuiID` (`unsigned int`) | `uint32_t` |
+| `ImVec2` (`{float x, y}`) | `AkarVec2` |
+| `ImVec4` (`{float x, y, z, w}`) | `AkarVec4` |
+| `ImU32` (packed RGBA) | `uint32_t` |
+| `ImDrawCmd` (ClipRect + TexRef + ElemCount) | `AkarDrawCmd` with `clip_rect`, `pipeline`, `idx_offset`, `elem_count` |
+| `ImDrawVert` (`{pos, uv, col}`, 20 bytes) | Custom quad vertex format (no `uv` needed for SDF) |
+
+Skip: `ImTextureRef`, `ImDrawListSplitter`, `ImGuiContext` (full), `ImGuiStyle`, `ImGuiWindow`.
+
+---
+
+## Task 3: egui Immediate-Mode Architecture Analysis
+
+### 1. How egui separates input from rendering
+
+egui uses a strict frame lifecycle through `Context`:
+
+1. **Input injection** at `begin_pass` (`context.rs:896`). `RawInput` is processed into `InputState`.
+2. **Widget registration** during the UI pass. Each widget calls `Context::create_widget(WidgetRect)` (`context.rs:1182`).
+3. **Interaction resolution** happens at the START of the next frame, using PREVIOUS frame's widget rects (`context.rs:472-493`). Hit-testing and interaction are pre-computed into an `InteractionSnapshot`.
+4. **Response creation** when widgets read their interaction result via `Context::get_response()` (`context.rs:1357`).
+5. **Rendering** is separate — widgets add `Shape`s to `PaintList` via `Painter::add()` (`painter.rs:213`).
+6. **Tessellation** is a separate backend step: `Context::tessellate()` (`context.rs:2757`).
+
+**akar should use the same split** but diverge: egui has a 1-frame delay for interaction (uses previous frame's rects). akar can use taffy layout to compute rects BEFORE the interaction pass within the same frame, eliminating this delay.
+
+### 2. Minimal Response API for akar
+
+egui's `Response` (`response.rs:23-75`) is 88 bytes with embedded `Context`. Core flags: `ENABLED`, `CONTAINS_POINTER`, `HOVERED`, `CLICKED`, `DRAG_STARTED`, `DRAGGED`, `DRAG_STOPPED`, `IS_POINTER_BUTTON_DOWN_ON`, `CHANGED`, `CLOSE`.
+
+**Minimal for akar:** `{ id, rect, clicked, hovered, contains_pointer, dragged, drag_delta, changed, has_focus, gained_focus, lost_focus, is_pointer_down }`. No embedded context (C ABI provides it separately). ~32-48 bytes with bitflags.
+
+### 3. Widget ID collisions
+
+egui uses `Id::new(source)` (hash-based, `NonZeroU64`, `id.rs:44`). Auto-IDs from `Ui` are position-dependent (unstable if widgets insert/remove). `Context::check_for_id_clash()` (`context.rs:1097`) stores IDs+rects and shows visual warnings on collision.
+
+**akar should NOT use hash-based IDs.** Use explicit taffy node IDs instead — stable across frames, unique by construction, zero-cost comparison. For per-widget state, use `HashMap<NodeId, WidgetState>`.
+
+### 4. Layout cursor vs. taffy tree
+
+egui uses a cursor-based system (`Placer` inside `Ui`). `allocate_space(desired_size)` (`ui.rs:1187`) returns a rect immediately. Layouts are created by nesting `Ui`s with different `Layout` directions. Single-pass, no tree.
+
+Taffy is two-pass: build tree with style properties, compute layout, read results. Supports cross-widget constraints, intrinsic sizing, grid layouts.
+
+**Verdict for akar:** Taffy is the right call (better layout correctness, natural virtualization support). But akar should provide a thin cursor-like wrapper over taffy for ergonomics: `let btn_id = ui.button("Click me")` internally creates/queries taffy nodes.
+
+### 5. Scroll area and clipper API
+
+egui's `ScrollArea::show_rows()` (`scroll_area.rs:984-1015`) computes visible range: `min_row = (viewport.min.y / row_height).floor()`, `max_row = (viewport.max.y / row_height).ceil() + 1`. No standalone clipper function.
+
+**akar should expose `list_clip(total, item_height, scroll_y) -> Range<usize>`** as a first-class API, as specified in AGENTS.md.
+
+### 6. Painter flush
+
+egui accumulates `Shape`s in `PaintList` -> `GraphicLayers::drain()` collects all shapes in z-order -> CPU tessellation via `Tessellator::tessellate_shapes()` -> `Vec<ClippedPrimitive>` with `Mesh` data -> backend iterates and issues GPU draw calls.
+
+**akar should differ:** No CPU tessellation step. Draw list stores GPU-ready primitives directly (rect, text). Z-sorting happens in the draw list before GPU upload. Scissor stack in draw list, batched by rect.
+
+---
+
+## Task 4: Nuklear C API Design Analysis
+
+### 1. Context memory handling
+
+Nuklear provides 4 init variants (`nuklear.h:19543-19585`):
+- `nk_init_default` — wraps `malloc`/`free`
+- `nk_init_fixed` — caller provides a single contiguous buffer, no allocator
+- `nk_init` — caller provides `nk_allocator` with `alloc`/`free` callbacks
+- `nk_init_custom` — caller provides two pre-initialized `nk_buffer` objects
+
+The allocator struct (`nuklear.h:506`) uses `nk_handle` (union of `void*` and `int`) for userdata. The `alloc` callback is `(userdata, old_ptr, new_size)` — doubles as both `malloc` and `realloc`.
+
+**akar should:** 3 variants: `akar_ctx_new(device, queue)` (Rust alloc), `akar_ctx_new_with_allocator(...)` (custom allocator), `akar_ctx_new_fixed(...)` (embedded targets). Use `(userdata, size, align)` allocator interface (closer to Rust's `GlobalAlloc`).
+
+### 2. Draw command iterator pattern
+
+Two layers:
+- **Layer 1** (`nk_foreach`): Abstract command buffer iteration. 18 command types (line, rect, circle, text, etc.). Caller casts based on `cmd->type`.
+- **Layer 2** (`nk_draw_foreach`): After `nk_convert()`, hardware-ready vertex/index buffers. Each `nk_draw_command` has `elem_count`, `clip_rect`, `texture`. Caller iterates to issue GPU draw calls.
+
+**akar should:** Skip the abstract command layer (Layer 1). Go straight to `DrawCall` structs with `elem_count`, `clip_rect`, `texture` (Layer 2 pattern). Expose `akar_draw_begin`/`next`/`end` as the primary API (not macros).
+
+### 3. Input model separation
+
+Two phases:
+- **Input feeding** (`nk_input_begin`/`nk_input_end`): Caller wraps platform events. `nk_input_begin` resets per-frame deltas. Individual functions (`nk_input_motion`, `nk_input_key`, `nk_input_button`, `nk_input_scroll`, `nk_input_char`) set state on `ctx->input`.
+- **Input querying** (inside widgets): Rect-based hit-test queries on `ctx->input`: `nk_input_is_mouse_hovering_rect`, `nk_input_is_mouse_click_in_rect`, etc. No callbacks, no event queue, no indirection.
+
+**akar should adopt this exactly.** Flat `InputState` struct, begin/end bracket, hit-test queries.
+
+### 4. Naming conventions
+
+Everything is `nk_` prefixed. Types: `nk_` + lowercase_with_underscores. Enums: `NK_` + SCREAMING_SNAKE_CASE. Functions: `nk_` + snake_case. Widget naming: `nk_button_label`, `nk_button_text`, `nk_button_image_label`. Callback types: `nk_plugin_alloc`, `nk_plugin_free`.
+
+**akar should follow:** `akar_` prefix, `AKAR_` enum prefix, `_label`/`_text` variant pattern for null-terminated vs length-delimited strings.
+
+### 5. Awkward patterns for non-C languages
+
+| Pattern | Problem | akar fix |
+|---|---|---|
+| `nk_handle` union | No FFI union support in most languages | Opaque `uint64_t` handles |
+| Variadic `_f` functions (`nk_labelf`) | Cannot call from non-C | Expose only `const char *text, int len` variants |
+| Out-parameter mutation (`float *val`) | Requires temp allocation in non-C | Return result structs with value + changed flag |
+| String-based window identification | String marshalling overhead | Handle-based (`AkarWindow*`) |
+| Macro-based iterators (`nk_foreach`) | Cannot call from non-C | Expose `akar_draw_begin`/`next`/`end` as functions |
+| Cast-based type dispatch (18 cmd types) | Unsafe in non-C | Single concrete `DrawCall` struct |
+| Window begin/end bracket | Forgetting `nk_end` = UB | Scoped handle pattern |
+
+---
+
+## Task 5: Zed GPUI Rendering Analysis
+
+### 1. Quad rendering structure
+
+GPUI uses **separate pipelines per primitive type** (`wgpu_renderer.rs:84-95`): `quads`, `shadows`, `path_rasterization`, `paths`, `underlines`, `mono_sprites`, `subpixel_sprites`, `poly_sprites`, `surfaces`. All share one compiled shader module (`shaders.wgsl`).
+
+Batching: `Scene` stores primitives in type-separated vectors. `BatchIterator` (`scene.rs:255-451`) produces `PrimitiveBatch` variants grouping consecutive same-type primitives by z-order. All draw calls use a **single shared instance buffer** (storage buffer, initially 2MB, grows on overflow). Each draw call writes instance data into a subregion and issues `draw(0..4, 0..instance_count)` — a triangle-strip quad instanced N times.
+
+**Key insight:** One pipeline per primitive type but a single shared instance buffer. akar could follow the same pattern.
+
+### 2. Rounded corners — SDF in shader
+
+GPUI uses **SDF (signed distance field) evaluation in the fragment shader** (`shaders.wgsl:362-387`). Per-corner radii, selected by quadrant. Fast path for zero-radius corners (no SDF). The `quad_sdf_impl` function: `length(max(0, corner_center_to_point)) + min(0, max(x, y)) - corner_radius`. Anti-aliasing via `blend_color(color, saturate(antialias_threshold - outer_sdf))`. Dashed borders also SDF-based.
+
+**akar should adopt SDF rounded corners.** The pattern is simple, branchless, and handles per-corner radii.
+
+### 3. Text and UI batching in the same render pass
+
+All primitives render in a single render pass. `BatchIterator` merge-sorts across all primitive type vectors by `(order, kind)`. Text sprites are batched by `texture_id` to minimize bind group changes. The only exception is paths, which require an intermediate texture pass (rasterize path -> composite into main pass).
+
+**akar can follow the same approach** since it is immediate-mode. Sort draw calls by `(z, pipeline_type)` before submission.
+
+### 4. DPI scaling
+
+GPUI uses a three-unit type system: `Pixels` (logical), `ScaledPixels` (physical after DPI multiply), `DevicePixels` (integer physical). Scale factor flows: platform provides it -> layout uses it for snapping -> paint methods multiply it -> shaders receive physical coordinates. Glyph rasterization is keyed by `scale_factor`.
+
+**akar simplification:** Work in logical pixels, apply scale factor at the end when converting to the draw list. All shader data must be in scaled (physical) pixels. Glyph rasterization must be keyed by `scale_factor`.
+
+### 5. wgpu minimum requirements
+
+GPUI requires `wgpu::Limits::downlevel_defaults()` (works on OpenGL ES 3.0). Only optional feature: `DUAL_SOURCE_BLENDING` for subpixel text (gracefully degraded). Surface format: prefers `Bgra8Unorm`, falls back to `Rgba8Unorm`. wgpu version: 29.0.4.
+
+**akar can target `downlevel_defaults()`** and be compatible with very wide hardware range. Check for `DUAL_SOURCE_BLENDING` at runtime and degrade gracefully.
+
+---
+
+## Task 6: taffy Layout API Analysis
+
+### 1. Minimal tree management API for akar-layout
+
+10 core methods from `TaffyTree`:
+- `new_leaf(Style) -> NodeId` — leaf nodes
+- `new_with_children(Style, &[NodeId]) -> NodeId` — container nodes
+- `new_leaf_with_context(Style, NodeContext) -> NodeId` — leaf nodes with measurement context (text data)
+- `add_child(parent, child)`
+- `set_children(parent, &[NodeId])`
+- `remove(node)`
+- `set_style(node, Style)` — automatically marks dirty
+- `set_node_context(node, Option<NodeContext>)`
+- `compute_layout_with_measure(node, available_space, measure_fn)`
+- `layout(node) -> &Layout`
+
+### 2. Dirty-flag mechanism
+
+Each node stores a `Cache` struct (`cache.rs:24-31`). `mark_dirty(node)` (`taffy_tree.rs:873-896`) propagates upward from the changed node to all ancestors. **Key optimization:** when a node is already dirty (cache empty), traversal stops (`ClearState::AlreadyEmpty`). All tree-mutation methods automatically call `mark_dirty`. During layout, `compute_cached_layout` short-circuits on cache hit, skipping entire subtrees.
+
+**akar does not need its own dirty-tracking layer.** Taffy's built-in system is sufficient.
+
+### 3. Content-sized nodes
+
+The measure function callback handles text/image sizing. Signature: `FnMut(known_dimensions: Size<Option<f32>>, available_space: Size<AvailableSpace>, node_id, Option<&mut NodeContext>, &Style) -> Size<f32>`. When `known_dimensions.width` is `Some(200.0)`, the function reports height at that width. The `content_size` feature provides `scroll_width()`/`scroll_height()` for scroll containers.
+
+### 4. Allocation-free operation
+
+`TaffyTree` uses `SlotMap` (heap-allocated arena). **Not allocation-free, but this is fine for akar.** SlotMap is arena allocation (contiguous memory, O(1) ops). Pre-allocation via `TaffyTree::with_capacity(n)` available. A low-level trait API exists for custom tree implementations if needed later.
+
+### 5. Text measure function integration
+
+The measure function receives `known_dimensions`, `available_space`, `node_id`, `Option<&mut NodeContext>`, and `&Style`. akar would create text leaf nodes with `new_leaf_with_context(Style, TextContext)` and the measure function would call glyphon to determine text size given constraints. `AvailableSpace` has three variants: `Definite(f32)`, `MinContent`, `MaxContent`.
+
+---
+
+## Task 7: sokol C API Design Analysis
+
+### 1. Opaque handle pattern
+
+sokol uses `typedef struct { uint32_t id; } sg_buffer;` (`sokol_gfx.h:2005-2010`). The 32-bit ID is split: 16-bit pool index + 16-bit generation counter. Strongly-typed structs prevent passing incompatible handles (compile error). Generation counter detects use-after-free.
+
+**akar should adopt this for all pooled GPU resources** (texture atlas entries, font handles). The `AkarCtx` pointer remains a pointer (singleton, not pooled).
+
+### 2. Desc-struct initialization pattern
+
+Zero-init a struct, set only the fields you care about, pass a pointer. All zero fields get sensible defaults filled by the library. `_sg_def(val, def)` macro: `((val) == 0) ? (def) : (val)`. Canary fields (`_start_canary`, `_end_canary`) catch uninitialized memory.
+
+**akar should use this for `AkarCtxDesc` and component option structs.** Use canaries on `AkarCtxDesc` (called once), skip on per-frame component descs.
+
+### 3. Backend differences in a single header
+
+Four strategies:
+1. **Compile-time backend selection** via `#define` (one backend compiled at a time)
+2. **Platform-specific state** behind `#ifdef` in global state struct
+3. **Backend-specific nested config structs** in public desc structs (e.g., `sg_desc.wgpu`)
+4. **Backend-specific escape-hatch query functions** (e.g., `sg_wgpu_device()` returning `const void*`)
+
+**akar should use `const void*` for native handles in the public C API.** `akar.h` must never `#include` wgpu headers.
+
+### 4. C and C++ compilation
+
+Five techniques:
+1. `extern "C"` wrapping with `#ifdef __cplusplus` guard
+2. C++ reference-based overloads after closing `extern "C"` block
+3. Dual struct initialization macros (`{0}` for C, `{}` for C++)
+4. `_FORCE_U32 = 0x7FFFFFFF` sentinel on every enum (ensures 32-bit width)
+5. `#include <stdbool.h>` for `bool` type
+
+**akar should adopt all five.** The C++ overloads would be a post-processing step on cbindgen output. `_FORCE_U32` is critical for ABI stability.
+
+---
+
+## Task 8: xilem, daisyUI, shadcn_ui Component Catalog Analysis
+
+### 1. xilem retained model vs. immediate mode
+
+xilem's retained model provides: incremental diffing (only mutate what changed), persistent `ViewState` per node, structured message routing via `ViewId` paths, typed dependency injection (`provides`/`with_context`), memoization, and lifecycle hooks (`teardown` for cleanup).
+
+**akar needs none of this in v1.** Immediate mode re-submits everything each frame. Component functions return state enums directly. Callbacks are passed directly. Theme tokens are a flat struct. No persistent resources to clean up. The one retained concept to eventually consider: focus management (`focused_id: Option<ComponentId>` in input state).
+
+### 2. Complete daisyUI component list (57 components)
+
+**Tier 1 — Direct immediate-mode calls (27):** alert, avatar, badge, breadcrumbs, button, calendar, card, divider, fieldset, footer, hero, indicator, kbd, label, link, list, loading, mask, mockup, navbar, progress, radialprogress, skeleton, stack, stat, status, steps.
+
+**Tier 2 — Need special input handling (9):** checkbox, radio, toggle, range, input, textarea, select, fileinput, swap.
+
+**Tier 3 — Require overlay/z-index stack (7):** dropdown, modal, drawer, tooltip, toast, collapse, tab.
+
+**Tier 4 — Layout/animation/complex (14):** carousel, chat, countdown, diff, dock, fab, filter, hover3d, hovergallery, menu, rating, timeline, validator, textrotate.
+
+### 3. Theme token system (synthesized from daisyUI + shadcn)
+
+**Color tokens (8 semantic slots + content pairs):** primary, secondary, accent, neutral, info, success, warning, error. Each with a `*-content` foreground color. Plus `base_100`/`base_200`/`base_300`/`base_content` for neutral backgrounds.
+
+**Size variants (5-step):** Xs, Sm, Md, Lg, Xl.
+
+**Style variants (6 treatments):** Solid, Outline, Ghost, Soft, Dash, Link.
+
+**Shape variants:** Default, Square, Circle, Wide, Block.
+
+**Structural tokens:** `radius_field`, `radius_box`, `radius_selector`, `border_width`, `depth`.
+
+### 4. Component names for akar
+
+**Verbatim from daisyUI (22):** button, badge, alert, card, checkbox, radio, toggle, input, textarea, select, range, progress, divider, tooltip, avatar, table, link, kbd, skeleton, steps, drawer, fab.
+
+**From shadcn (13):** dialog, sheet, separator, switch (rename toggle), slider (rename range), accordion (rename collapse), popover, scroll_area, command_palette, breadcrumb, pagination, empty_state, spinner (rename loading).
+
+**Renamed for imperative clarity:** collapse -> expandable, loading -> spinner, range -> slider, sonner -> toast, alert-dialog -> confirm_dialog, resizable -> split_pane.
+
+**Recommended v1 set (22 components):**
+1. Primitives: button, badge, label, link, separator, spinner, kbd
+2. Inputs: input, textarea, checkbox, radio, switch, slider, select
+3. Feedback: alert, tooltip, toast
+4. Layout: card, table, tab_bar + tab_panel, scroll_area
+5. Overlay: dialog
