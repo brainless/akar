@@ -8,14 +8,17 @@ pub enum DrawCall {
 
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
+// Field order matches WGSL vec4 alignment: corner_radii must sit at offset 48
+// (16-byte aligned) so it follows three vec4 fields. border_width, z, and two
+// pad floats occupy the trailing 16 bytes.
 pub struct QuadCall {
-    pub rect: [f32; 4],
-    pub fill: [f32; 4],
-    pub border_color: [f32; 4],
-    pub border_width: f32,
-    pub corner_radii: [f32; 4],
-    pub z: f32,
-    pub _pad: f32,
+    pub rect: [f32; 4],         // offset 0
+    pub fill: [f32; 4],         // offset 16
+    pub border_color: [f32; 4], // offset 32
+    pub corner_radii: [f32; 4], // offset 48 — must stay here for WGSL vec4 alignment
+    pub border_width: f32,      // offset 64
+    pub z: f32,                 // offset 68
+    pub _pad: [f32; 2],         // offset 72 — keeps struct size at 80 (multiple of 16)
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,6 +87,10 @@ impl DrawList {
         call.rect[1] *= self.scale_factor;
         call.rect[2] *= self.scale_factor;
         call.rect[3] *= self.scale_factor;
+        call.border_width *= self.scale_factor;
+        for r in &mut call.corner_radii {
+            *r *= self.scale_factor;
+        }
         if let Some(scissor) = self.active_scissor() {
             if !intersects(call.rect, scissor) {
                 return;
@@ -138,10 +145,10 @@ mod tests {
             rect: [x, y, w, h],
             fill: [1.0, 0.0, 0.0, 1.0],
             border_color: [0.0; 4],
-            border_width: 0.0,
             corner_radii: [0.0; 4],
+            border_width: 0.0,
             z: 0.0,
-            _pad: 0.0,
+            _pad: [0.0; 2],
         }
     }
 

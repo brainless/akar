@@ -22,10 +22,10 @@ pub fn container(
         rect,
         fill: color_to_f32(background),
         border_color: color_to_f32(theme.base_300),
-        border_width: 0.0,
         corner_radii: [theme.radius_box; 4],
+        border_width: 0.0,
         z: 0.0,
-        _pad: 0.0,
+        _pad: [0.0; 2],
     });
 }
 

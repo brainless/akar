@@ -3,13 +3,13 @@ struct Params {
 }
 
 struct QuadInstance {
-    rect: vec4<f32>,           // x, y, w, h in physical pixels
-    fill: vec4<f32>,           // RGBA
-    border_color: vec4<f32>,   // RGBA
+    rect: vec4<f32>,            // x, y, w, h in physical pixels
+    fill: vec4<f32>,            // RGBA
+    border_color: vec4<f32>,    // RGBA
+    corner_radii: vec4<f32>,    // tl, tr, br, bl — at offset 48, 16-byte aligned
     border_width: f32,
-    corner_radii: vec4<f32>,   // tl, tr, br, bl
     z: f32,
-    _pad: f32,
+    _pad: vec2<f32>,
 }
 
 @group(0) @binding(0) var<storage, read> quads: array<QuadInstance>;

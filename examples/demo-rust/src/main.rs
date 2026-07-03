@@ -139,10 +139,11 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), AKAR_THEME_DARK.secondary, &AKAR_THEME_DARK);
-                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), AKAR_THEME_DARK.neutral, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), 0x1e3a8aff, &AKAR_THEME_DARK); // dark blue
+                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), 0x14532dff, &AKAR_THEME_DARK); // dark green
                 akar_container(&mut state.core, &state.layout, state.page.main, AKAR_THEME_DARK.base_100, &AKAR_THEME_DARK);
-                akar_container(&mut state.core, &state.layout, state.two_col.left, AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.two_col.left, 0x172554ff, &AKAR_THEME_DARK); // dark navy
+                akar_container(&mut state.core, &state.layout, state.two_col.right, 0x27272aff, &AKAR_THEME_DARK); // dark grey
                 akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
 
                 let result = akar_button(

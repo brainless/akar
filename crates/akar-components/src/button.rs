@@ -81,10 +81,10 @@ pub fn button(
         rect,
         fill: color_to_f32(fill_color),
         border_color: color_to_f32(border_color),
-        border_width: theme.border_width,
         corner_radii: [theme.radius_field; 4],
+        border_width: theme.border_width,
         z: 0.0,
-        _pad: 0.0,
+        _pad: [0.0; 2],
     });
 
     // TODO: cache buffer per node_id

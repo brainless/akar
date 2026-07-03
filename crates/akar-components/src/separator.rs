@@ -18,10 +18,10 @@ pub fn separator(
         rect,
         fill: color_to_f32(theme.base_300),
         border_color: [0.0; 4],
-        border_width: 0.0,
         corner_radii: [0.0; 4],
+        border_width: 0.0,
         z: 0.0,
-        _pad: 0.0,
+        _pad: [0.0; 2],
     });
 }
 

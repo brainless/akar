@@ -47,7 +47,6 @@ impl AkarCore {
 
     pub fn begin_frame(&mut self, width: u32, height: u32, scale_factor: f32) {
         self.draw_list.begin_frame(scale_factor);
-        self.input.begin_frame();
         self.viewport_width = width;
         self.viewport_height = height;
         self.scale_factor = scale_factor;
@@ -89,6 +88,9 @@ impl AkarCore {
 
         self.text_pipeline.trim_atlas();
         self.text_pipeline.render(pass)?;
+
+        // Clear single-frame input events after all components have read them.
+        self.input.begin_frame();
 
         Ok(())
     }
