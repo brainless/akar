@@ -877,3 +877,12 @@ pollster = "0.4"
 
 ### Task 5: akar-core Text pipeline — DONE
 **Reviewed:** `cargo test -p akar-core` passes (11 total). TextPipeline wraps glyphon init sequence. set_text auto-assigns IDs, measure returns Vec2. Adapted to actual glyphon 0.11 API. 1 unit test for buffer ID assignment.
+
+### Task 6: akar-core AkarCore context — DONE
+**Reviewed:** `cargo check --workspace` passes. AkarCore owns DrawList, InputState, QuadPipeline, TextPipeline. begin_frame clears state, end_frame runs text prepare → quad flush → text render → trim. Filters DrawCall::Text variants into Vec<TextCall> for prepare. Named lifetime for render pass borrow.
+
+### Task 7: akar-layout Taffy wrapper — DONE
+**Reviewed:** `cargo test -p akar-layout` passes (1 test). Layout wraps TaffyTree<AkarNodeContext>, 10 methods delegate directly. compute converts Option<f32> to AvailableSpace. rect returns [x, y, w, h]. Re-exports taffy::prelude::*.
+
+### Task 8: akar-components Theme — DONE
+**Reviewed:** `cargo check --workspace` passes. AkarTheme with 20 color tokens (packed RGBA u32) and 8 size tokens. AKAR_THEME_DARK and AKAR_THEME_LIGHT presets with shadcn/ui palette values.
