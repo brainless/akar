@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 akar-core = { path = "../akar-core" }
 akar-layout = { path = "../akar-layout" }
+glyphon.workspace = true

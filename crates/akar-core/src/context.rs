@@ -5,7 +5,7 @@ pub struct AkarCore {
     pub draw_list: DrawList,
     pub input: InputState,
     pub(crate) quad_pipeline: QuadPipeline,
-    pub(crate) text_pipeline: TextPipeline,
+    pub text_pipeline: TextPipeline,
     #[allow(dead_code)]
     surface_format: wgpu::TextureFormat,
     viewport_width: u32,
@@ -29,6 +29,20 @@ impl AkarCore {
             viewport_height: 0,
             scale_factor: 1.0,
         }
+    }
+
+    pub fn mock() -> Self {
+        // Minimal mock for unit testing component logic without a GPU.
+        // quad_pipeline and text_pipeline are zero-initialized placeholders
+        // and must not be used for actual rendering.
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+        let adapter =
+            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default()))
+                .expect("no suitable adapter");
+        let (device, queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
+                .expect("failed to create device");
+        Self::new(&device, &queue, wgpu::TextureFormat::Bgra8UnormSrgb)
     }
 
     pub fn begin_frame(&mut self, width: u32, height: u32, scale_factor: f32) {

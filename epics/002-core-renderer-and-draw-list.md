@@ -886,3 +886,9 @@ pollster = "0.4"
 
 ### Task 8: akar-components Theme — DONE
 **Reviewed:** `cargo check --workspace` passes. AkarTheme with 20 color tokens (packed RGBA u32) and 8 size tokens. AKAR_THEME_DARK and AKAR_THEME_LIGHT presets with shadcn/ui palette values.
+
+### Task 9: akar-components Button — DONE
+**Reviewed:** `cargo test -p akar-components` passes (1 test). ButtonVariant (Solid/Outline/Ghost), ButtonResult, button() with state detection, variant-based color selection, dim/lighten helpers. Zero-area fast path test. Made text_pipeline pub on AkarCore for component access. Added mock() constructor for testing.
+
+### Task 10: akar-winit Winit event bridge — DONE
+**Reviewed:** `cargo check -p akar-winit` passes. process_window_event converts winit 0.30 WindowEvent variants to InputState calls. Adapted to winit 0.30 KeyEvent API.
