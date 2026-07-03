@@ -26,15 +26,7 @@ fn color_to_f32(c: u32) -> [f32; 4] {
     ]
 }
 
-fn dim_color(c: u32, factor: f32) -> u32 {
-    let r = (((c >> 24) & 0xFF) as f32 * factor).min(255.0) as u32;
-    let g = (((c >> 16) & 0xFF) as f32 * factor).min(255.0) as u32;
-    let b = (((c >> 8) & 0xFF) as f32 * factor).min(255.0) as u32;
-    let a = c & 0xFF;
-    (r << 24) | (g << 16) | (b << 8) | a
-}
-
-fn lighten_color(c: u32, factor: f32) -> u32 {
+fn scale_color(c: u32, factor: f32) -> u32 {
     let r = (((c >> 24) & 0xFF) as f32 * factor).min(255.0) as u32;
     let g = (((c >> 16) & 0xFF) as f32 * factor).min(255.0) as u32;
     let b = (((c >> 8) & 0xFF) as f32 * factor).min(255.0) as u32;
@@ -67,9 +59,9 @@ pub fn button(
     let (fill_color, border_color) = match variant {
         ButtonVariant::Solid => {
             let base = if pressed {
-                dim_color(theme.primary, 0.8)
+                scale_color(theme.primary, 0.8)
             } else if hovered {
-                lighten_color(theme.primary, 1.1)
+                scale_color(theme.primary, 1.1)
             } else {
                 theme.primary
             };
@@ -77,7 +69,7 @@ pub fn button(
         }
         ButtonVariant::Outline => {
             let border = if hovered {
-                lighten_color(theme.primary, 1.1)
+                scale_color(theme.primary, 1.1)
             } else {
                 theme.primary
             };
@@ -85,7 +77,7 @@ pub fn button(
         }
         ButtonVariant::Ghost => {
             let fill = if hovered {
-                lighten_color(theme.primary, 1.1)
+                scale_color(theme.primary, 1.1)
             } else {
                 0x00000000u32
             };

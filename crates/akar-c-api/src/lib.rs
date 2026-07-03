@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 use std::ffi::{c_char, c_void};
 use std::ptr;
 
@@ -219,7 +221,13 @@ pub unsafe extern "C" fn akar_button(
 
     let label_bytes =
         unsafe { std::slice::from_raw_parts(label as *const u8, label_len as usize) };
-    let label_str = unsafe { std::str::from_utf8_unchecked(label_bytes) };
+    let Ok(label_str) = std::str::from_utf8(label_bytes) else {
+        return AkarButtonResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    };
 
     let nid: akar_layout::NodeId = node_id.into();
     let result = akar_components::akar_button(

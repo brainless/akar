@@ -119,6 +119,12 @@ impl DrawList {
     }
 }
 
+impl Default for DrawList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn intersects(a: [f32; 4], b: [f32; 4]) -> bool {
     a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1]
 }

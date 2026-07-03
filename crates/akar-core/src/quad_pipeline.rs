@@ -132,7 +132,7 @@ impl QuadPipeline {
             return;
         }
 
-        let required_size = quads.len() * mem::size_of::<QuadCall>();
+        let required_size = std::mem::size_of_val(quads);
         if required_size > self.instance_capacity * mem::size_of::<QuadCall>() {
             let new_capacity = (quads.len() * 2).next_power_of_two();
             self.instance_buffer = device.create_buffer(&BufferDescriptor {

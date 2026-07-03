@@ -82,7 +82,7 @@ Call sites become self-documenting: `scale_color(theme.primary, 0.8)` (dim on pr
 
 ## Acceptance Criteria
 
-- [ ] `cargo clippy --workspace -- -D warnings` passes with zero errors.
-- [ ] Passing invalid UTF-8 bytes into `akar_button` returns `AkarButtonResult { false, false, false }` instead of UB.
-- [ ] `button.rs` has one `scale_color` function instead of two identical ones.
-- [ ] All existing tests continue to pass (`cargo test --workspace`).
+- [x] `cargo clippy --workspace -- -D warnings` passes with zero errors.
+- [x] Passing invalid UTF-8 bytes into `akar_button` returns `AkarButtonResult { false, false, false }` instead of UB.
+- [x] `button.rs` has one `scale_color` function instead of two identical ones.
+- [x] All existing tests continue to pass (`cargo test --workspace`).
