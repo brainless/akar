@@ -871,3 +871,9 @@ pollster = "0.4"
 
 ### Task 3: akar-core DrawList and DrawCall — DONE
 **Reviewed:** `cargo test -p akar-core` passes. DrawCall enum (Quad/Text), QuadCall with bytemuck Pod+Zeroable, DrawList with scissor stack (logical→physical + intersection), AABB culling on push_quad/push_text, stable z-sort on sorted_quads(). 5 unit tests cover culling, sorting, intersection.
+
+### Task 4: akar-core Quad pipeline — DONE
+**Reviewed:** `cargo check -p akar-core` passes. WGSL shader with SDF rounded corners, per-corner radii, border support, fast path for sharp quads. QuadPipeline with instanced draw(0..6, N). Added uniform buffer for viewport params alongside storage buffer for quad instances — needed for clip-space conversion.
+
+### Task 5: akar-core Text pipeline — DONE
+**Reviewed:** `cargo test -p akar-core` passes (11 total). TextPipeline wraps glyphon init sequence. set_text auto-assigns IDs, measure returns Vec2. Adapted to actual glyphon 0.11 API. 1 unit test for buffer ID assignment.
