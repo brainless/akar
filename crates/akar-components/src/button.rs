@@ -103,8 +103,8 @@ pub fn button(
 
     core.draw_list.push_text(TextCall {
         buffer_id,
-        x: rect[0],
-        y: rect[1],
+        x: rect[0] + theme.border_width + theme.padding_x,
+        y: rect[1] + theme.border_width + theme.padding_y,
         clip: rect,
         color: text_color,
         z: 0.0,

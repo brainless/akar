@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use akar_components::{akar_button, akar_container, akar_separator, AKAR_THEME_DARK, ButtonVariant};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Style, Size, length};
+use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, length};
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -87,6 +87,7 @@ impl ApplicationHandler for App {
                 width: length(160.0),
                 height: length(48.0),
             },
+            align_self: Some(AlignSelf::FLEX_START),
             ..Default::default()
         });
         layout.add_child(two_col.right, btn_node);
@@ -138,8 +139,10 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
-                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), AKAR_THEME_DARK.secondary, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), AKAR_THEME_DARK.neutral, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.main, AKAR_THEME_DARK.base_100, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.two_col.left, AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
                 akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
 
                 let result = akar_button(

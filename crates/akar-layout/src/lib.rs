@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 pub use taffy::prelude::*;
 
 mod responsive;
@@ -11,12 +13,14 @@ pub struct AkarNodeContext {
 
 pub struct Layout {
     tree: TaffyTree<AkarNodeContext>,
+    parents: HashMap<NodeId, NodeId>,
 }
 
 impl Layout {
     pub fn new() -> Self {
         Self {
             tree: TaffyTree::new(),
+            parents: HashMap::new(),
         }
     }
 
@@ -29,18 +33,27 @@ impl Layout {
     }
 
     pub fn new_with_children(&mut self, style: Style, children: &[NodeId]) -> NodeId {
-        self.tree.new_with_children(style, children).unwrap()
+        let node = self.tree.new_with_children(style, children).unwrap();
+        for &child in children {
+            self.parents.insert(child, node);
+        }
+        node
     }
 
     pub fn add_child(&mut self, parent: NodeId, child: NodeId) {
         self.tree.add_child(parent, child).unwrap();
+        self.parents.insert(child, parent);
     }
 
     pub fn set_children(&mut self, parent: NodeId, children: &[NodeId]) {
         self.tree.set_children(parent, children).unwrap();
+        for &child in children {
+            self.parents.insert(child, parent);
+        }
     }
 
     pub fn remove(&mut self, node: NodeId) {
+        self.parents.remove(&node);
         self.tree.remove(node).unwrap();
     }
 
@@ -73,7 +86,16 @@ impl Layout {
 
     pub fn rect(&self, node: NodeId) -> [f32; 4] {
         let l = self.tree.layout(node).unwrap();
-        [l.location.x, l.location.y, l.size.width, l.size.height]
+        let mut x = l.location.x;
+        let mut y = l.location.y;
+        let mut current = node;
+        while let Some(&parent) = self.parents.get(&current) {
+            let pl = self.tree.layout(parent).unwrap();
+            x += pl.location.x;
+            y += pl.location.y;
+            current = parent;
+        }
+        [x, y, l.size.width, l.size.height]
     }
 }
 
