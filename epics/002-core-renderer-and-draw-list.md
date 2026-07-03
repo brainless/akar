@@ -865,3 +865,9 @@ pollster = "0.4"
 
 ### Task 1: Workspace scaffold — DONE
 **Reviewed:** `cargo check --workspace` passes. Corrected dependency versions from epic spec: wgpu 29 (not 22), taffy 0.11 (not 0.6), winit 0.30. Used path deps for glyphon and glam per DEVELOP.md. 6 workspace members created (5 crates + demo-rust example).
+
+### Task 2: akar-core InputState — DONE
+**Reviewed:** `cargo test -p akar-core` passes (10 tests). InputState struct with begin/end bracket, mouse button edge detection, hit-test helpers (is_hovering, is_clicked, is_pressed). Fixed missing `pub mod input` re-export in lib.rs.
+
+### Task 3: akar-core DrawList and DrawCall — DONE
+**Reviewed:** `cargo test -p akar-core` passes. DrawCall enum (Quad/Text), QuadCall with bytemuck Pod+Zeroable, DrawList with scissor stack (logical→physical + intersection), AABB culling on push_quad/push_text, stable z-sort on sorted_quads(). 5 unit tests cover culling, sorting, intersection.
