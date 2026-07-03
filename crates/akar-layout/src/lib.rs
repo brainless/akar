@@ -1,5 +1,8 @@
 pub use taffy::prelude::*;
 
+mod responsive;
+pub use responsive::responsive_columns;
+
 pub type NodeId = taffy::NodeId;
 
 pub struct AkarNodeContext {
@@ -74,6 +77,266 @@ impl Layout {
     }
 }
 
+pub struct TwoColumnLayout {
+    pub left: NodeId,
+    pub separator: NodeId,
+    pub right: NodeId,
+}
+
+pub struct ThreeColumnLayout {
+    pub left: NodeId,
+    pub sep_left: NodeId,
+    pub middle: NodeId,
+    pub sep_right: NodeId,
+    pub right: NodeId,
+}
+
+impl Layout {
+    pub fn two_column(
+        &mut self,
+        parent: NodeId,
+        left_fraction: f32,
+        separator_thickness: f32,
+    ) -> TwoColumnLayout {
+        self.set_style(
+            parent,
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            },
+        );
+
+        let left_fraction = left_fraction.clamp(0.0, 1.0);
+        let right_fraction = 1.0 - left_fraction;
+
+        let left = self.new_leaf(Style {
+            flex_grow: left_fraction,
+            flex_shrink: 1.0,
+            ..Default::default()
+        });
+        let separator = self.new_leaf(Style {
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(separator_thickness),
+                height: Dimension::auto(),
+            },
+            ..Default::default()
+        });
+        let right = self.new_leaf(Style {
+            flex_grow: right_fraction,
+            flex_shrink: 1.0,
+            ..Default::default()
+        });
+
+        self.set_children(parent, &[left, separator, right]);
+
+        TwoColumnLayout {
+            left,
+            separator,
+            right,
+        }
+    }
+
+    pub fn three_column(
+        &mut self,
+        parent: NodeId,
+        fractions: [f32; 3],
+        separator_thickness: f32,
+    ) -> ThreeColumnLayout {
+        self.set_style(
+            parent,
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            },
+        );
+
+        let left = self.new_leaf(Style {
+            flex_grow: fractions[0],
+            flex_shrink: 1.0,
+            ..Default::default()
+        });
+        let sep_left = self.new_leaf(Style {
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(separator_thickness),
+                height: Dimension::auto(),
+            },
+            ..Default::default()
+        });
+        let middle = self.new_leaf(Style {
+            flex_grow: fractions[1],
+            flex_shrink: 1.0,
+            ..Default::default()
+        });
+        let sep_right = self.new_leaf(Style {
+            flex_grow: 0.0,
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(separator_thickness),
+                height: Dimension::auto(),
+            },
+            ..Default::default()
+        });
+        let right = self.new_leaf(Style {
+            flex_grow: fractions[2],
+            flex_shrink: 1.0,
+            ..Default::default()
+        });
+
+        self.set_children(parent, &[left, sep_left, middle, sep_right, right]);
+
+        ThreeColumnLayout {
+            left,
+            sep_left,
+            middle,
+            sep_right,
+            right,
+        }
+    }
+}
+
+pub struct PageConfig {
+    pub header_height: Option<f32>,
+    pub footer_height: Option<f32>,
+    pub sidebar_left_width: Option<f32>,
+    pub sidebar_right_width: Option<f32>,
+}
+
+pub struct PageLayout {
+    pub root: NodeId,
+    pub header: Option<NodeId>,
+    pub body: NodeId,
+    pub sidebar_left: Option<NodeId>,
+    pub main: NodeId,
+    pub sidebar_right: Option<NodeId>,
+    pub footer: Option<NodeId>,
+}
+
+impl Layout {
+    pub fn page(&mut self, config: PageConfig) -> PageLayout {
+        let header = config.header_height.map(|h| {
+            self.new_leaf(Style {
+                flex_shrink: 0.0,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: length(h),
+                },
+                ..Default::default()
+            })
+        });
+
+        let footer = config.footer_height.map(|h| {
+            self.new_leaf(Style {
+                flex_shrink: 0.0,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: length(h),
+                },
+                ..Default::default()
+            })
+        });
+
+        let sidebar_left = config.sidebar_left_width.map(|w| {
+            self.new_leaf(Style {
+                flex_shrink: 0.0,
+                size: Size {
+                    width: length(w),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            })
+        });
+
+        let sidebar_right = config.sidebar_right_width.map(|w| {
+            self.new_leaf(Style {
+                flex_shrink: 0.0,
+                size: Size {
+                    width: length(w),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            })
+        });
+
+        let main = self.new_leaf(Style {
+            flex_grow: 1.0,
+            size: Size {
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
+            },
+            ..Default::default()
+        });
+
+        let mut body_children: Vec<NodeId> = Vec::new();
+        if let Some(sl) = sidebar_left {
+            body_children.push(sl);
+        }
+        body_children.push(main);
+        if let Some(sr) = sidebar_right {
+            body_children.push(sr);
+        }
+
+        let body = self.new_with_children(
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                flex_grow: 1.0,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: Dimension::auto(),
+                },
+                ..Default::default()
+            },
+            &body_children,
+        );
+
+        let mut root_children: Vec<NodeId> = Vec::new();
+        if let Some(h) = header {
+            root_children.push(h);
+        }
+        root_children.push(body);
+        if let Some(f) = footer {
+            root_children.push(f);
+        }
+
+        let root = self.new_with_children(
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: Dimension::percent(1.0),
+                },
+                ..Default::default()
+            },
+            &root_children,
+        );
+
+        PageLayout {
+            root,
+            header,
+            body,
+            sidebar_left,
+            main,
+            sidebar_right,
+            footer,
+        }
+    }
+}
+
 impl Default for Layout {
     fn default() -> Self {
         Self::new()
@@ -123,5 +386,101 @@ mod tests {
         let r_b = layout.rect(child_b);
         assert_eq!(r_b[0], 100.0, "child_b.x should be 100.0");
         assert_eq!(r_b[2], 100.0, "child_b.width should be 100.0");
+    }
+
+    #[test]
+    fn two_column_equal_split() {
+        let mut layout = Layout::new();
+        let root = layout.new_leaf(Style::default());
+        let cols = layout.two_column(root, 0.5, 1.0);
+        layout.compute(root, (Some(401.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let left_r = layout.rect(cols.left);
+        let sep_r = layout.rect(cols.separator);
+        let right_r = layout.rect(cols.right);
+
+        assert_eq!(sep_r[2], 1.0, "separator width should be 1.0");
+        assert!((left_r[2] - 200.0).abs() < 1.0, "left width should be ~200.0, got {}", left_r[2]);
+        assert!((right_r[2] - 200.0).abs() < 1.0, "right width should be ~200.0, got {}", right_r[2]);
+    }
+
+    #[test]
+    fn two_column_30_70_split() {
+        let mut layout = Layout::new();
+        let root = layout.new_leaf(Style::default());
+        let cols = layout.two_column(root, 0.3, 2.0);
+        layout.compute(root, (Some(402.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let left_r = layout.rect(cols.left);
+        let sep_r = layout.rect(cols.separator);
+        let right_r = layout.rect(cols.right);
+
+        assert_eq!(sep_r[2], 2.0);
+        assert!((left_r[2] - 120.0).abs() < 1.0, "left width should be ~120.0, got {}", left_r[2]);
+        assert!((right_r[2] - 280.0).abs() < 1.0, "right width should be ~280.0, got {}", right_r[2]);
+    }
+
+    #[test]
+    fn three_column_weighted_split() {
+        let mut layout = Layout::new();
+        let root = layout.new_leaf(Style::default());
+        let cols = layout.three_column(root, [1.0, 2.0, 1.0], 1.0);
+        layout.compute(root, (Some(402.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let left_r = layout.rect(cols.left);
+        let middle_r = layout.rect(cols.middle);
+        let right_r = layout.rect(cols.right);
+        let sep_l = layout.rect(cols.sep_left);
+        let sep_r = layout.rect(cols.sep_right);
+
+        assert_eq!(sep_l[2], 1.0);
+        assert_eq!(sep_r[2], 1.0);
+        assert!((left_r[2] - 100.0).abs() < 1.0, "left width should be ~100.0, got {}", left_r[2]);
+        assert!((middle_r[2] - 200.0).abs() < 1.0, "middle width should be ~200.0, got {}", middle_r[2]);
+        assert!((right_r[2] - 100.0).abs() < 1.0, "right width should be ~100.0, got {}", right_r[2]);
+    }
+
+    #[test]
+    fn page_with_header_and_left_sidebar() {
+        let mut layout = Layout::new();
+        let page = layout.page(PageConfig {
+            header_height: Some(60.0),
+            footer_height: None,
+            sidebar_left_width: Some(200.0),
+            sidebar_right_width: None,
+        });
+        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| Size::ZERO);
+
+        let header_r = layout.rect(page.header.unwrap());
+        let sidebar_r = layout.rect(page.sidebar_left.unwrap());
+        let main_r = layout.rect(page.main);
+
+        assert_eq!(header_r[2], 800.0, "header width should be 800.0");
+        assert_eq!(header_r[3], 60.0, "header height should be 60.0");
+        assert_eq!(sidebar_r[2], 200.0, "sidebar width should be 200.0");
+        assert_eq!(sidebar_r[3], 540.0, "sidebar height should be 540.0");
+        assert!((main_r[2] - 600.0).abs() < 1.0, "main width should be ~600.0, got {}", main_r[2]);
+        assert_eq!(main_r[3], 540.0, "main height should be 540.0");
+    }
+
+    #[test]
+    fn page_minimal_no_optional_regions() {
+        let mut layout = Layout::new();
+        let page = layout.page(PageConfig {
+            header_height: None,
+            footer_height: None,
+            sidebar_left_width: None,
+            sidebar_right_width: None,
+        });
+        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| Size::ZERO);
+
+        assert!(page.header.is_none());
+        assert!(page.footer.is_none());
+        assert!(page.sidebar_left.is_none());
+        assert!(page.sidebar_right.is_none());
+
+        let main_r = layout.rect(page.main);
+        assert_eq!(main_r[2], 800.0, "main width should be 800.0");
+        assert_eq!(main_r[3], 600.0, "main height should be 600.0");
     }
 }

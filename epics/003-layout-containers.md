@@ -1,6 +1,6 @@
 # Epic 003: Layout Containers
 
-**Status:** Planned
+**Status:** Done
 **Goal:** Build the layout container primitives — `Container`, `Separator`, `TwoColumn`, `ThreeColumn`, and `Page` — so developers can compose typical application shells without writing raw taffy code. Add a `responsive_columns` utility. Update the demo to show a full page shell with a two-column main area. No new GPU pipelines or draw-list changes are required; all work builds on Epic 002's infrastructure.
 
 **Prerequisite:** Epic 002 improvements (`epics/002-improvements.md`) are applied and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
@@ -511,14 +511,14 @@ if result.clicked {
 
 ## Acceptance Criteria for Epic 003
 
-- [ ] `cargo clippy --workspace -- -D warnings` passes with zero errors (including Epic 002 fixes from Task 1).
-- [ ] `cargo test --workspace` passes. New tests from Tasks 2–6 cover: separator zero-area, container zero-area and transparent, `two_column` and `three_column` flex widths, `page` region sizes, all five `responsive_columns` cases.
-- [ ] `cargo check --manifest-path examples/demo-rust/Cargo.toml` passes.
-- [ ] The demo renders a visible page shell with header, sidebar, separator, and a working button.
-- [ ] No windowing or event loop code exists in `akar-core`, `akar-layout`, or `akar-components`.
-- [ ] No `unsafe` outside `crates/akar-c-api/src/lib.rs`.
-- [ ] Grid (`display: grid`) is not implemented; its deferral is documented in ADR-008.
-- [ ] Canvas is not implemented; its design contract is documented in ADR-008.
+- [x] `cargo clippy --workspace -- -D warnings` passes with zero errors (including Epic 002 fixes from Task 1).
+- [x] `cargo test --workspace` passes. New tests from Tasks 2-6 cover: separator zero-area, container zero-area and transparent, `two_column` and `three_column` flex widths, `page` region sizes, all five `responsive_columns` cases.
+- [x] `cargo check --manifest-path examples/demo-rust/Cargo.toml` passes.
+- [x] The demo renders a visible page shell with header, sidebar, separator, and a working button.
+- [x] No windowing or event loop code exists in `akar-core`, `akar-layout`, or `akar-components`.
+- [x] No `unsafe` outside `crates/akar-c-api/src/lib.rs`.
+- [x] Grid (`display: grid`) is not implemented; its deferral is documented in ADR-008.
+- [x] Canvas is not implemented; its design contract is documented in ADR-008.
 
 ---
 

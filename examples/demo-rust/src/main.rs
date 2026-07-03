@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use akar_components::{akar_button, AKAR_THEME_DARK, ButtonVariant};
+use akar_components::{akar_button, akar_container, akar_separator, AKAR_THEME_DARK, ButtonVariant};
 use akar_core::AkarCore;
-use akar_layout::{Layout, Style, Size, length};
+use akar_layout::{Layout, PageConfig, Style, Size, length};
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -21,6 +21,8 @@ struct AppState {
     surface_config: wgpu::SurfaceConfiguration,
     core: AkarCore,
     layout: Layout,
+    page: akar_layout::PageLayout,
+    two_col: akar_layout::TwoColumnLayout,
     btn_node: akar_layout::NodeId,
 }
 
@@ -71,6 +73,15 @@ impl ApplicationHandler for App {
         let core = AkarCore::new(&device, &queue, surface_format);
         let mut layout = Layout::new();
 
+        let page = layout.page(PageConfig {
+            header_height: Some(48.0),
+            footer_height: None,
+            sidebar_left_width: Some(200.0),
+            sidebar_right_width: None,
+        });
+
+        let two_col = layout.two_column(page.main, 0.5, 1.0);
+
         let btn_node = layout.new_leaf(Style {
             size: Size {
                 width: length(160.0),
@@ -78,6 +89,7 @@ impl ApplicationHandler for App {
             },
             ..Default::default()
         });
+        layout.add_child(two_col.right, btn_node);
 
         self.state = Some(AppState {
             window,
@@ -87,6 +99,8 @@ impl ApplicationHandler for App {
             surface_config,
             core,
             layout,
+            page,
+            two_col,
             btn_node,
         });
     }
@@ -119,10 +133,14 @@ impl ApplicationHandler for App {
                 state.core.begin_frame(size.width, size.height, scale);
 
                 state.layout.compute(
-                    state.btn_node,
+                    state.page.root,
                     (Some(size.width as f32 / scale), Some(size.height as f32 / scale)),
                     |_, _, _, _, _| Size::ZERO,
                 );
+
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), AKAR_THEME_DARK.base_200, &AKAR_THEME_DARK);
+                akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
 
                 let result = akar_button(
                     &mut state.core,

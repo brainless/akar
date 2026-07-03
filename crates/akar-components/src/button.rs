@@ -2,6 +2,7 @@ use akar_core::AkarCore;
 use akar_core::{QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
+use crate::color::color_to_f32;
 use crate::AkarTheme;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -15,15 +16,6 @@ pub struct ButtonResult {
     pub clicked: bool,
     pub hovered: bool,
     pub pressed: bool,
-}
-
-fn color_to_f32(c: u32) -> [f32; 4] {
-    [
-        ((c >> 24) & 0xFF) as f32 / 255.0,
-        ((c >> 16) & 0xFF) as f32 / 255.0,
-        ((c >> 8) & 0xFF) as f32 / 255.0,
-        (c & 0xFF) as f32 / 255.0,
-    ]
 }
 
 fn scale_color(c: u32, factor: f32) -> u32 {
