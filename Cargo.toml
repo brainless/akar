@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/akar-core",
+    "crates/akar-layout",
+    "crates/akar-components",
+    "crates/akar-c-api",
+    "crates/akar-winit",
+    "examples/demo-rust",
+]
+
+[workspace.dependencies]
+wgpu = "29"
+glyphon = { path = "/Users/brainless/Projects/glyphon" }
+glam = { path = "/Users/brainless/Projects/glam-rs" }
+taffy = "0.11"
+winit = "0.30"
+thiserror = "2"
+log = "0.4"
+bytemuck = { version = "1", features = ["derive"] }

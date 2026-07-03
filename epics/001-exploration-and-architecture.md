@@ -1,6 +1,6 @@
 # Epic 001: Exploration & Architecture
 
-**Status:** Active
+**Status:** Done
 **Goal:** Research and document the design space thoroughly enough to write Epic 002 — which is where implementation begins. No code is produced in this epic.
 
 ---

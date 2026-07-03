@@ -1,0 +1,12 @@
+[package]
+name = "akar-c-api"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+akar-components = { path = "../akar-components" }
+akar-core = { path = "../akar-core" }
+akar-layout = { path = "../akar-layout" }
