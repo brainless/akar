@@ -1,0 +1,11 @@
+language = "C"
+include_guard = "AKAR_H"
+pragma_once = false
+tab_width = 4
+documentation = true
+
+[export]
+include = ["AkarCtx", "AkarButtonResult"]
+
+[enum]
+rename_variants = "ScreamingSnakeCase"

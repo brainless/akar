@@ -10,3 +10,8 @@ crate-type = ["cdylib", "staticlib"]
 akar-components = { path = "../akar-components" }
 akar-core = { path = "../akar-core" }
 akar-layout = { path = "../akar-layout" }
+glyphon.workspace = true
+wgpu.workspace = true
+
+[build-dependencies]
+cbindgen = "0.28"
