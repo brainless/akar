@@ -49,6 +49,7 @@ version = "0.1.0"
 dependencies = [
  "akar-core",
  "akar-layout",
+ "glam",
  "glyphon",
 ]
 
@@ -312,6 +313,19 @@ dependencies = [
  "rustix 0.38.44",
  "wayland-backend",
  "wayland-client",
+]
+
+[[package]]
+name = "canvas-basic-rust"
+version = "0.1.0"
+dependencies = [
+ "akar-components",
+ "akar-core",
+ "akar-layout",
+ "akar-winit",
+ "pollster",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]
