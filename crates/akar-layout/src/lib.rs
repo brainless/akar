@@ -5,6 +5,17 @@ pub use taffy::prelude::*;
 mod responsive;
 pub use responsive::responsive_columns;
 
+mod rect;
+pub use rect::Rect;
+
+mod canvas_transform;
+pub use canvas_transform::{
+    CanvasTransform,
+    make_world_to_screen,
+    make_screen_to_world,
+    compute_visible_world_rect,
+};
+
 pub type NodeId = taffy::NodeId;
 
 pub struct AkarNodeContext {

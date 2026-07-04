@@ -727,4 +727,8 @@ canvas_end(&mut core, painter);
 
 ## Review Notes
 
-*(Filled during implementation)*
+### Task 1 — `akar-layout`: Rect and CanvasTransform
+- Created `rect.rs` (Rect with from_xywh, intersects) and `canvas_transform.rs` (CanvasTransform with apply/apply_rect/scale_radius, plus make_world_to_screen/make_screen_to_world/compute_visible_world_rect)
+- Updated `lib.rs` with mod declarations and pub use re-exports
+- Code matches epic spec exactly; no existing code modified
+- `cargo check -p akar-layout` and `cargo clippy -p akar-layout -- -D warnings` both pass clean
