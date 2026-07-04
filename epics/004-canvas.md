@@ -749,3 +749,10 @@ canvas_end(&mut core, painter);
 - canvas_transform.rs: 8 tests (w2s identity/pan/zoom/off-center, round-trip, visible rect identity/zoom2, apply_rect dimensions)
 - canvas.rs: 5 tests (zoom anchors cursor, clamp min/max, is_visible_world cases, push_quad transforms rect)
 - All 44 tests pass (17 new + 27 existing), `cargo clippy --workspace -- -D warnings` clean
+
+### Task 5 — `examples/demo-rust`: Canvas demo
+- Replaced two-column layout and button with canvas filling page.main
+- 5 DemoObject rects at world-space positions with distinct colors
+- canvas_begin/end loop with is_visible_world culling and push_quad
+- Header and sidebar containers unchanged
+- `cargo clippy --workspace -- -D warnings` clean

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use akar_components::{akar_button, akar_container, akar_separator, AKAR_THEME_DARK, ButtonVariant};
+use akar_components::{akar_container, canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasState, AKAR_THEME_DARK};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, length};
+use akar_layout::{Layout, PageConfig, Rect, Size};
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -13,6 +13,11 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+struct DemoObject {
+    bounds: Rect,
+    fill: u32,
+}
+
 struct AppState {
     window: Arc<Window>,
     device: wgpu::Device,
@@ -22,8 +27,7 @@ struct AppState {
     core: AkarCore,
     layout: Layout,
     page: akar_layout::PageLayout,
-    two_col: akar_layout::TwoColumnLayout,
-    btn_node: akar_layout::NodeId,
+    canvas_state: CanvasState,
 }
 
 fn main() {
@@ -80,17 +84,7 @@ impl ApplicationHandler for App {
             sidebar_right_width: None,
         });
 
-        let two_col = layout.two_column(page.main, 0.5, 1.0);
-
-        let btn_node = layout.new_leaf(Style {
-            size: Size {
-                width: length(160.0),
-                height: length(48.0),
-            },
-            align_self: Some(AlignSelf::FLEX_START),
-            ..Default::default()
-        });
-        layout.add_child(two_col.right, btn_node);
+        let canvas_state = CanvasState::new();
 
         self.state = Some(AppState {
             window,
@@ -101,8 +95,7 @@ impl ApplicationHandler for App {
             core,
             layout,
             page,
-            two_col,
-            btn_node,
+            canvas_state,
         });
     }
 
@@ -139,24 +132,27 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), 0x1e3a8aff, &AKAR_THEME_DARK); // dark blue
-                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), 0x14532dff, &AKAR_THEME_DARK); // dark green
-                akar_container(&mut state.core, &state.layout, state.page.main, AKAR_THEME_DARK.base_100, &AKAR_THEME_DARK);
-                akar_container(&mut state.core, &state.layout, state.two_col.left, 0x172554ff, &AKAR_THEME_DARK); // dark navy
-                akar_container(&mut state.core, &state.layout, state.two_col.right, 0x27272aff, &AKAR_THEME_DARK); // dark grey
-                akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), 0x1e3a8aff, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), 0x14532dff, &AKAR_THEME_DARK);
 
-                let result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.btn_node,
-                    "Click me",
-                    ButtonVariant::Solid,
-                    &AKAR_THEME_DARK,
-                );
-                if result.clicked {
-                    println!("clicked!");
+                let objects = [
+                    DemoObject { bounds: Rect::from_xywh(-180.0, -80.0, 120.0, 60.0), fill: 0x3B82F6FF },
+                    DemoObject { bounds: Rect::from_xywh(80.0,  -80.0, 120.0, 60.0),  fill: 0x10B981FF },
+                    DemoObject { bounds: Rect::from_xywh(-60.0,  40.0, 120.0, 60.0),  fill: 0xF59E0BFF },
+                    DemoObject { bounds: Rect::from_xywh(-280.0, 60.0,  80.0, 80.0),  fill: 0xEF4444FF },
+                    DemoObject { bounds: Rect::from_xywh(200.0,  20.0, 100.0, 100.0), fill: 0x8B5CF6FF },
+                ];
+
+                let config = CanvasConfig::default();
+                let (response, mut painter) = canvas_begin(&mut state.core, &state.layout, state.page.main, &mut state.canvas_state, &config);
+
+                for obj in &objects {
+                    if is_visible_world(response.visible_world_rect, obj.bounds) {
+                        painter.push_quad(obj.bounds, obj.fill, 0x00000000, 0.0, [8.0; 4], 0.0);
+                    }
                 }
+
+                canvas_end(&mut state.core, painter);
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
