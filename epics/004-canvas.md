@@ -732,3 +732,9 @@ canvas_end(&mut core, painter);
 - Updated `lib.rs` with mod declarations and pub use re-exports
 - Code matches epic spec exactly; no existing code modified
 - `cargo check -p akar-layout` and `cargo clippy -p akar-layout -- -D warnings` both pass clean
+
+### Task 2 — `akar-components`: Canvas types
+- Created `canvas.rs` with PanButton, CanvasConfig, CanvasState (with zoom_at_point), CanvasResponse, CanvasPainter (with push_quad)
+- Updated `lib.rs` with canvas module and re-exports
+- Added `glam.workspace = true` to akar-components/Cargo.toml
+- `cargo check -p akar-components` and `cargo clippy -p akar-components -- -D warnings` both pass clean
