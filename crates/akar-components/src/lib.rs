@@ -13,4 +13,7 @@ pub mod container;
 pub use container::container as akar_container;
 
 pub mod canvas;
-pub use canvas::{CanvasConfig, CanvasPainter, CanvasResponse, CanvasState, PanButton};
+pub use canvas::{
+    CanvasConfig, CanvasPainter, CanvasResponse, CanvasState, PanButton,
+    canvas_begin, canvas_end, is_visible_world,
+};

@@ -738,3 +738,8 @@ canvas_end(&mut core, painter);
 - Updated `lib.rs` with canvas module and re-exports
 - Added `glam.workspace = true` to akar-components/Cargo.toml
 - `cargo check -p akar-components` and `cargo clippy -p akar-components -- -D warnings` both pass clean
+
+### Task 3 — `akar-components`: canvas_begin, canvas_end, is_visible_world
+- Added canvas_begin (scissor push, pan/zoom input handling, response/painter construction), canvas_end (buffer drain, scissor pop), is_visible_world (delegates to Rect::intersects)
+- Updated lib.rs re-exports to include the three functions
+- `cargo check -p akar-components` and `cargo clippy -p akar-components -- -D warnings` both pass clean

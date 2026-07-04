@@ -1,6 +1,6 @@
 use glam::Vec2;
-use akar_core::QuadCall;
-use akar_layout::{Rect, CanvasTransform};
+use akar_core::{AkarCore, QuadCall};
+use akar_layout::{Rect, CanvasTransform, Layout, NodeId, make_world_to_screen, make_screen_to_world, compute_visible_world_rect};
 use crate::color::color_to_f32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -97,4 +97,73 @@ impl CanvasPainter {
             _pad: [0.0; 2],
         });
     }
+}
+
+pub fn canvas_begin(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    state: &mut CanvasState,
+    config: &CanvasConfig,
+) -> (CanvasResponse, CanvasPainter) {
+    let rect = layout.rect(node_id);
+
+    core.draw_list.push_scissor(rect);
+
+    let pan_btn = match config.pan_button {
+        PanButton::Middle => 2,
+        PanButton::Right => 1,
+    };
+
+    if core.input.mouse_buttons_pressed[pan_btn] && core.input.is_hovering(rect) {
+        state.is_panning = true;
+    }
+    if !core.input.mouse_buttons[pan_btn] {
+        state.is_panning = false;
+    }
+
+    let mut dragged = false;
+    if state.is_panning {
+        let delta = (core.input.mouse_pos - core.input.mouse_pos_prev) / state.zoom;
+        if delta != Vec2::ZERO {
+            state.pan -= delta;
+            dragged = true;
+        }
+    }
+
+    let mut zoomed = false;
+    let scroll_y = core.input.scroll_delta.y;
+    if scroll_y != 0.0 && core.input.is_hovering(rect) {
+        let zoom_factor = 1.0 + scroll_y * config.zoom_sensitivity;
+        if zoom_factor > 0.0 {
+            state.zoom_at_point(
+                core.input.mouse_pos,
+                rect,
+                zoom_factor,
+                config.zoom_min,
+                config.zoom_max,
+            );
+            zoomed = true;
+        }
+    }
+
+    let world_to_screen = make_world_to_screen(state.pan, state.zoom, rect);
+    let screen_to_world = make_screen_to_world(state.pan, state.zoom, rect);
+    let visible_world_rect = compute_visible_world_rect(state.pan, state.zoom, rect);
+
+    let response = CanvasResponse { dragged, zoomed, world_to_screen, screen_to_world, visible_world_rect };
+    let painter = CanvasPainter { buffer: Vec::new(), world_to_screen };
+
+    (response, painter)
+}
+
+pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
+    for quad in painter.buffer {
+        core.draw_list.push_quad(quad);
+    }
+    core.draw_list.pop_scissor();
+}
+
+pub fn is_visible_world(viewport: Rect, target: Rect) -> bool {
+    viewport.intersects(target)
 }
