@@ -743,3 +743,9 @@ canvas_end(&mut core, painter);
 - Added canvas_begin (scissor push, pan/zoom input handling, response/painter construction), canvas_end (buffer drain, scissor pop), is_visible_world (delegates to Rect::intersects)
 - Updated lib.rs re-exports to include the three functions
 - `cargo check -p akar-components` and `cargo clippy -p akar-components -- -D warnings` both pass clean
+
+### Task 4 — Tests
+- rect.rs: 4 tests (intersects inside/outside/touching/partial)
+- canvas_transform.rs: 8 tests (w2s identity/pan/zoom/off-center, round-trip, visible rect identity/zoom2, apply_rect dimensions)
+- canvas.rs: 5 tests (zoom anchors cursor, clamp min/max, is_visible_world cases, push_quad transforms rect)
+- All 44 tests pass (17 new + 27 existing), `cargo clippy --workspace -- -D warnings` clean

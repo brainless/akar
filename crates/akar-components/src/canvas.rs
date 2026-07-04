@@ -167,3 +167,63 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
 pub fn is_visible_world(viewport: Rect, target: Rect) -> bool {
     viewport.intersects(target)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec2;
+
+    const CANVAS: [f32; 4] = [0.0, 0.0, 800.0, 600.0];
+
+    #[test]
+    fn zoom_at_point_anchors_cursor() {
+        let mut state = CanvasState::new();
+        let cursor = Vec2::new(500.0, 300.0);
+        let canvas_center = Vec2::new(400.0, 300.0);
+        let world_before = (cursor - canvas_center) / state.zoom + state.pan;
+        state.zoom_at_point(cursor, CANVAS, 2.0, 0.1, 5.0);
+        let screen_after = (world_before - state.pan) * state.zoom + canvas_center;
+        assert!((screen_after - cursor).length() < 0.001, "got {screen_after}");
+    }
+
+    #[test]
+    fn zoom_clamps_at_min() {
+        let mut state = CanvasState { pan: Vec2::ZERO, zoom: 0.15, is_panning: false };
+        state.zoom_at_point(Vec2::new(400.0, 300.0), CANVAS, 0.1, 0.1, 5.0);
+        assert!(state.zoom >= 0.1);
+    }
+
+    #[test]
+    fn zoom_clamps_at_max() {
+        let mut state = CanvasState { pan: Vec2::ZERO, zoom: 4.9, is_panning: false };
+        state.zoom_at_point(Vec2::new(400.0, 300.0), CANVAS, 10.0, 0.1, 5.0);
+        assert!(state.zoom <= 5.0);
+    }
+
+    #[test]
+    fn is_visible_world_cases() {
+        let viewport = Rect { min: Vec2::new(-100.0, -100.0), max: Vec2::new(100.0, 100.0) };
+        let inside   = Rect { min: Vec2::new(-50.0, -50.0),   max: Vec2::new(50.0, 50.0) };
+        let outside  = Rect { min: Vec2::new(200.0, 200.0),   max: Vec2::new(300.0, 300.0) };
+        let touching = Rect { min: Vec2::new(100.0, -50.0),   max: Vec2::new(200.0, 50.0) };
+        let partial  = Rect { min: Vec2::new(50.0, 50.0),     max: Vec2::new(150.0, 150.0) };
+        assert!(is_visible_world(viewport, inside));
+        assert!(!is_visible_world(viewport, outside));
+        assert!(is_visible_world(viewport, touching));
+        assert!(is_visible_world(viewport, partial));
+    }
+
+    #[test]
+    fn push_quad_transforms_rect() {
+        let w2s = akar_layout::make_world_to_screen(Vec2::ZERO, 2.0, CANVAS);
+        let mut painter = CanvasPainter { buffer: Vec::new(), world_to_screen: w2s };
+        let world_rect = Rect { min: Vec2::new(-5.0, -5.0), max: Vec2::new(5.0, 5.0) };
+        painter.push_quad(world_rect, 0xFF0000FF, 0x00000000, 0.0, [0.0; 4], 0.0);
+        assert_eq!(painter.buffer.len(), 1);
+        let [x, y, w, h] = painter.buffer[0].rect;
+        assert!((x - 390.0).abs() < 0.001, "x={x}");
+        assert!((y - 290.0).abs() < 0.001, "y={y}");
+        assert!((w - 20.0).abs() < 0.001,  "w={w}");
+        assert!((h - 20.0).abs() < 0.001,  "h={h}");
+    }
+}

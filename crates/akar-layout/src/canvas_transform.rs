@@ -54,3 +54,77 @@ pub fn compute_visible_world_rect(pan: Vec2, zoom: f32, canvas_rect: [f32; 4]) -
         max: s2w.apply(br),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use glam::Vec2;
+
+    const CANVAS: [f32; 4] = [0.0, 0.0, 800.0, 600.0];
+    const CENTER: Vec2 = Vec2::new(400.0, 300.0);
+
+    #[test]
+    fn world_to_screen_identity() {
+        let t = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+        let s = t.apply(Vec2::ZERO);
+        assert!((s - CENTER).length() < 0.001, "got {s}");
+    }
+
+    #[test]
+    fn world_to_screen_with_pan() {
+        let t = make_world_to_screen(Vec2::new(100.0, 0.0), 1.0, CANVAS);
+        let s = t.apply(Vec2::new(100.0, 0.0));
+        assert!((s - CENTER).length() < 0.001, "got {s}");
+    }
+
+    #[test]
+    fn world_to_screen_with_zoom() {
+        let t = make_world_to_screen(Vec2::ZERO, 2.0, CANVAS);
+        let s = t.apply(Vec2::new(1.0, 0.0));
+        assert!((s - Vec2::new(402.0, 300.0)).length() < 0.001, "got {s}");
+    }
+
+    #[test]
+    fn world_to_screen_off_center_canvas() {
+        let canvas = [200.0, 0.0, 600.0, 600.0];
+        let expected_center = Vec2::new(500.0, 300.0);
+        let t = make_world_to_screen(Vec2::ZERO, 1.0, canvas);
+        let s = t.apply(Vec2::ZERO);
+        assert!((s - expected_center).length() < 0.001, "got {s}");
+    }
+
+    #[test]
+    fn round_trip() {
+        let canvas = [50.0, 100.0, 700.0, 500.0];
+        let pan = Vec2::new(123.0, -45.0);
+        let zoom = 1.7;
+        let world = Vec2::new(200.0, -80.0);
+        let w2s = make_world_to_screen(pan, zoom, canvas);
+        let s2w = make_screen_to_world(pan, zoom, canvas);
+        let back = s2w.apply(w2s.apply(world));
+        assert!((back - world).length() < 0.001, "round-trip error: {back}");
+    }
+
+    #[test]
+    fn visible_world_rect_identity() {
+        let v = compute_visible_world_rect(Vec2::ZERO, 1.0, CANVAS);
+        assert!((v.min - Vec2::new(-400.0, -300.0)).length() < 0.001);
+        assert!((v.max - Vec2::new(400.0, 300.0)).length() < 0.001);
+    }
+
+    #[test]
+    fn visible_world_rect_zoom2() {
+        let v = compute_visible_world_rect(Vec2::ZERO, 2.0, CANVAS);
+        assert!((v.min - Vec2::new(-200.0, -150.0)).length() < 0.001);
+        assert!((v.max - Vec2::new(200.0, 150.0)).length() < 0.001);
+    }
+
+    #[test]
+    fn apply_rect_dimensions() {
+        let t = make_world_to_screen(Vec2::ZERO, 2.0, CANVAS);
+        let world_rect = crate::Rect { min: Vec2::new(-5.0, -5.0), max: Vec2::new(5.0, 5.0) };
+        let [_x, _y, w, h] = t.apply_rect(world_rect);
+        assert!((w - 20.0).abs() < 0.001);
+        assert!((h - 20.0).abs() < 0.001);
+    }
+}
