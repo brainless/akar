@@ -6,14 +6,7 @@ akar is in **pre-alpha / implementation phase**. Epic 002 (core renderer and dra
 
 ## Local Dependencies
 
-All dependencies and reference projects are cloned locally under `~/Projects/`. Coding agents and contributors should read these local sources directly rather than relying on crates.io docs or GitHub browsing — they are the authoritative source for internals and undocumented behavior.
-
-### Active path dependencies
-
-| Crate | Local path | Role in akar |
-|---|---|---|
-| **glyphon** | `~/Projects/glyphon` | GPU text rendering via cosmic-text + wgpu. akar's text pipeline. |
-| **glam** | `~/Projects/glam-rs` | Math (Vec2, Vec4, Mat4). Used in geometry and layout. |
+All crate dependencies come from crates.io. The projects below are cloned locally under `~/Projects/` for design research and behavioral reference — coding agents and contributors should read these local sources directly rather than relying on crates.io docs or GitHub browsing, as they are the authoritative source for internals and undocumented behavior.
 
 ### Reference-only local checkouts
 
@@ -21,6 +14,8 @@ These are NOT path dependencies but are cloned locally for design research and b
 
 | Project | Local path | What we learn from it |
 |---|---|---|
+| **glyphon** | `~/Projects/glyphon` | GPU text rendering via cosmic-text + wgpu. akar's text pipeline. Read `text_render.rs`, `text_atlas.rs` first. |
+| **glam** | `~/Projects/glam-rs` | Math types (Vec2, Vec4, Mat4). Reference for geometry and layout internals. |
 | **wgpu** | `~/Projects/wgpu` | GPU pipeline, render passes, buffer management. Source of truth for wgpu 29 internals. |
 | **sugacode** | `~/Projects/sugacode` | Author's own wgpu + glyphon app. The direct inspiration for akar; reference for renderer setup, TextAreaData pattern, UIManager pattern, scroll containers, and drawer. Read `src/renderer.rs` and `src/ui/` first. |
 | **xilem** | `~/Projects/xilem` | Linebender's Rust reactive UI (Masonry + vello). Reference for retained-mode architecture, widget lifecycle, and accessibility model — things akar deliberately defers. |
