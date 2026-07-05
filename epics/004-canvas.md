@@ -1,6 +1,6 @@
 # Epic 004: Canvas
 
-**Status:** Planned
+**Status:** Done
 **Goal:** Add an infinite-pan / zoom canvas surface as a first-class component. A `Canvas` occupies a taffy leaf node — the layout system allocates it a pixel rect like any other component. Inside that rect the developer controls a world coordinate system (pan offset + zoom). The public API is `canvas_begin` / `canvas_end`, a scoped painter (`CanvasPainter`) that enforces world-space drawing, and a pure `is_visible_world` culling helper. Grid rendering and C ABI bindings are deferred.
 
 **Prerequisite:** Epic 003 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
