@@ -240,6 +240,8 @@ pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
 
 **Acceptance criteria:** `cargo build -p akar-c-api` succeeds. `akar.h` exists at workspace root and passes the checklist above. Header is committed.
 
+**Review note (2026-07-05):** `akar.h` generated (70 lines). All checklist items verified present: AkarCtx, AkarRect, AkarButtonResult, all layout/input/frame/mock/button functions. Include guard correct.
+
 ---
 
 ### Task 4: Rust Integration Tests
