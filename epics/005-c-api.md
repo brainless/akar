@@ -338,6 +338,8 @@ fn input_feed_does_not_panic() {
 
 **Acceptance criteria:** `cargo test -p akar-c-api` passes all 5 tests. `cargo clippy -p akar-c-api -- -D warnings` passes clean.
 
+**Review note (2026-07-05):** All 5 tests pass. Added `"rlib"` to `crate-type` in Cargo.toml — required for integration tests to import the crate (cdylib/staticlib alone don't produce an rlib). Tests match epic spec exactly.
+
 ---
 
 ## Acceptance Criteria for Epic 005
