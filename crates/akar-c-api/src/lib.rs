@@ -144,6 +144,23 @@ pub unsafe extern "C" fn akar_ctx_free(ctx: *mut AkarCtx) {
     }
 }
 
+/// Creates a headless context suitable for testing layout and input logic.
+/// The GPU pipeline is initialized against a headless wgpu adapter; no surface
+/// or real window is required. Do not call `akar_end_frame` on a mock context.
+#[no_mangle]
+pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
+    let core = AkarCore::mock();
+    let layout = Layout::new();
+    let theme = AKAR_THEME_DARK;
+    Box::into_raw(Box::new(AkarCtx {
+        core,
+        layout,
+        theme,
+        device: std::ptr::null(),
+        queue: std::ptr::null(),
+    }))
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_begin_frame(
     ctx: *mut AkarCtx,

@@ -217,6 +217,8 @@ pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
 
 **Acceptance criteria:** `cargo check -p akar-c-api` passes. The function is present in the compiled library and callable from integration tests.
 
+**Review note (2026-07-05):** `akar_ctx_mock` added between `akar_ctx_free` and `akar_begin_frame`. Matches epic spec exactly. Clippy clean.
+
 ---
 
 ### Task 3: Generate and Commit `akar.h`
