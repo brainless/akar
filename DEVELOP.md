@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / implementation phase**. Epic 002 (core renderer and draw list) is the active epic. Epic 001 (exploration and architecture) is complete. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / implementation phase**. Epic 005 (C ABI MVP) is complete. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 
