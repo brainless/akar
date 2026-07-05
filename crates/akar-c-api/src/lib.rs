@@ -202,6 +202,106 @@ pub unsafe extern "C" fn akar_push_char(ctx: *mut AkarCtx, codepoint: u32) {
 #[no_mangle]
 pub unsafe extern "C" fn akar_input_end(_ctx: *mut AkarCtx) {}
 
+#[repr(C)]
+pub struct AkarRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_new_leaf(ctx: *mut AkarCtx, flex_grow: f32) -> u64 {
+    use akar_layout::Style;
+    let ctx = unsafe { &mut *ctx };
+    let style = Style {
+        flex_grow,
+        flex_shrink: 1.0,
+        ..Default::default()
+    };
+    ctx.layout.new_leaf(style).into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_new_fixed_leaf(ctx: *mut AkarCtx, w: f32, h: f32) -> u64 {
+    use akar_layout::{Style, Size, Dimension, length};
+    let ctx = unsafe { &mut *ctx };
+    let style = Style {
+        size: Size {
+            width:  if w > 0.0 { length(w) } else { Dimension::auto() },
+            height: if h > 0.0 { length(h) } else { Dimension::auto() },
+        },
+        flex_shrink: 0.0,
+        ..Default::default()
+    };
+    ctx.layout.new_leaf(style).into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_new_flex_row(ctx: *mut AkarCtx) -> u64 {
+    use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
+    let ctx = unsafe { &mut *ctx };
+    let style = Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Row,
+        size: Size {
+            width: Dimension::percent(1.0),
+            height: Dimension::percent(1.0),
+        },
+        ..Default::default()
+    };
+    ctx.layout.new_with_children(style, &[]).into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_new_flex_col(ctx: *mut AkarCtx) -> u64 {
+    use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
+    let ctx = unsafe { &mut *ctx };
+    let style = Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Column,
+        size: Size {
+            width: Dimension::percent(1.0),
+            height: Dimension::percent(1.0),
+        },
+        ..Default::default()
+    };
+    ctx.layout.new_with_children(style, &[]).into()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_add_child(ctx: *mut AkarCtx, parent: u64, child: u64) {
+    let ctx = unsafe { &mut *ctx };
+    let parent_node: akar_layout::NodeId = parent.into();
+    let child_node:  akar_layout::NodeId = child.into();
+    ctx.layout.add_child(parent_node, child_node);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_layout_compute(
+    ctx: *mut AkarCtx,
+    root: u64,
+    width: f32,
+    height: f32,
+) {
+    use akar_layout::Size;
+    let ctx = unsafe { &mut *ctx };
+    let root_node: akar_layout::NodeId = root.into();
+    ctx.layout.compute(
+        root_node,
+        (Some(width), Some(height)),
+        |_, _, _, _, _| Size::ZERO,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_layout_rect(ctx: *mut AkarCtx, node: u64) -> AkarRect {
+    let ctx = unsafe { &mut *ctx };
+    let node_id: akar_layout::NodeId = node.into();
+    let [x, y, w, h] = ctx.layout.rect(node_id);
+    AkarRect { x, y, w, h }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_button(
     ctx: *mut AkarCtx,

@@ -185,6 +185,8 @@ include = ["AkarCtx", "AkarButtonResult", "AkarRect"]
 
 **Acceptance criteria:** `cargo check -p akar-c-api` and `cargo clippy -p akar-c-api -- -D warnings` both pass clean.
 
+**Review note (2026-07-05):** All 8 functions and `AkarRect` added. Flex containers use `new_with_children(style, &[])` per review fix. Clippy clean. Unused `Size`/`Dimension` imports from `akar_new_leaf` were removed by agent (clippy caught it).
+
 ---
 
 ### Task 2: `akar_ctx_mock`
