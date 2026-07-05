@@ -1,6 +1,6 @@
 # Epic 005: C ABI MVP
 
-**Status:** Planned
+**Status:** Done
 **Goal:** Make `akar-c-api` minimally complete: fill the layout C API gap, generate a valid `akar.h`, and prove the surface with an integration test. No wgpu-native integration, no full C demo, no canvas ABI. Defer those explicitly.
 
 **Prerequisite:** Epic 004 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
@@ -344,13 +344,13 @@ fn input_feed_does_not_panic() {
 
 ## Acceptance Criteria for Epic 005
 
-- [ ] `cargo clippy --workspace -- -D warnings` passes with zero errors.
-- [ ] `cargo test -p akar-c-api` passes all integration tests (no GPU rendering required).
-- [ ] `akar.h` is present at the workspace root and contains all exported types and function declarations.
-- [ ] Layout C API: `akar_new_leaf`, `akar_new_fixed_leaf`, `akar_new_flex_row`, `akar_new_flex_col`, `akar_add_child`, `akar_layout_compute`, `akar_layout_rect` are all present and correct in `akar.h`.
-- [ ] `akar_ctx_mock` is present in `akar.h` and returns a non-null pointer in tests.
-- [ ] `AkarRect` struct is in `akar.h` with fields `x`, `y`, `w`, `h`.
-- [ ] No changes to `akar-core`, `akar-layout`, `akar-components`, or `akar-winit`.
-- [ ] No canvas ABI (`akar_canvas_begin`, `akar_canvas_end`) — deferred per ADR-014.
-- [ ] No wgpu-native dependency added.
-- [ ] Full `examples/demo-c/` with real rendering is not required — deferred per ADR-014.
+- [x] `cargo clippy --workspace -- -D warnings` passes with zero errors.
+- [x] `cargo test -p akar-c-api` passes all integration tests (no GPU rendering required).
+- [x] `akar.h` is present at the workspace root and contains all exported types and function declarations.
+- [x] Layout C API: `akar_new_leaf`, `akar_new_fixed_leaf`, `akar_new_flex_row`, `akar_new_flex_col`, `akar_add_child`, `akar_layout_compute`, `akar_layout_rect` are all present and correct in `akar.h`.
+- [x] `akar_ctx_mock` is present in `akar.h` and returns a non-null pointer in tests.
+- [x] `AkarRect` struct is in `akar.h` with fields `x`, `y`, `w`, `h`.
+- [x] No changes to `akar-core`, `akar-layout`, `akar-components`, or `akar-winit`.
+- [x] No canvas ABI (`akar_canvas_begin`, `akar_canvas_end`) — deferred per ADR-014.
+- [x] No wgpu-native dependency added.
+- [x] Full `examples/demo-c/` with real rendering is not required — deferred per ADR-014.
