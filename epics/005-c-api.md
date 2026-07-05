@@ -53,6 +53,8 @@
 
 **Add to `crates/akar-c-api/src/lib.rs`:**
 
+> **Review fix:** Added `#[repr(C)]` to `AkarRect` (was missing — required for correct ABI layout).
+
 ```rust
 #[repr(C)]
 pub struct AkarRect {
@@ -95,6 +97,8 @@ pub unsafe extern "C" fn akar_new_fixed_leaf(ctx: *mut AkarCtx, w: f32, h: f32) 
 }
 
 /// Creates a flex-row container node (children laid out left-to-right).
+/// > **Review fix:** Uses `new_with_children(style, &[])` instead of `new_leaf` to match
+/// > existing Layout container pattern (see `two_column`, `three_column`).
 #[no_mangle]
 pub unsafe extern "C" fn akar_new_flex_row(ctx: *mut AkarCtx) -> u64 {
     use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
@@ -108,10 +112,12 @@ pub unsafe extern "C" fn akar_new_flex_row(ctx: *mut AkarCtx) -> u64 {
         },
         ..Default::default()
     };
-    ctx.layout.new_leaf(style).into()
+    ctx.layout.new_with_children(style, &[]).into()
 }
 
 /// Creates a flex-column container node (children laid out top-to-bottom).
+/// > **Review fix:** Uses `new_with_children(style, &[])` instead of `new_leaf` to match
+/// > existing Layout container pattern (see `two_column`, `three_column`).
 #[no_mangle]
 pub unsafe extern "C" fn akar_new_flex_col(ctx: *mut AkarCtx) -> u64 {
     use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
@@ -125,7 +131,7 @@ pub unsafe extern "C" fn akar_new_flex_col(ctx: *mut AkarCtx) -> u64 {
         },
         ..Default::default()
     };
-    ctx.layout.new_leaf(style).into()
+    ctx.layout.new_with_children(style, &[]).into()
 }
 
 /// Adds `child` as the last child of `parent`.
@@ -139,6 +145,9 @@ pub unsafe extern "C" fn akar_add_child(ctx: *mut AkarCtx, parent: u64, child: u
 
 /// Runs layout computation for the tree rooted at `root`.
 /// Call once per frame after setting up the tree, before calling component functions.
+/// > **Review fix:** The measure function returns `Size::ZERO` for all nodes. This means
+/// > text-containing elements will have zero intrinsic size. Acceptable for proving the
+/// > layout surface; text measurement will be added when the C API exposes text buffers.
 #[no_mangle]
 pub unsafe extern "C" fn akar_layout_compute(
     ctx: *mut AkarCtx,
