@@ -21,6 +21,10 @@ pub fn separator(
         corner_radii: [0.0; 4],
         border_width: 0.0,
         z: 0.0,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
         _pad: [0.0; 2],
     });
 }

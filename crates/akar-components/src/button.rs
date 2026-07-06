@@ -84,6 +84,10 @@ pub fn button(
         corner_radii: [theme.radius_field; 4],
         border_width: theme.border_width,
         z: 0.0,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
         _pad: [0.0; 2],
     });
 

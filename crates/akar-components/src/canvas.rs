@@ -94,6 +94,10 @@ impl CanvasPainter {
             border_width,
             corner_radii: scaled_radii,
             z,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
             _pad: [0.0; 2],
         });
     }

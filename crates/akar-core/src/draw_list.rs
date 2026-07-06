@@ -8,18 +8,21 @@ pub enum DrawCall {
 
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
-// Field order matches WGSL vec4 alignment: corner_radii must sit at offset 48
-// (16-byte aligned) so it follows three vec4 fields. border_width, z, and two
-// pad floats occupy the trailing 16 bytes.
 pub struct QuadCall {
-    pub rect: [f32; 4],         // offset 0
-    pub fill: [f32; 4],         // offset 16
-    pub border_color: [f32; 4], // offset 32
-    pub corner_radii: [f32; 4], // offset 48 — must stay here for WGSL vec4 alignment
-    pub border_width: f32,      // offset 64
-    pub z: f32,                 // offset 68
-    pub _pad: [f32; 2],         // offset 72 — keeps struct size at 80 (multiple of 16)
+    pub rect: [f32; 4],
+    pub fill: [f32; 4],
+    pub border_color: [f32; 4],
+    pub corner_radii: [f32; 4],
+    pub border_width: f32,
+    pub z: f32,
+    pub shadow_blur: f32,
+    pub shadow_spread: f32,
+    pub shadow_color: [f32; 4],
+    pub shadow_offset: [f32; 2],
+    pub _pad: [f32; 2],
 }
+
+const _: () = assert!(std::mem::size_of::<QuadCall>() == 112);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextCall {
@@ -91,6 +94,10 @@ impl DrawList {
         for r in &mut call.corner_radii {
             *r *= self.scale_factor;
         }
+        call.shadow_blur *= self.scale_factor;
+        call.shadow_spread *= self.scale_factor;
+        call.shadow_offset[0] *= self.scale_factor;
+        call.shadow_offset[1] *= self.scale_factor;
         if let Some(scissor) = self.active_scissor() {
             if !intersects(call.rect, scissor) {
                 return;
@@ -156,6 +163,10 @@ mod tests {
             corner_radii: [0.0; 4],
             border_width: 0.0,
             z: 0.0,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
             _pad: [0.0; 2],
         }
     }

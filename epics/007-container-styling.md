@@ -1,6 +1,6 @@
 # Epic 007: Container Styling
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Give `container` HTML/CSS-level visual capabilities: configurable fill, border, per-corner radii, alpha, and soft drop shadow — all driven by a new `BoxStyle` type. Add `Layout::set_padding` and `Layout::set_margin` so padding and margin can be adjusted after node creation. Expose the new surface in the C ABI.
 
 **Prerequisite:** Epic 006 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
@@ -282,6 +282,8 @@ QuadCall {
 Files to update: `button.rs`, `container.rs`, `separator.rs`, `canvas.rs` (`CanvasPainter::push_quad`).
 
 **Acceptance criteria:** `cargo test --workspace` passes. Visually: the demo looks identical to before (no shadow on existing quads).
+
+**Review:** Done. `QuadCall` expanded to 112 bytes with `shadow_blur`, `shadow_spread`, `shadow_color`, `shadow_offset`. Compile-time `size_of` assert added. `quad.wgsl` fully replaced with SDF shadow compositing in fragment shader; vertex shader expands quad for shadow region. `push_quad` scales shadow fields by `scale_factor`. All 4 construction sites (`button.rs`, `container.rs`, `separator.rs`, `canvas.rs`) zero the new fields. Clippy clean, 50 tests pass.
 
 ---
 
