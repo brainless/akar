@@ -21,6 +21,17 @@ typedef struct AkarButtonResult {
     bool pressed;
 } AkarButtonResult;
 
+typedef struct AkarBoxStyle {
+    uint32_t fill;
+    uint32_t border_color;
+    float border_width;
+    float corner_radii[4];
+    uint32_t shadow_color;
+    float shadow_offset[2];
+    float shadow_blur;
+    float shadow_spread;
+} AkarBoxStyle;
+
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
 void akar_ctx_free(struct AkarCtx *ctx);
@@ -72,5 +83,21 @@ void akar_label(struct AkarCtx *ctx,
                 const char *text,
                 int32_t text_len,
                 uint32_t color);
+
+void akar_container(struct AkarCtx *ctx, uint64_t node_id, struct AkarBoxStyle style);
+
+void akar_set_padding(struct AkarCtx *ctx,
+                      uint64_t node_id,
+                      float top,
+                      float right,
+                      float bottom,
+                      float left);
+
+void akar_set_margin(struct AkarCtx *ctx,
+                     uint64_t node_id,
+                     float top,
+                     float right,
+                     float bottom,
+                     float left);
 
 #endif  /* AKAR_H */

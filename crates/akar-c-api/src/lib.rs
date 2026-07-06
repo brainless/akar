@@ -392,3 +392,74 @@ pub unsafe extern "C" fn akar_label(
         &ctx.theme,
     );
 }
+
+#[repr(C)]
+pub struct AkarBoxStyle {
+    pub fill: u32,
+    pub border_color: u32,
+    pub border_width: f32,
+    pub corner_radii: [f32; 4],
+    pub shadow_color: u32,
+    pub shadow_offset: [f32; 2],
+    pub shadow_blur: f32,
+    pub shadow_spread: f32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_container(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    style: AkarBoxStyle,
+) {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+
+    let shadow = if (style.shadow_color & 0xFF) > 0 {
+        Some(akar_components::BoxShadow {
+            color: style.shadow_color,
+            offset: style.shadow_offset,
+            blur: style.shadow_blur,
+            spread: style.shadow_spread,
+        })
+    } else {
+        None
+    };
+
+    let box_style = akar_components::BoxStyle {
+        fill: style.fill,
+        border_color: style.border_color,
+        border_width: style.border_width,
+        corner_radii: style.corner_radii,
+        shadow,
+    };
+
+    akar_components::akar_container(&mut ctx.core, &ctx.layout, nid, &box_style);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_set_padding(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+) {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+    ctx.layout.set_padding(nid, top, right, bottom, left);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_set_margin(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    top: f32,
+    right: f32,
+    bottom: f32,
+    left: f32,
+) {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+    ctx.layout.set_margin(nid, top, right, bottom, left);
+}

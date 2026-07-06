@@ -699,6 +699,8 @@ include = ["AkarCtx", "AkarButtonResult", "AkarRect", "AkarBoxStyle"]
 
 **Acceptance criteria:** `cargo check -p akar-c-api` and `cargo clippy -p akar-c-api -- -D warnings` pass clean. Updated `akar.h` committed.
 
+**Review:** Done. `AkarBoxStyle` repr(C) struct added with fill/border/radii/shadow fields. `akar_container` converts to `BoxStyle` and delegates. `akar_set_padding` and `akar_set_margin` delegate to `Layout`. `cbindgen.toml` updated, `akar.h` regenerated with all 4 new symbols. Clippy clean, 53 tests pass.
+
 ---
 
 ### Task 6: Update `examples/demo-rust` and Demonstrate Shadow
