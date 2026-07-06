@@ -534,6 +534,7 @@ dependencies = [
  "akar-layout",
  "akar-winit",
  "pollster",
+ "taffy",
  "wgpu",
  "winit",
 ]

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use akar_components::{akar_button, akar_container, akar_separator, AKAR_THEME_DARK, ButtonVariant};
+use akar_components::{akar_button, akar_container, akar_label, akar_separator, AKAR_THEME_DARK, ButtonVariant};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, length};
+use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, Display, FlexDirection, Dimension, length};
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -24,6 +24,10 @@ struct AppState {
     page: akar_layout::PageLayout,
     two_col: akar_layout::TwoColumnLayout,
     btn_node: akar_layout::NodeId,
+    strip: akar_layout::NodeId,
+    btn_zoom_in: akar_layout::NodeId,
+    btn_zoom_out: akar_layout::NodeId,
+    hint_label: akar_layout::NodeId,
 }
 
 fn main() {
@@ -92,6 +96,62 @@ impl ApplicationHandler for App {
         });
         layout.add_child(two_col.right, btn_node);
 
+        layout.set_style(two_col.right, Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            flex_grow: 1.0,
+            ..Default::default()
+        });
+
+        let strip = layout.new_leaf(Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(48.0),
+            },
+            gap: taffy::prelude::Size {
+                width: length(8.0),
+                height: length(0.0),
+            },
+            padding: taffy::prelude::Rect {
+                left: length(8.0),
+                right: length(8.0),
+                top: length(4.0),
+                bottom: length(4.0),
+            },
+            ..Default::default()
+        });
+
+        let btn_zoom_in = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(80.0),
+                height: length(36.0),
+            },
+            ..Default::default()
+        });
+
+        let btn_zoom_out = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(80.0),
+                height: length(36.0),
+            },
+            ..Default::default()
+        });
+
+        let hint_label = layout.new_leaf(Style {
+            flex_grow: 1.0,
+            ..Default::default()
+        });
+
+        layout.add_child(strip, btn_zoom_in);
+        layout.add_child(strip, btn_zoom_out);
+        layout.add_child(strip, hint_label);
+        layout.add_child(two_col.right, strip);
+
         self.state = Some(AppState {
             window,
             device,
@@ -103,6 +163,10 @@ impl ApplicationHandler for App {
             page,
             two_col,
             btn_node,
+            strip,
+            btn_zoom_in,
+            btn_zoom_out,
+            hint_label,
         });
     }
 
@@ -157,6 +221,34 @@ impl ApplicationHandler for App {
                 if result.clicked {
                     println!("clicked!");
                 }
+
+                akar_container(&mut state.core, &state.layout, state.strip, AKAR_THEME_DARK.base_300, &AKAR_THEME_DARK);
+
+                let _zoom_in_result = akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.btn_zoom_in,
+                    "Zoom In",
+                    ButtonVariant::Solid,
+                    &AKAR_THEME_DARK,
+                );
+                let _zoom_out_result = akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.btn_zoom_out,
+                    "Zoom Out",
+                    ButtonVariant::Outline,
+                    &AKAR_THEME_DARK,
+                );
+
+                akar_label(
+                    &mut state.core,
+                    &state.layout,
+                    state.hint_label,
+                    "Pan: middle-mouse drag  |  Zoom: scroll",
+                    AKAR_THEME_DARK.base_content,
+                    &AKAR_THEME_DARK,
+                );
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,

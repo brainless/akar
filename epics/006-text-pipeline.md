@@ -317,6 +317,8 @@ label(&mut core, &layout, hint_label,
 - The hint label text renders to the right of the buttons.
 - No panics on resize, hover, or rapid clicking.
 
+**Review:** Done. Added controls strip (48px flex-row) to right panel with "Zoom In" (solid) + "Zoom Out" (outline) buttons and hint label. Right panel converted to flex-column. `taffy` dep added to demo Cargo.toml for gap/padding types. Clippy clean, check passes. Canvas integration deferred — zoom buttons are wired but non-functional (no canvas in demo yet).
+
 ---
 
 ## Acceptance Criteria for Epic 006
