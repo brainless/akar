@@ -87,9 +87,8 @@ pub fn button(
         _pad: [0.0; 2],
     });
 
-    // TODO: cache buffer per node_id
     let buffer_id = core.text_pipeline.set_text(
-        None,
+        Some(node_id.into()),
         label,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2]),

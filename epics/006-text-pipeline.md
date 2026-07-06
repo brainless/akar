@@ -84,6 +84,8 @@ let buffer_id = core.text_pipeline.set_text(
 
 **Acceptance criteria:** `cargo test -p akar-components` passes. The button test in `button.rs` continues to pass. Running `demo-rust` for multiple frames shows stable buffer count (no growth in `text_pipeline.buffers.len()`).
 
+**Review:** Done. `set_text(None, ...)` → `set_text(Some(node_id.into()), ...)`, TODO removed. Clippy clean, all 10 tests pass.
+
 ---
 
 ### Task 2: `label` Component
