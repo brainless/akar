@@ -362,3 +362,33 @@ pub unsafe extern "C" fn akar_button(
         pressed: result.pressed,
     }
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_label(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    text_len: i32,
+    color: u32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    if text.is_null() || text_len <= 0 {
+        return;
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(text as *const u8, text_len as usize) };
+    let Ok(text_str) = std::str::from_utf8(bytes) else {
+        return;
+    };
+
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_label(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        color,
+        &ctx.theme,
+    );
+}

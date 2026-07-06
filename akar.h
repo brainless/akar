@@ -67,4 +67,10 @@ struct AkarButtonResult akar_button(struct AkarCtx *ctx,
                                     const char *label,
                                     int32_t label_len);
 
+void akar_label(struct AkarCtx *ctx,
+                uint64_t node_id,
+                const char *text,
+                int32_t text_len,
+                uint32_t color);
+
 #endif  /* AKAR_H */

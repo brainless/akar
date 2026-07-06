@@ -220,6 +220,8 @@ pub unsafe extern "C" fn akar_label(
 
 **Acceptance criteria:** `cargo check -p akar-c-api` passes. `cargo build -p akar-c-api` regenerates `akar.h` with `akar_label` present.
 
+**Review:** Done. `akar_label` added with text+text_len+color params, null-safe, mirrors `akar_button` pattern. Clippy clean, build succeeds.
+
 ---
 
 ### Task 4: Update `examples/demo-rust` — Show Labels
