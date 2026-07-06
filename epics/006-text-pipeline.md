@@ -1,6 +1,6 @@
 # Epic 006: Text Pipeline
 
-**Status:** Planned
+**Status:** Done
 **Goal:** Fix the text buffer memory leak, add a standalone `label` component, expose text via the C ABI, and update the Rust demo to show real labeled UI. The GPU text pipeline (`TextPipeline`, `DrawList::push_text`, `AkarCore::end_frame` render path) is already complete — this epic wires it correctly into the component layer.
 
 **Prerequisite:** Epic 005 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
@@ -323,12 +323,12 @@ label(&mut core, &layout, hint_label,
 
 ## Acceptance Criteria for Epic 006
 
-- [ ] `cargo clippy --workspace -- -D warnings` passes with zero errors.
-- [ ] `cargo test --workspace` passes. New tests: 1 in label component (zero-area guard).
-- [ ] `button.rs` no longer has the `// TODO: cache buffer per node_id` comment; `set_text` is called with `Some(node_id.into())`.
-- [ ] `label` component is exported from `akar-components` and documented in `lib.rs`.
-- [ ] `akar_label` is present in `akar.h` after `cargo build -p akar-c-api`.
-- [ ] `demo-rust` shows visible text on buttons and a visible hint label.
-- [ ] No text centering or font loading — deferred per ADR-017.
-- [ ] No `CanvasPainter::push_text` — deferred per ADR-017.
-- [ ] No text input component — deferred per ADR-017.
+- [x] `cargo clippy --workspace -- -D warnings` passes with zero errors.
+- [x] `cargo test --workspace` passes. New tests: 1 in label component (zero-area guard).
+- [x] `button.rs` no longer has the `// TODO: cache buffer per node_id` comment; `set_text` is called with `Some(node_id.into())`.
+- [x] `label` component is exported from `akar-components` and documented in `lib.rs`.
+- [x] `akar_label` is present in `akar.h` after `cargo build -p akar-c-api`.
+- [x] `demo-rust` shows visible text on buttons and a visible hint label.
+- [x] No text centering or font loading — deferred per ADR-017.
+- [x] No `CanvasPainter::push_text` — deferred per ADR-017.
+- [x] No text input component — deferred per ADR-017.
