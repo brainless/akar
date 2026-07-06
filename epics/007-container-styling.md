@@ -1,6 +1,6 @@
 # Epic 007: Container Styling
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Give `container` HTML/CSS-level visual capabilities: configurable fill, border, per-corner radii, alpha, and soft drop shadow — all driven by a new `BoxStyle` type. Add `Layout::set_padding` and `Layout::set_margin` so padding and margin can be adjusted after node creation. Expose the new surface in the C ABI.
 
 **Prerequisite:** Epic 006 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean before Task 1 begins.
@@ -741,20 +741,22 @@ use akar_components::{BoxStyle, /* existing imports... */};
 - Buttons retain their existing appearance and behavior.
 - No panics on resize or interaction.
 
+**Review:** Done. Control strip changed from `BoxStyle::panel` to `BoxStyle::card`, demonstrating the full shadow pipeline. Header/sidebar use `panel` (border, no shadow), main uses `surface`, strip uses `card` (border + shadow). Clippy clean, 53 tests pass.
+
 ---
 
 ## Acceptance Criteria for Epic 007
 
-- [ ] `cargo clippy --workspace -- -D warnings` passes with zero errors.
-- [ ] `cargo test --workspace` passes. New tests: 1 in `container` (shadow fields propagate), 2 in `akar-layout` (padding and margin affect child layout).
-- [ ] `QuadCall` is 112 bytes; `std::mem::size_of::<QuadCall>() == 112` (add a compile-time assert in `draw_list.rs`).
-- [ ] WGSL struct byte layout matches `QuadCall` exactly — verified by correct visual output.
-- [ ] Quads with `shadow_color.a == 0` render identically to before (fast path or zero shadow alpha).
-- [ ] `BoxStyle::card` renders a visible soft drop shadow in `demo-rust`.
-- [ ] `BoxStyle::panel` renders a border without shadow in `demo-rust`.
-- [ ] `BoxStyle::flat(0)` / transparent fill → no quad pushed.
-- [ ] `Layout::set_padding` and `Layout::set_margin` are exported from `akar-layout`.
-- [ ] `AkarBoxStyle`, `akar_container`, `akar_set_padding`, `akar_set_margin` are in `akar.h`.
-- [ ] No inset shadow, no multiple shadows — deferred per ADR-021.
-- [ ] `CanvasPainter::push_quad` zeros all shadow fields — no world-space shadow in Epic 007.
-- [ ] No changes to `akar-winit`.
+- [x] `cargo clippy --workspace -- -D warnings` passes with zero errors.
+- [x] `cargo test --workspace` passes. New tests: 1 in `container` (shadow fields propagate), 2 in `akar-layout` (padding and margin affect child layout).
+- [x] `QuadCall` is 112 bytes; `std::mem::size_of::<QuadCall>() == 112` (compile-time assert in `draw_list.rs`).
+- [x] WGSL struct byte layout matches `QuadCall` exactly — verified by correct visual output.
+- [x] Quads with `shadow_color.a == 0` render identically to before (fast path or zero shadow alpha).
+- [x] `BoxStyle::card` renders a visible soft drop shadow in `demo-rust`.
+- [x] `BoxStyle::panel` renders a border without shadow in `demo-rust`.
+- [x] `BoxStyle::flat(0)` / transparent fill -> no quad pushed.
+- [x] `Layout::set_padding` and `Layout::set_margin` are exported from `akar-layout`.
+- [x] `AkarBoxStyle`, `akar_container`, `akar_set_padding`, `akar_set_margin` are in `akar.h`.
+- [x] No inset shadow, no multiple shadows — deferred per ADR-021.
+- [x] `CanvasPainter::push_quad` zeros all shadow fields — no world-space shadow in Epic 007.
+- [x] No changes to `akar-winit`.

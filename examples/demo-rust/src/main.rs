@@ -222,7 +222,7 @@ impl ApplicationHandler for App {
                     println!("clicked!");
                 }
 
-                akar_container(&mut state.core, &state.layout, state.strip, &BoxStyle::panel(&AKAR_THEME_DARK));
+                akar_container(&mut state.core, &state.layout, state.strip, &BoxStyle::card(&AKAR_THEME_DARK));
 
                 let _zoom_in_result = akar_button(
                     &mut state.core,
