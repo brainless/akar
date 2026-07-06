@@ -603,6 +603,8 @@ fn set_margin_pushes_node() {
 
 **Acceptance criteria:** `cargo test -p akar-layout` passes including the two new tests.
 
+**Review:** Done. `set_padding` and `set_margin` added to `Layout` impl, using `taffy::geometry::Rect` explicitly to avoid shadowing the world-space `Rect`. Two tests added: `set_padding_affects_child_position` and `set_margin_pushes_node`. Clippy clean, 53 tests pass.
+
 ---
 
 ### Task 5: C ABI — `AkarBoxStyle`, `akar_container`, `akar_set_padding`, `akar_set_margin`

@@ -76,6 +76,28 @@ impl Layout {
         self.tree.set_node_context(node, ctx).unwrap();
     }
 
+    pub fn set_padding(&mut self, node: NodeId, top: f32, right: f32, bottom: f32, left: f32) {
+        let mut style = self.tree.style(node).unwrap().clone();
+        style.padding = taffy::geometry::Rect {
+            top: length(top),
+            right: length(right),
+            bottom: length(bottom),
+            left: length(left),
+        };
+        self.tree.set_style(node, style).unwrap();
+    }
+
+    pub fn set_margin(&mut self, node: NodeId, top: f32, right: f32, bottom: f32, left: f32) {
+        let mut style = self.tree.style(node).unwrap().clone();
+        style.margin = taffy::geometry::Rect {
+            top: length(top),
+            right: length(right),
+            bottom: length(bottom),
+            left: length(left),
+        };
+        self.tree.set_style(node, style).unwrap();
+    }
+
     pub fn compute<F>(&mut self, root: NodeId, available: (Option<f32>, Option<f32>), measure_fn: F)
     where
         F: FnMut(
@@ -515,5 +537,50 @@ mod tests {
         let main_r = layout.rect(page.main);
         assert_eq!(main_r[2], 800.0, "main width should be 800.0");
         assert_eq!(main_r[3], 600.0, "main height should be 600.0");
+    }
+
+    #[test]
+    fn set_padding_affects_child_position() {
+        let mut layout = Layout::new();
+        let child = layout.new_leaf(Style {
+            size: Size { width: length(50.0), height: length(50.0) },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(
+            Style {
+                display: Display::Flex,
+                size: Size { width: length(200.0), height: length(200.0) },
+                ..Default::default()
+            },
+            &[child],
+        );
+        layout.set_padding(root, 20.0, 20.0, 20.0, 20.0);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect(child);
+        assert!((r[0] - 20.0).abs() < 1.0, "child.x = {}", r[0]);
+        assert!((r[1] - 20.0).abs() < 1.0, "child.y = {}", r[1]);
+    }
+
+    #[test]
+    fn set_margin_pushes_node() {
+        let mut layout = Layout::new();
+        let child = layout.new_leaf(Style {
+            size: Size { width: length(50.0), height: length(50.0) },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(
+            Style {
+                display: Display::Flex,
+                ..Default::default()
+            },
+            &[child],
+        );
+        layout.set_margin(child, 10.0, 0.0, 0.0, 15.0);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect(child);
+        assert!((r[0] - 15.0).abs() < 1.0, "child.x = {}", r[0]);
+        assert!((r[1] - 10.0).abs() < 1.0, "child.y = {}", r[1]);
     }
 }
