@@ -12,6 +12,9 @@ pub use separator::separator as akar_separator;
 pub mod container;
 pub use container::container as akar_container;
 
+pub mod box_style;
+pub use box_style::{BoxShadow, BoxStyle};
+
 pub mod label;
 pub use label::label as akar_label;
 

@@ -380,6 +380,8 @@ pub use box_style::{BoxShadow, BoxStyle};
 
 **Acceptance criteria:** `cargo check -p akar-components` passes.
 
+**Review:** Done. `box_style.rs` created with `BoxShadow`, `BoxStyle`, and presets `flat`, `surface`, `panel`, `card`. Re-exported from `lib.rs`. Clippy clean, 50 tests pass.
+
 ---
 
 ### Task 3: Upgrade `container` to Use `BoxStyle`
