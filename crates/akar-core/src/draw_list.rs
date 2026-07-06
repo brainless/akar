@@ -124,6 +124,14 @@ impl DrawList {
     pub fn text_calls(&self) -> &[DrawCall] {
         &self.calls
     }
+
+    pub fn len(&self) -> usize {
+        self.calls.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.calls.is_empty()
+    }
 }
 
 impl Default for DrawList {

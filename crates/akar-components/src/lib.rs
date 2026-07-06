@@ -12,6 +12,9 @@ pub use separator::separator as akar_separator;
 pub mod container;
 pub use container::container as akar_container;
 
+pub mod label;
+pub use label::label as akar_label;
+
 pub mod canvas;
 pub use canvas::{
     CanvasConfig, CanvasPainter, CanvasResponse, CanvasState, PanButton,

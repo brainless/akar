@@ -176,6 +176,8 @@ pub fn len(&self) -> usize {
 
 **Acceptance criteria:** `cargo test -p akar-components` passes including the new label test.
 
+**Review:** Done. `label.rs` created (quad-free, text-only), `DrawList::len()` + `is_empty()` added, `lib.rs` exports `akar_label`. Clippy clean, 11 component tests + 11 core tests pass.
+
 ---
 
 ### Task 3: C ABI — `akar_label`
