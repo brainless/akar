@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / implementation phase**. Epic 006 (Text Pipeline) is complete. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / implementation phase**. Epic 007 (Container Styling) is complete. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 
