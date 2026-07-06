@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use akar_components::{akar_button, akar_container, akar_label, akar_separator, AKAR_THEME_DARK, ButtonVariant};
+use akar_components::{akar_button, akar_container, akar_label, akar_separator, AKAR_THEME_DARK, ButtonVariant, BoxStyle};
 use akar_core::AkarCore;
 use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, Display, FlexDirection, Dimension, length};
 use akar_winit::process_window_event;
@@ -203,11 +203,11 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), 0x1e3a8aff, &AKAR_THEME_DARK); // dark blue
-                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), 0x14532dff, &AKAR_THEME_DARK); // dark green
-                akar_container(&mut state.core, &state.layout, state.page.main, AKAR_THEME_DARK.base_100, &AKAR_THEME_DARK);
-                akar_container(&mut state.core, &state.layout, state.two_col.left, 0x172554ff, &AKAR_THEME_DARK); // dark navy
-                akar_container(&mut state.core, &state.layout, state.two_col.right, 0x27272aff, &AKAR_THEME_DARK); // dark grey
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
+                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
+                akar_container(&mut state.core, &state.layout, state.page.main, &BoxStyle::surface(&AKAR_THEME_DARK));
+                akar_container(&mut state.core, &state.layout, state.two_col.left, &BoxStyle::flat(0x172554ff));
+                akar_container(&mut state.core, &state.layout, state.two_col.right, &BoxStyle::flat(0x27272aff));
                 akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
 
                 let result = akar_button(
@@ -222,7 +222,7 @@ impl ApplicationHandler for App {
                     println!("clicked!");
                 }
 
-                akar_container(&mut state.core, &state.layout, state.strip, AKAR_THEME_DARK.base_300, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.strip, &BoxStyle::panel(&AKAR_THEME_DARK));
 
                 let _zoom_in_result = akar_button(
                     &mut state.core,

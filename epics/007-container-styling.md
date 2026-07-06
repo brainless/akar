@@ -513,6 +513,8 @@ mod tests {
 
 **Acceptance criteria:** `cargo test -p akar-components` passes. The demo compiles (call sites updated in Task 5).
 
+**Review:** Done. `container` signature changed to `(style: &BoxStyle)`, shadow fields propagate to `QuadCall`. New test `shadow_fields_propagate_to_quad` added (4 container tests total). All call sites in `demo-rust` (6 sites) and `canvas-basic-rust` (1 site) migrated to `BoxStyle::panel`/`surface`/`flat`. Clippy clean, 51 tests pass.
+
 ---
 
 ### Task 4: `Layout::set_padding` and `Layout::set_margin`

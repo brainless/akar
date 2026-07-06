@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use akar_components::{akar_container, canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasState, AKAR_THEME_DARK};
+use akar_components::{akar_container, canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasState, AKAR_THEME_DARK, BoxStyle};
 use akar_core::AkarCore;
 use akar_layout::{Layout, PageConfig, Rect, Size};
 use akar_winit::process_window_event;
@@ -132,7 +132,7 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), 0x1e3a8aff, &AKAR_THEME_DARK);
+                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
 
                 let objects = [
                     DemoObject { bounds: Rect::from_xywh(-180.0, -80.0, 120.0, 60.0), fill: 0x3B82F6FF },
