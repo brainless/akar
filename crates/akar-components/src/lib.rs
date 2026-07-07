@@ -33,6 +33,9 @@ pub use scroll_area::{scroll_area_begin, scroll_area_end, ScrollAreaResponse};
 pub mod stat;
 pub use stat::stat as akar_stat;
 
+pub mod skeleton;
+pub use skeleton::{skeleton as akar_skeleton, SkeletonVariant};
+
 pub mod canvas;
 pub use canvas::{
     canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasPainter, CanvasResponse,

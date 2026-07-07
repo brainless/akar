@@ -27,6 +27,16 @@
 - Tests: zero-area, with description (1 quad + 3 text), without description (3 total)
 - 3 tests pass, clippy clean
 
+### Task 3 — Skeleton (Done)
+
+`crates/akar-components/src/skeleton.rs`:
+- `SkeletonVariant` enum: `Text`, `Card`, `Circle`
+- `skeleton()` pushes a single rounded rect quad with `theme.base_300` fill
+- Corner radii: Text → `radius_field/2`, Card → `radius_box`, Circle → `height/2`
+- No interaction, no return value
+- Tests: zero-area, text variant quad count + radius, circle radius
+- 3 tests pass, clippy clean
+
 ---
 
 ## Scope
