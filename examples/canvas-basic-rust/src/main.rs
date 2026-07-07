@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use akar_components::{akar_container, canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasState, AKAR_THEME_DARK, BoxStyle};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Rect, Size};
+use akar_layout::{Layout, PageConfig, WorldRect, Size};
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -14,7 +14,7 @@ use winit::{
 };
 
 struct DemoObject {
-    bounds: Rect,
+    bounds: WorldRect,
     fill: u32,
 }
 
@@ -135,11 +135,11 @@ impl ApplicationHandler for App {
                 akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
 
                 let objects = [
-                    DemoObject { bounds: Rect::from_xywh(-180.0, -80.0, 120.0, 60.0), fill: 0x3B82F6FF },
-                    DemoObject { bounds: Rect::from_xywh(80.0,  -80.0, 120.0, 60.0),  fill: 0x10B981FF },
-                    DemoObject { bounds: Rect::from_xywh(-60.0,  40.0, 120.0, 60.0),  fill: 0xF59E0BFF },
-                    DemoObject { bounds: Rect::from_xywh(-280.0, 60.0,  80.0, 80.0),  fill: 0xEF4444FF },
-                    DemoObject { bounds: Rect::from_xywh(200.0,  20.0, 100.0, 100.0), fill: 0x8B5CF6FF },
+                    DemoObject { bounds: WorldRect::from_xywh(-180.0, -80.0, 120.0, 60.0), fill: 0x3B82F6FF },
+                    DemoObject { bounds: WorldRect::from_xywh(80.0,  -80.0, 120.0, 60.0),  fill: 0x10B981FF },
+                    DemoObject { bounds: WorldRect::from_xywh(-60.0,  40.0, 120.0, 60.0),  fill: 0xF59E0BFF },
+                    DemoObject { bounds: WorldRect::from_xywh(-280.0, 60.0,  80.0, 80.0),  fill: 0xEF4444FF },
+                    DemoObject { bounds: WorldRect::from_xywh(200.0,  20.0, 100.0, 100.0), fill: 0x8B5CF6FF },
                 ];
 
                 let config = CanvasConfig::default();

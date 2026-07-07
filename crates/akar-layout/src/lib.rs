@@ -6,7 +6,7 @@ mod responsive;
 pub use responsive::responsive_columns;
 
 mod rect;
-pub use rect::Rect;
+pub use rect::WorldRect;
 
 mod canvas_transform;
 pub use canvas_transform::{
