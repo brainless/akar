@@ -28,6 +28,15 @@
 - 5 tests: zero size (0 calls), renders ≥2 quads + ≥4 total calls, scrim click closes, valid content node, scissor balanced
 - 59 total component tests, clippy clean
 
+### Task 3 — Toast component (Done)
+
+`crates/akar-components/src/toast.rs`:
+- `ToastVariant` enum: `Info`, `Success`, `Warning`, `Error`
+- `ToastItem { variant, message, dismiss_on_click }` and `ToastResponse { dismissed: Option<usize> }`
+- `toasts()` — renders each item as rounded quad at `Z_OVERLAY` with variant-colored fill, white text; stacks from bottom-right upward; width = 35% viewport (max 360px); returns `Some(index)` on click if `dismiss_on_click` is true
+- 6 tests: empty (0 calls), single (≥2 calls), 3 stack (3 quads, right-aligned, distinct Y), dismiss click, non-dismissable, all 4 variants (≥8 calls)
+- 65 total component tests, clippy clean
+
 ---
 
 ## Scope
