@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / implementation phase**. Epic 007 (Container Styling) is complete. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / implementation phase**. Epic 007 (Container Styling) is complete. Epics 008–012 are planned: scroll area and display components, static display and navigation, tabs and drawer, overlay stack, form controls and text input. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 
