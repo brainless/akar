@@ -53,7 +53,11 @@ pub fn steps(
             let conn_w = circle_x - conn_x;
 
             if conn_w > 0.0 {
-                let conn_color = if i <= current { theme.primary } else { theme.base_300 };
+                let conn_color = if i <= current {
+                    theme.primary
+                } else {
+                    theme.base_300
+                };
                 let circle_center_y = rect[1] + circle_base_radius + 2.0;
                 let conn_y = circle_center_y - 1.0;
 
@@ -75,7 +79,11 @@ pub fn steps(
 
         let circle_center_y = rect[1] + circle_base_radius + 2.0;
         let circle_y = circle_center_y - radius;
-        let circle_fill = if i <= current { theme.primary } else { theme.base_300 };
+        let circle_fill = if i <= current {
+            theme.primary
+        } else {
+            theme.base_300
+        };
 
         core.draw_list.push_quad(QuadCall {
             rect: [circle_x, circle_y, diameter, diameter],

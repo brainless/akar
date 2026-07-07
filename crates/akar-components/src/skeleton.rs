@@ -56,7 +56,13 @@ mod tests {
         let node_id = layout.new_leaf(Style::default());
         let mut core = AkarCore::mock();
 
-        skeleton(&mut core, &layout, node_id, SkeletonVariant::Text, &AKAR_THEME_DARK);
+        skeleton(
+            &mut core,
+            &layout,
+            node_id,
+            SkeletonVariant::Text,
+            &AKAR_THEME_DARK,
+        );
 
         assert!(core.draw_list.sorted_quads().is_empty());
     }
@@ -76,7 +82,13 @@ mod tests {
         });
         let mut core = AkarCore::mock();
 
-        skeleton(&mut core, &layout, node_id, SkeletonVariant::Text, &AKAR_THEME_DARK);
+        skeleton(
+            &mut core,
+            &layout,
+            node_id,
+            SkeletonVariant::Text,
+            &AKAR_THEME_DARK,
+        );
 
         let quads = core.draw_list.sorted_quads();
         assert_eq!(quads.len(), 1);
@@ -98,7 +110,13 @@ mod tests {
         });
         let mut core = AkarCore::mock();
 
-        skeleton(&mut core, &layout, node_id, SkeletonVariant::Circle, &AKAR_THEME_DARK);
+        skeleton(
+            &mut core,
+            &layout,
+            node_id,
+            SkeletonVariant::Circle,
+            &AKAR_THEME_DARK,
+        );
 
         let quads = core.draw_list.sorted_quads();
         assert_eq!(quads.len(), 1);

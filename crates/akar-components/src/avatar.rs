@@ -7,7 +7,10 @@ use crate::AkarTheme;
 fn derive_color_idx(initials: &str) -> usize {
     let chars: Vec<char> = initials.chars().collect();
     let c0 = chars.first().copied().unwrap_or('A') as u32;
-    let c1 = chars.get(1).copied().unwrap_or(chars.first().copied().unwrap_or('A')) as u32;
+    let c1 = chars
+        .get(1)
+        .copied()
+        .unwrap_or(chars.first().copied().unwrap_or('A')) as u32;
     ((c0 * 7 + c1 * 31) % 6) as usize
 }
 

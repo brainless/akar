@@ -263,8 +263,10 @@ mod tests {
         let close_x = x + w - close_btn_size - AKAR_THEME_DARK.padding_x;
         let close_y = y + (h - close_btn_size) / 2.0;
 
-        core.input
-            .set_mouse_pos(close_x + close_btn_size / 2.0, close_y + close_btn_size / 2.0);
+        core.input.set_mouse_pos(
+            close_x + close_btn_size / 2.0,
+            close_y + close_btn_size / 2.0,
+        );
         core.input.push_mouse_button(0, true);
         core.input.push_mouse_button(0, false);
 

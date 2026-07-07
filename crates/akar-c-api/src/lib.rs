@@ -627,8 +627,9 @@ pub unsafe extern "C" fn akar_stat(
     let description_str = if description.is_null() || description_len <= 0 {
         None
     } else {
-        let desc_bytes =
-            unsafe { std::slice::from_raw_parts(description as *const u8, description_len as usize) };
+        let desc_bytes = unsafe {
+            std::slice::from_raw_parts(description as *const u8, description_len as usize)
+        };
         std::str::from_utf8(desc_bytes).ok()
     };
 
@@ -645,11 +646,7 @@ pub unsafe extern "C" fn akar_stat(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn akar_skeleton(
-    ctx: *mut AkarCtx,
-    node_id: u64,
-    variant: u32,
-) {
+pub unsafe extern "C" fn akar_skeleton(ctx: *mut AkarCtx, node_id: u64, variant: u32) {
     let ctx = unsafe { &mut *ctx };
 
     let variant = match variant {
@@ -744,5 +741,12 @@ pub unsafe extern "C" fn akar_avatar(
     let color = if color == 0 { None } else { Some(color) };
 
     let nid: akar_layout::NodeId = node_id.into();
-    akar_components::akar_avatar(&mut ctx.core, &ctx.layout, nid, initials_str, color, &ctx.theme);
+    akar_components::akar_avatar(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        initials_str,
+        color,
+        &ctx.theme,
+    );
 }

@@ -376,12 +376,6 @@ impl ApplicationHandler for App {
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(
-                    &mut state.core,
-                    &state.layout,
-                    navbar_id,
-                    &BoxStyle::panel(&AKAR_THEME_DARK),
-                );
                 akar_label(
                     &mut state.core,
                     &state.layout,
