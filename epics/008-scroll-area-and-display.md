@@ -71,6 +71,10 @@ core.draw_list.pop_scissor();
 
 ### Task 1: Rename `akar_layout::Rect` → `WorldRect`
 
+**Status:** Done (commit a175dcc)
+
+**Review note:** Clean mechanical rename across 5 files. No remaining uses of `akar_layout::Rect`. Clippy and tests pass.
+
 **Goal:** Eliminate the naming ambiguity between `akar_layout::Rect` (world-space bounding box) and `taffy::geometry::Rect` (padding/margin type, in scope via `pub use taffy::prelude::*`).
 
 **Rename:** `Rect` → `WorldRect` everywhere it refers to the canvas world-space bounding box.

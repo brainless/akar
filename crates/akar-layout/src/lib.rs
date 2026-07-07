@@ -117,6 +117,11 @@ impl Layout {
             .unwrap();
     }
 
+    pub fn rect_offset(&self, node: NodeId, origin: [f32; 2]) -> [f32; 4] {
+        let [x, y, w, h] = self.rect(node);
+        [origin[0] + x, origin[1] + y, w, h]
+    }
+
     pub fn rect(&self, node: NodeId) -> [f32; 4] {
         let l = self.tree.layout(node).unwrap();
         let mut x = l.location.x;
@@ -560,6 +565,23 @@ mod tests {
         let r = layout.rect(child);
         assert!((r[0] - 20.0).abs() < 1.0, "child.x = {}", r[0]);
         assert!((r[1] - 20.0).abs() < 1.0, "child.y = {}", r[1]);
+    }
+
+    #[test]
+    fn rect_offset_shifts_by_origin() {
+        let mut layout = Layout::new();
+        let child = layout.new_leaf(Style {
+            size: Size { width: length(40.0), height: length(20.0) },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect_offset(child, [100.0, 50.0]);
+        assert_eq!(r[0], 100.0);
+        assert_eq!(r[1], 50.0);
+        assert_eq!(r[2], 40.0);
+        assert_eq!(r[3], 20.0);
     }
 
     #[test]
