@@ -431,6 +431,36 @@ pub unsafe extern "C" fn akar_container(ctx: *mut AkarCtx, node_id: u64, style: 
     akar_components::akar_container(&mut ctx.core, &ctx.layout, nid, &box_style);
 }
 
+#[repr(C)]
+pub struct AkarDrawerResponse {
+    pub close_requested: bool,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_drawer_begin(
+    ctx: *mut AkarCtx,
+    edge: u32,
+    panel_width: f32,
+    viewport_rect: *const f32,
+) -> AkarDrawerResponse {
+    let ctx = unsafe { &mut *ctx };
+    let rect = unsafe { *(viewport_rect as *const [f32; 4]) };
+    let drawer_edge = match edge {
+        1 => akar_components::DrawerEdge::Right,
+        _ => akar_components::DrawerEdge::Left,
+    };
+    let result = akar_components::drawer_begin(&mut ctx.core, rect, drawer_edge, panel_width, &ctx.theme);
+    AkarDrawerResponse {
+        close_requested: result.close_requested,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_drawer_end(ctx: *mut AkarCtx) {
+    let ctx = unsafe { &mut *ctx };
+    akar_components::drawer_end(&mut ctx.core);
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_set_padding(
     ctx: *mut AkarCtx,
@@ -717,6 +747,64 @@ pub unsafe extern "C" fn akar_steps(
         current as usize,
         &ctx.theme,
     );
+}
+
+#[repr(C)]
+pub struct AkarTabBarResponse {
+    pub clicked_index: i32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_tab_bar(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    labels: *const *const c_char,
+    label_count: u32,
+    label_lengths: *const i32,
+    active_index: u32,
+    variant: u32,
+) -> AkarTabBarResponse {
+    let ctx = unsafe { &mut *ctx };
+
+    if labels.is_null() || label_lengths.is_null() || label_count == 0 {
+        return AkarTabBarResponse { clicked_index: -1 };
+    }
+
+    let mut label_strs: Vec<&str> = Vec::with_capacity(label_count as usize);
+    for i in 0..label_count as usize {
+        let ptr = unsafe { *labels.add(i) };
+        let len = unsafe { *label_lengths.add(i) };
+        if ptr.is_null() || len <= 0 {
+            return AkarTabBarResponse { clicked_index: -1 };
+        }
+        let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) };
+        match std::str::from_utf8(bytes) {
+            Ok(s) => label_strs.push(s),
+            Err(_) => return AkarTabBarResponse { clicked_index: -1 },
+        }
+    }
+
+    let nid: akar_layout::NodeId = node_id.into();
+    let tab_variant = match variant {
+        1 => akar_components::TabVariant::Lifted,
+        2 => akar_components::TabVariant::Pills,
+        3 => akar_components::TabVariant::Underline,
+        _ => akar_components::TabVariant::Boxed,
+    };
+
+    let result = akar_components::akar_tab_bar(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &label_strs,
+        active_index as usize,
+        tab_variant,
+        &ctx.theme,
+    );
+
+    AkarTabBarResponse {
+        clicked_index: result.clicked.map(|i| i as i32).unwrap_or(-1),
+    }
 }
 
 #[no_mangle]

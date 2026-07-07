@@ -37,6 +37,16 @@
 - Tests: zero width (no draw calls), left/right edge (2 quads at correct positions), scrim click (close_requested=true), panel click (close_requested=false), scissor push/pop
 - 6 tests pass, 49 total component tests, clippy clean
 
+### Task 4 — C ABI Exposure (Done)
+
+`crates/akar-c-api/src/lib.rs`:
+- `AkarTabBarResponse { clicked_index: i32 }` repr(C) struct
+- `akar_tab_bar(ctx, node_id, labels, label_count, label_lengths, active_index, variant)` — wraps `akar_components::akar_tab_bar`, uses same string array pattern as `akar_steps`
+- `AkarDrawerResponse { close_requested: bool }` repr(C) struct
+- `akar_drawer_begin(ctx, edge, panel_width, viewport_rect)` — wraps `drawer_begin`, rect passed as `*const f32` (same pattern as `akar_scroll_area_begin`)
+- `akar_drawer_end(ctx)` — wraps `drawer_end`
+- `akar.h` regenerated — all 5 new symbols confirmed present (AkarDrawerResponse, AkarTabBarResponse, akar_drawer_begin, akar_drawer_end, akar_tab_bar)
+
 
 
 ---

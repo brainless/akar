@@ -32,6 +32,10 @@ typedef struct AkarBoxStyle {
     float shadow_spread;
 } AkarBoxStyle;
 
+typedef struct AkarDrawerResponse {
+    bool close_requested;
+} AkarDrawerResponse;
+
 typedef struct AkarRange {
     uint32_t start;
     uint32_t end;
@@ -46,6 +50,10 @@ typedef struct AkarNavbarSlots {
     uint64_t center;
     uint64_t end;
 } AkarNavbarSlots;
+
+typedef struct AkarTabBarResponse {
+    int32_t clicked_index;
+} AkarTabBarResponse;
 
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
@@ -100,6 +108,13 @@ void akar_label(struct AkarCtx *ctx,
                 uint32_t color);
 
 void akar_container(struct AkarCtx *ctx, uint64_t node_id, struct AkarBoxStyle style);
+
+struct AkarDrawerResponse akar_drawer_begin(struct AkarCtx *ctx,
+                                            uint32_t edge,
+                                            float panel_width,
+                                            const float *viewport_rect);
+
+void akar_drawer_end(struct AkarCtx *ctx);
 
 void akar_set_padding(struct AkarCtx *ctx,
                       uint64_t node_id,
@@ -162,6 +177,14 @@ void akar_steps(struct AkarCtx *ctx,
                 uint32_t label_count,
                 const int32_t *label_lengths,
                 uint32_t current);
+
+struct AkarTabBarResponse akar_tab_bar(struct AkarCtx *ctx,
+                                       uint64_t node_id,
+                                       const char *const *labels,
+                                       uint32_t label_count,
+                                       const int32_t *label_lengths,
+                                       uint32_t active_index,
+                                       uint32_t variant);
 
 void akar_avatar(struct AkarCtx *ctx,
                  uint64_t node_id,
