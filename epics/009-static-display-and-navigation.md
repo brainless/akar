@@ -18,6 +18,15 @@
 - Tests: zero-area return, info variant color, closable count, close click dismisses
 - 4 tests pass, clippy clean
 
+### Task 2 — Stat (Done)
+
+`crates/akar-components/src/stat.rs`:
+- KPI display card with title (font_size_sm), value (font_size_lg), optional description (font_size_sm)
+- Uses `BoxStyle::card` background via `container()`
+- Fixed vertical offsets within rect — no sub-layout
+- Tests: zero-area, with description (1 quad + 3 text), without description (3 total)
+- 3 tests pass, clippy clean
+
 ---
 
 ## Scope
