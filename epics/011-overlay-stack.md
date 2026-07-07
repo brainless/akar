@@ -18,6 +18,16 @@
 - 5 tests: not-hovered (0 calls, visible=false), hovered (≥1 call, visible=true), above placement, flip-to-bottom, right-edge clamping
 - All 5 pass, 54 total component tests, clippy clean
 
+### Task 2 — Modal/Dialog component (Done)
+
+`crates/akar-components/src/modal.rs`:
+- `ModalResponse { close_requested: bool, content_node: NodeId }`
+- `modal_begin()` — scrim quad at `Z_SCRIM`, panel quad at `Z_FLOAT`, internal taffy sub-tree (title + "×" close button header, content area), scissor push to content rect; `close_requested` fires on scrim click or close button click
+- `modal_end()` — pops scissor
+- `content_node` is a valid taffy NodeId for caller rendering
+- 5 tests: zero size (0 calls), renders ≥2 quads + ≥4 total calls, scrim click closes, valid content node, scissor balanced
+- 59 total component tests, clippy clean
+
 ---
 
 ## Scope
