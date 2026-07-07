@@ -1,10 +1,15 @@
 use std::sync::Arc;
 
-use akar_components::{akar_container, canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasState, AKAR_THEME_DARK, BoxStyle};
+use akar_components::{
+    akar_container, canvas_begin, canvas_end, is_visible_world, BoxStyle, CanvasConfig,
+    CanvasState, AKAR_THEME_DARK,
+};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, WorldRect, Size};
+use akar_layout::{Layout, PageConfig, Size, WorldRect};
 use akar_winit::process_window_event;
-use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
+use wgpu::{
+    CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
+};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
@@ -54,15 +59,13 @@ impl ApplicationHandler for App {
             event_loop.owned_display_handle(),
         )));
         let surface = instance.create_surface(window.clone()).unwrap();
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-                compatible_surface: Some(&surface),
-                ..Default::default()
-            }))
-            .unwrap();
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            compatible_surface: Some(&surface),
+            ..Default::default()
+        }))
+        .unwrap();
         let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                .unwrap();
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).unwrap();
 
         let size = window.inner_size();
         let mut surface_config = surface
@@ -128,22 +131,51 @@ impl ApplicationHandler for App {
 
                 state.layout.compute(
                     state.page.root,
-                    (Some(size.width as f32 / scale), Some(size.height as f32 / scale)),
+                    (
+                        Some(size.width as f32 / scale),
+                        Some(size.height as f32 / scale),
+                    ),
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.page.header.unwrap(),
+                    &BoxStyle::panel(&AKAR_THEME_DARK),
+                );
 
                 let objects = [
-                    DemoObject { bounds: WorldRect::from_xywh(-180.0, -80.0, 120.0, 60.0), fill: 0x3B82F6FF },
-                    DemoObject { bounds: WorldRect::from_xywh(80.0,  -80.0, 120.0, 60.0),  fill: 0x10B981FF },
-                    DemoObject { bounds: WorldRect::from_xywh(-60.0,  40.0, 120.0, 60.0),  fill: 0xF59E0BFF },
-                    DemoObject { bounds: WorldRect::from_xywh(-280.0, 60.0,  80.0, 80.0),  fill: 0xEF4444FF },
-                    DemoObject { bounds: WorldRect::from_xywh(200.0,  20.0, 100.0, 100.0), fill: 0x8B5CF6FF },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-180.0, -80.0, 120.0, 60.0),
+                        fill: 0x3B82F6FF,
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(80.0, -80.0, 120.0, 60.0),
+                        fill: 0x10B981FF,
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-60.0, 40.0, 120.0, 60.0),
+                        fill: 0xF59E0BFF,
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-280.0, 60.0, 80.0, 80.0),
+                        fill: 0xEF4444FF,
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(200.0, 20.0, 100.0, 100.0),
+                        fill: 0x8B5CF6FF,
+                    },
                 ];
 
                 let config = CanvasConfig::default();
-                let (response, mut painter) = canvas_begin(&mut state.core, &state.layout, state.page.main, &mut state.canvas_state, &config);
+                let (response, mut painter) = canvas_begin(
+                    &mut state.core,
+                    &state.layout,
+                    state.page.main,
+                    &mut state.canvas_state,
+                    &config,
+                );
 
                 for obj in &objects {
                     if is_visible_world(response.visible_world_rect, obj.bounds) {

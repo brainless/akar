@@ -24,12 +24,8 @@ impl TextPipeline {
         let cache = glyphon::Cache::new(device);
         let viewport = glyphon::Viewport::new(device, &cache);
         let mut atlas = glyphon::TextAtlas::new(device, queue, &cache, surface_format);
-        let renderer = glyphon::TextRenderer::new(
-            &mut atlas,
-            device,
-            wgpu::MultisampleState::default(),
-            None,
-        );
+        let renderer =
+            glyphon::TextRenderer::new(&mut atlas, device, wgpu::MultisampleState::default(), None);
 
         Self {
             font_system,
@@ -68,7 +64,13 @@ impl TextPipeline {
             buffer.set_size(&mut self.font_system, Some(w), height);
         }
 
-        buffer.set_text(&mut self.font_system, text, &glyphon::Attrs::new(), glyphon::Shaping::Advanced, None);
+        buffer.set_text(
+            &mut self.font_system,
+            text,
+            &glyphon::Attrs::new(),
+            glyphon::Shaping::Advanced,
+            None,
+        );
         buffer.shape_until_scroll(&mut self.font_system, false);
 
         id

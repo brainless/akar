@@ -1,7 +1,7 @@
-use akar_core::{AkarCore, QuadCall};
-use akar_layout::{Layout, NodeId};
 use crate::color::color_to_f32;
 use crate::AkarTheme;
+use akar_core::{AkarCore, QuadCall};
+use akar_layout::{Layout, NodeId};
 
 pub struct ProgressStyle {
     pub track_color: u32,
@@ -27,6 +27,10 @@ pub fn progress(
     style: &ProgressStyle,
 ) {
     let rect = layout.rect(node_id);
+    progress_at(core, rect, value, style);
+}
+
+pub fn progress_at(core: &mut AkarCore, rect: [f32; 4], value: f32, style: &ProgressStyle) {
     if rect[2] == 0.0 || rect[3] == 0.0 {
         return;
     }
@@ -69,14 +73,19 @@ pub fn progress(
 mod tests {
     use super::*;
     use akar_core::AkarCore;
-    use akar_layout::{Layout, Style, Size, length};
+    use akar_layout::{length, Layout, Size, Style};
 
     fn node_100x20(layout: &mut Layout) -> NodeId {
         let n = layout.new_leaf(Style {
-            size: Size { width: length(100.0), height: length(20.0) },
+            size: Size {
+                width: length(100.0),
+                height: length(20.0),
+            },
             ..Default::default()
         });
-        layout.compute(n, (Some(200.0), Some(200.0)), |_, _, _, _, _| akar_layout::Size::ZERO);
+        layout.compute(n, (Some(200.0), Some(200.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
         n
     }
 
@@ -86,7 +95,11 @@ mod tests {
         let node = node_100x20(&mut layout);
         let mut core = AkarCore::mock();
         core.draw_list.begin_frame(1.0);
-        let style = ProgressStyle { track_color: 0xccccccff, fill_color: 0x0000ffff, corner_radius: 4.0 };
+        let style = ProgressStyle {
+            track_color: 0xccccccff,
+            fill_color: 0x0000ffff,
+            corner_radius: 4.0,
+        };
         progress(&mut core, &layout, node, 1.0, &style);
         assert_eq!(core.draw_list.len(), 2);
     }
@@ -97,7 +110,11 @@ mod tests {
         let node = node_100x20(&mut layout);
         let mut core = AkarCore::mock();
         core.draw_list.begin_frame(1.0);
-        let style = ProgressStyle { track_color: 0xccccccff, fill_color: 0x0000ffff, corner_radius: 4.0 };
+        let style = ProgressStyle {
+            track_color: 0xccccccff,
+            fill_color: 0x0000ffff,
+            corner_radius: 4.0,
+        };
         progress(&mut core, &layout, node, 0.0, &style);
         assert_eq!(core.draw_list.len(), 1);
     }
@@ -108,7 +125,11 @@ mod tests {
         let node = node_100x20(&mut layout);
         let mut core = AkarCore::mock();
         core.draw_list.begin_frame(1.0);
-        let style = ProgressStyle { track_color: 0xccccccff, fill_color: 0x0000ffff, corner_radius: 0.0 };
+        let style = ProgressStyle {
+            track_color: 0xccccccff,
+            fill_color: 0x0000ffff,
+            corner_radius: 0.0,
+        };
         progress(&mut core, &layout, node, 5.0, &style);
         let quads = core.draw_list.sorted_quads();
         assert_eq!(quads[0].rect[2], quads[1].rect[2]);

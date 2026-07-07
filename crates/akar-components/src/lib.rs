@@ -19,16 +19,16 @@ pub mod label;
 pub use label::label as akar_label;
 
 pub mod progress;
-pub use progress::{ProgressStyle, progress as akar_progress};
+pub use progress::{progress as akar_progress, progress_at, ProgressStyle};
 
 pub mod badge;
-pub use badge::{BadgeVariant, badge as akar_badge};
+pub use badge::{badge as akar_badge, BadgeVariant};
 
 pub mod scroll_area;
-pub use scroll_area::{ScrollAreaResponse, scroll_area_begin, scroll_area_end};
+pub use scroll_area::{scroll_area_begin, scroll_area_end, ScrollAreaResponse};
 
 pub mod canvas;
 pub use canvas::{
-    CanvasConfig, CanvasPainter, CanvasResponse, CanvasState, PanButton,
-    canvas_begin, canvas_end, is_visible_world,
+    canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasPainter, CanvasResponse,
+    CanvasState, PanButton,
 };

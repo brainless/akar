@@ -4,12 +4,7 @@ use akar_layout::{Layout, NodeId};
 use crate::color::color_to_f32;
 use crate::AkarTheme;
 
-pub fn separator(
-    core: &mut AkarCore,
-    layout: &Layout,
-    node_id: NodeId,
-    theme: &AkarTheme,
-) {
+pub fn separator(core: &mut AkarCore, layout: &Layout, node_id: NodeId, theme: &AkarTheme) {
     let rect = layout.rect(node_id);
     if rect[2] == 0.0 || rect[3] == 0.0 {
         return;

@@ -4,27 +4,16 @@ use akar_layout::{Layout, NodeId};
 use crate::box_style::BoxStyle;
 use crate::color::color_to_f32;
 
-pub fn container(
-    core: &mut AkarCore,
-    layout: &Layout,
-    node_id: NodeId,
-    style: &BoxStyle,
-) {
+pub fn container(core: &mut AkarCore, layout: &Layout, node_id: NodeId, style: &BoxStyle) {
     let rect = layout.rect(node_id);
     if rect[2] == 0.0 || rect[3] == 0.0 || style.fill == 0 {
         return;
     }
 
-    let (shadow_color, shadow_offset, shadow_blur, shadow_spread) =
-        match &style.shadow {
-            Some(s) => (
-                color_to_f32(s.color),
-                s.offset,
-                s.blur,
-                s.spread,
-            ),
-            None => ([0.0; 4], [0.0; 2], 0.0, 0.0),
-        };
+    let (shadow_color, shadow_offset, shadow_blur, shadow_spread) = match &style.shadow {
+        Some(s) => (color_to_f32(s.color), s.offset, s.blur, s.spread),
+        None => ([0.0; 4], [0.0; 2], 0.0, 0.0),
+    };
 
     core.draw_list.push_quad(QuadCall {
         rect,

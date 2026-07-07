@@ -1,8 +1,8 @@
+use crate::color::color_to_f32;
+use crate::label::label;
+use crate::AkarTheme;
 use akar_core::{AkarCore, QuadCall};
 use akar_layout::{Layout, NodeId};
-use crate::color::color_to_f32;
-use crate::AkarTheme;
-use crate::label::label;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum BadgeVariant {
@@ -28,12 +28,12 @@ pub fn badge(
     }
 
     let (bg, fg) = match variant {
-        BadgeVariant::Default  => (theme.base_300,   theme.base_content),
-        BadgeVariant::Primary  => (theme.primary,     theme.primary_content),
-        BadgeVariant::Success  => (theme.success,     theme.success_content),
-        BadgeVariant::Warning  => (theme.warning,     theme.warning_content),
-        BadgeVariant::Error    => (theme.error,       theme.error_content),
-        BadgeVariant::Info     => (theme.info,        theme.info_content),
+        BadgeVariant::Default => (theme.base_300, theme.base_content),
+        BadgeVariant::Primary => (theme.primary, theme.primary_content),
+        BadgeVariant::Success => (theme.success, theme.success_content),
+        BadgeVariant::Warning => (theme.warning, theme.warning_content),
+        BadgeVariant::Error => (theme.error, theme.error_content),
+        BadgeVariant::Info => (theme.info, theme.info_content),
     };
 
     core.draw_list.push_quad(QuadCall {

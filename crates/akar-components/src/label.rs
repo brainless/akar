@@ -48,7 +48,14 @@ mod tests {
         let node_id = layout.new_leaf(Style::default());
 
         let mut core = AkarCore::mock();
-        label(&mut core, &layout, node_id, "Hello", 0xFFFFFFFF, &AKAR_THEME_DARK);
+        label(
+            &mut core,
+            &layout,
+            node_id,
+            "Hello",
+            0xFFFFFFFF,
+            &AKAR_THEME_DARK,
+        );
 
         assert_eq!(core.draw_list.len(), 0);
     }

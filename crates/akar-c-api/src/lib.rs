@@ -241,12 +241,20 @@ pub unsafe extern "C" fn akar_new_leaf(ctx: *mut AkarCtx, flex_grow: f32) -> u64
 
 #[no_mangle]
 pub unsafe extern "C" fn akar_new_fixed_leaf(ctx: *mut AkarCtx, w: f32, h: f32) -> u64 {
-    use akar_layout::{Style, Size, Dimension, length};
+    use akar_layout::{length, Dimension, Size, Style};
     let ctx = unsafe { &mut *ctx };
     let style = Style {
         size: Size {
-            width:  if w > 0.0 { length(w) } else { Dimension::auto() },
-            height: if h > 0.0 { length(h) } else { Dimension::auto() },
+            width: if w > 0.0 {
+                length(w)
+            } else {
+                Dimension::auto()
+            },
+            height: if h > 0.0 {
+                length(h)
+            } else {
+                Dimension::auto()
+            },
         },
         flex_shrink: 0.0,
         ..Default::default()
@@ -256,7 +264,7 @@ pub unsafe extern "C" fn akar_new_fixed_leaf(ctx: *mut AkarCtx, w: f32, h: f32) 
 
 #[no_mangle]
 pub unsafe extern "C" fn akar_new_flex_row(ctx: *mut AkarCtx) -> u64 {
-    use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
+    use akar_layout::{Dimension, Display, FlexDirection, Size, Style};
     let ctx = unsafe { &mut *ctx };
     let style = Style {
         display: Display::Flex,
@@ -272,7 +280,7 @@ pub unsafe extern "C" fn akar_new_flex_row(ctx: *mut AkarCtx) -> u64 {
 
 #[no_mangle]
 pub unsafe extern "C" fn akar_new_flex_col(ctx: *mut AkarCtx) -> u64 {
-    use akar_layout::{Style, Display, FlexDirection, Size, Dimension};
+    use akar_layout::{Dimension, Display, FlexDirection, Size, Style};
     let ctx = unsafe { &mut *ctx };
     let style = Style {
         display: Display::Flex,
@@ -290,7 +298,7 @@ pub unsafe extern "C" fn akar_new_flex_col(ctx: *mut AkarCtx) -> u64 {
 pub unsafe extern "C" fn akar_add_child(ctx: *mut AkarCtx, parent: u64, child: u64) {
     let ctx = unsafe { &mut *ctx };
     let parent_node: akar_layout::NodeId = parent.into();
-    let child_node:  akar_layout::NodeId = child.into();
+    let child_node: akar_layout::NodeId = child.into();
     ctx.layout.add_child(parent_node, child_node);
 }
 
@@ -304,11 +312,10 @@ pub unsafe extern "C" fn akar_layout_compute(
     use akar_layout::Size;
     let ctx = unsafe { &mut *ctx };
     let root_node: akar_layout::NodeId = root.into();
-    ctx.layout.compute(
-        root_node,
-        (Some(width), Some(height)),
-        |_, _, _, _, _| Size::ZERO,
-    );
+    ctx.layout
+        .compute(root_node, (Some(width), Some(height)), |_, _, _, _, _| {
+            Size::ZERO
+        });
 }
 
 #[no_mangle]
@@ -336,8 +343,7 @@ pub unsafe extern "C" fn akar_button(
         };
     }
 
-    let label_bytes =
-        unsafe { std::slice::from_raw_parts(label as *const u8, label_len as usize) };
+    let label_bytes = unsafe { std::slice::from_raw_parts(label as *const u8, label_len as usize) };
     let Ok(label_str) = std::str::from_utf8(label_bytes) else {
         return AkarButtonResult {
             clicked: false,
@@ -383,14 +389,7 @@ pub unsafe extern "C" fn akar_label(
     };
 
     let nid: akar_layout::NodeId = node_id.into();
-    akar_components::akar_label(
-        &mut ctx.core,
-        &ctx.layout,
-        nid,
-        text_str,
-        color,
-        &ctx.theme,
-    );
+    akar_components::akar_label(&mut ctx.core, &ctx.layout, nid, text_str, color, &ctx.theme);
 }
 
 #[repr(C)]
@@ -406,11 +405,7 @@ pub struct AkarBoxStyle {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn akar_container(
-    ctx: *mut AkarCtx,
-    node_id: u64,
-    style: AkarBoxStyle,
-) {
+pub unsafe extern "C" fn akar_container(ctx: *mut AkarCtx, node_id: u64, style: AkarBoxStyle) {
     let ctx = unsafe { &mut *ctx };
     let nid: akar_layout::NodeId = node_id.into();
 
@@ -478,7 +473,10 @@ pub extern "C" fn akar_list_clip(
     viewport_height: f32,
 ) -> AkarRange {
     let r = akar_core::list_clip(total as usize, item_height, scroll_y, viewport_height);
-    AkarRange { start: r.start as u32, end: r.end as u32 }
+    AkarRange {
+        start: r.start as u32,
+        end: r.end as u32,
+    }
 }
 
 #[no_mangle]
@@ -516,7 +514,11 @@ pub unsafe extern "C" fn akar_progress(
 ) {
     let ctx = unsafe { &mut *ctx };
     let nid: akar_layout::NodeId = node_id.into();
-    let style = akar_components::ProgressStyle { track_color, fill_color, corner_radius };
+    let style = akar_components::ProgressStyle {
+        track_color,
+        fill_color,
+        corner_radius,
+    };
     akar_components::akar_progress(&mut ctx.core, &ctx.layout, nid, value, &style);
 }
 
@@ -527,9 +529,14 @@ pub unsafe extern "C" fn akar_badge(
     text: *const std::ffi::c_char,
     variant: u32,
 ) {
+    if text.is_null() {
+        return;
+    }
     let ctx = unsafe { &mut *ctx };
     let nid: akar_layout::NodeId = node_id.into();
-    let text = unsafe { std::ffi::CStr::from_ptr(text) }.to_str().unwrap_or("");
+    let text = unsafe { std::ffi::CStr::from_ptr(text) }
+        .to_str()
+        .unwrap_or("");
     let variant = match variant {
         1 => akar_components::BadgeVariant::Primary,
         2 => akar_components::BadgeVariant::Success,

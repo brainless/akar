@@ -1,10 +1,9 @@
 use std::mem;
 use wgpu::{
-    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
-    BlendState, Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ColorTargetState,
-    ColorWrites, Device, FragmentState, PipelineCompilationOptions, PipelineLayoutDescriptor,
-    PrimitiveState, PrimitiveTopology, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderStages,
+    BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, BlendState,
+    Buffer, BufferBindingType, BufferDescriptor, BufferUsages, ColorTargetState, ColorWrites,
+    Device, FragmentState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
+    PrimitiveTopology, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderStages,
 };
 
 use crate::draw_list::QuadCall;
@@ -144,11 +143,7 @@ impl QuadPipeline {
             self.instance_capacity = new_capacity;
         }
 
-        queue.write_buffer(
-            &self.instance_buffer,
-            0,
-            bytemuck::cast_slice(quads),
-        );
+        queue.write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(quads));
 
         let params = Params {
             screen_resolution: [screen_width, screen_height],

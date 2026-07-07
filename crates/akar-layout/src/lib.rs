@@ -10,10 +10,7 @@ pub use rect::WorldRect;
 
 mod canvas_transform;
 pub use canvas_transform::{
-    CanvasTransform,
-    make_world_to_screen,
-    make_screen_to_world,
-    compute_visible_world_rect,
+    compute_visible_world_rect, make_screen_to_world, make_world_to_screen, CanvasTransform,
 };
 
 pub type NodeId = taffy::NodeId;
@@ -109,8 +106,14 @@ impl Layout {
         ) -> Size<f32>,
     {
         let available_space = Size {
-            width: available.0.map(AvailableSpace::Definite).unwrap_or(AvailableSpace::MaxContent),
-            height: available.1.map(AvailableSpace::Definite).unwrap_or(AvailableSpace::MaxContent),
+            width: available
+                .0
+                .map(AvailableSpace::Definite)
+                .unwrap_or(AvailableSpace::MaxContent),
+            height: available
+                .1
+                .map(AvailableSpace::Definite)
+                .unwrap_or(AvailableSpace::MaxContent),
         };
         self.tree
             .compute_layout_with_measure(root, available_space, measure_fn)
@@ -460,8 +463,16 @@ mod tests {
         let right_r = layout.rect(cols.right);
 
         assert_eq!(sep_r[2], 1.0, "separator width should be 1.0");
-        assert!((left_r[2] - 200.0).abs() < 1.0, "left width should be ~200.0, got {}", left_r[2]);
-        assert!((right_r[2] - 200.0).abs() < 1.0, "right width should be ~200.0, got {}", right_r[2]);
+        assert!(
+            (left_r[2] - 200.0).abs() < 1.0,
+            "left width should be ~200.0, got {}",
+            left_r[2]
+        );
+        assert!(
+            (right_r[2] - 200.0).abs() < 1.0,
+            "right width should be ~200.0, got {}",
+            right_r[2]
+        );
     }
 
     #[test]
@@ -476,8 +487,16 @@ mod tests {
         let right_r = layout.rect(cols.right);
 
         assert_eq!(sep_r[2], 2.0);
-        assert!((left_r[2] - 120.0).abs() < 1.0, "left width should be ~120.0, got {}", left_r[2]);
-        assert!((right_r[2] - 280.0).abs() < 1.0, "right width should be ~280.0, got {}", right_r[2]);
+        assert!(
+            (left_r[2] - 120.0).abs() < 1.0,
+            "left width should be ~120.0, got {}",
+            left_r[2]
+        );
+        assert!(
+            (right_r[2] - 280.0).abs() < 1.0,
+            "right width should be ~280.0, got {}",
+            right_r[2]
+        );
     }
 
     #[test]
@@ -495,9 +514,21 @@ mod tests {
 
         assert_eq!(sep_l[2], 1.0);
         assert_eq!(sep_r[2], 1.0);
-        assert!((left_r[2] - 100.0).abs() < 1.0, "left width should be ~100.0, got {}", left_r[2]);
-        assert!((middle_r[2] - 200.0).abs() < 1.0, "middle width should be ~200.0, got {}", middle_r[2]);
-        assert!((right_r[2] - 100.0).abs() < 1.0, "right width should be ~100.0, got {}", right_r[2]);
+        assert!(
+            (left_r[2] - 100.0).abs() < 1.0,
+            "left width should be ~100.0, got {}",
+            left_r[2]
+        );
+        assert!(
+            (middle_r[2] - 200.0).abs() < 1.0,
+            "middle width should be ~200.0, got {}",
+            middle_r[2]
+        );
+        assert!(
+            (right_r[2] - 100.0).abs() < 1.0,
+            "right width should be ~100.0, got {}",
+            right_r[2]
+        );
     }
 
     #[test]
@@ -509,7 +540,9 @@ mod tests {
             sidebar_left_width: Some(200.0),
             sidebar_right_width: None,
         });
-        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| Size::ZERO);
+        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| {
+            Size::ZERO
+        });
 
         let header_r = layout.rect(page.header.unwrap());
         let sidebar_r = layout.rect(page.sidebar_left.unwrap());
@@ -519,7 +552,11 @@ mod tests {
         assert_eq!(header_r[3], 60.0, "header height should be 60.0");
         assert_eq!(sidebar_r[2], 200.0, "sidebar width should be 200.0");
         assert_eq!(sidebar_r[3], 540.0, "sidebar height should be 540.0");
-        assert!((main_r[2] - 600.0).abs() < 1.0, "main width should be ~600.0, got {}", main_r[2]);
+        assert!(
+            (main_r[2] - 600.0).abs() < 1.0,
+            "main width should be ~600.0, got {}",
+            main_r[2]
+        );
         assert_eq!(main_r[3], 540.0, "main height should be 540.0");
     }
 
@@ -532,7 +569,9 @@ mod tests {
             sidebar_left_width: None,
             sidebar_right_width: None,
         });
-        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| Size::ZERO);
+        layout.compute(page.root, (Some(800.0), Some(600.0)), |_, _, _, _, _| {
+            Size::ZERO
+        });
 
         assert!(page.header.is_none());
         assert!(page.footer.is_none());
@@ -548,13 +587,19 @@ mod tests {
     fn set_padding_affects_child_position() {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
-            size: Size { width: length(50.0), height: length(50.0) },
+            size: Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
             ..Default::default()
         });
         let root = layout.new_with_children(
             Style {
                 display: Display::Flex,
-                size: Size { width: length(200.0), height: length(200.0) },
+                size: Size {
+                    width: length(200.0),
+                    height: length(200.0),
+                },
                 ..Default::default()
             },
             &[child],
@@ -571,7 +616,10 @@ mod tests {
     fn rect_offset_shifts_by_origin() {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
-            size: Size { width: length(40.0), height: length(20.0) },
+            size: Size {
+                width: length(40.0),
+                height: length(20.0),
+            },
             ..Default::default()
         });
         let root = layout.new_with_children(Style::default(), &[child]);
@@ -588,7 +636,10 @@ mod tests {
     fn set_margin_pushes_node() {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
-            size: Size { width: length(50.0), height: length(50.0) },
+            size: Size {
+                width: length(50.0),
+                height: length(50.0),
+            },
             ..Default::default()
         });
         let root = layout.new_with_children(

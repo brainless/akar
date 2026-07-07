@@ -1,5 +1,5 @@
-use glam::Vec2;
 use crate::WorldRect;
+use glam::Vec2;
 
 #[derive(Clone, Copy, Debug)]
 pub struct CanvasTransform {
@@ -48,7 +48,10 @@ pub fn make_screen_to_world(pan: Vec2, zoom: f32, canvas_rect: [f32; 4]) -> Canv
 pub fn compute_visible_world_rect(pan: Vec2, zoom: f32, canvas_rect: [f32; 4]) -> WorldRect {
     let s2w = make_screen_to_world(pan, zoom, canvas_rect);
     let tl = Vec2::new(canvas_rect[0], canvas_rect[1]);
-    let br = Vec2::new(canvas_rect[0] + canvas_rect[2], canvas_rect[1] + canvas_rect[3]);
+    let br = Vec2::new(
+        canvas_rect[0] + canvas_rect[2],
+        canvas_rect[1] + canvas_rect[3],
+    );
     WorldRect {
         min: s2w.apply(tl),
         max: s2w.apply(br),
@@ -122,7 +125,10 @@ mod tests {
     #[test]
     fn apply_rect_dimensions() {
         let t = make_world_to_screen(Vec2::ZERO, 2.0, CANVAS);
-        let world_rect = crate::WorldRect { min: Vec2::new(-5.0, -5.0), max: Vec2::new(5.0, 5.0) };
+        let world_rect = crate::WorldRect {
+            min: Vec2::new(-5.0, -5.0),
+            max: Vec2::new(5.0, 5.0),
+        };
         let [_x, _y, w, h] = t.apply_rect(world_rect);
         assert!((w - 20.0).abs() < 0.001);
         assert!((h - 20.0).abs() < 0.001);

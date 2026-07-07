@@ -133,7 +133,14 @@ mod tests {
 
         let mut core = AkarCore::mock();
 
-        let result = button(&mut core, &layout, node_id, "Click", ButtonVariant::Solid, &AKAR_THEME_DARK);
+        let result = button(
+            &mut core,
+            &layout,
+            node_id,
+            "Click",
+            ButtonVariant::Solid,
+            &AKAR_THEME_DARK,
+        );
 
         assert!(!result.clicked);
         assert!(!result.hovered);

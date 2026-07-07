@@ -1,10 +1,7 @@
 use akar_c_api::{
-    akar_ctx_mock, akar_ctx_free,
-    akar_new_leaf, akar_new_fixed_leaf, akar_new_flex_row, akar_new_flex_col,
-    akar_add_child, akar_layout_compute, akar_layout_rect,
-    akar_input_begin, akar_set_mouse_pos, akar_push_mouse_button,
-    akar_push_scroll, akar_input_end,
-    akar_begin_frame,
+    akar_add_child, akar_begin_frame, akar_ctx_free, akar_ctx_mock, akar_input_begin,
+    akar_input_end, akar_layout_compute, akar_layout_rect, akar_new_fixed_leaf, akar_new_flex_col,
+    akar_new_flex_row, akar_new_leaf, akar_push_mouse_button, akar_push_scroll, akar_set_mouse_pos,
 };
 
 #[test]
@@ -18,7 +15,7 @@ fn lifecycle_mock_create_free() {
 fn layout_flex_grow_leaf_fills_parent() {
     let ctx = unsafe { akar_ctx_mock() };
 
-    let root  = unsafe { akar_new_flex_col(ctx) };
+    let root = unsafe { akar_new_flex_col(ctx) };
     let child = unsafe { akar_new_leaf(ctx, 1.0) };
     unsafe { akar_add_child(ctx, root, child) };
     unsafe { akar_layout_compute(ctx, root, 800.0, 600.0) };
@@ -34,7 +31,7 @@ fn layout_flex_grow_leaf_fills_parent() {
 fn layout_fixed_leaf_respected() {
     let ctx = unsafe { akar_ctx_mock() };
 
-    let root  = unsafe { akar_new_flex_row(ctx) };
+    let root = unsafe { akar_new_flex_row(ctx) };
     let child = unsafe { akar_new_fixed_leaf(ctx, 120.0, 40.0) };
     unsafe { akar_add_child(ctx, root, child) };
     unsafe { akar_layout_compute(ctx, root, 800.0, 600.0) };
@@ -51,7 +48,7 @@ fn layout_two_flex_siblings_fill_row() {
     let ctx = unsafe { akar_ctx_mock() };
 
     let root = unsafe { akar_new_flex_row(ctx) };
-    let left  = unsafe { akar_new_leaf(ctx, 1.0) };
+    let left = unsafe { akar_new_leaf(ctx, 1.0) };
     let right = unsafe { akar_new_leaf(ctx, 1.0) };
     unsafe { akar_add_child(ctx, root, left) };
     unsafe { akar_add_child(ctx, root, right) };

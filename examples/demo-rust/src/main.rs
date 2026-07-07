@@ -1,12 +1,16 @@
 use std::sync::Arc;
 
-use akar_components::{akar_badge, akar_container, AKAR_THEME_DARK, BadgeVariant, BoxStyle};
-use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Style, Size, Display, FlexDirection, Dimension, length};
+use akar_components::{
+    akar_badge, akar_container, progress_at, BadgeVariant, BoxStyle, ProgressStyle, AKAR_THEME_DARK,
+};
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
+use akar_core::AkarCore;
+use akar_layout::{length, Dimension, Display, FlexDirection, Layout, PageConfig, Size, Style};
 use akar_winit::process_window_event;
-use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
+use wgpu::{
+    CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
+};
 use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
@@ -56,15 +60,13 @@ impl ApplicationHandler for App {
             event_loop.owned_display_handle(),
         )));
         let surface = instance.create_surface(window.clone()).unwrap();
-        let adapter =
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-                compatible_surface: Some(&surface),
-                ..Default::default()
-            }))
-            .unwrap();
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            compatible_surface: Some(&surface),
+            ..Default::default()
+        }))
+        .unwrap();
         let (device, queue) =
-            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
-                .unwrap();
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).unwrap();
 
         let size = window.inner_size();
         let mut surface_config = surface
@@ -88,12 +90,15 @@ impl ApplicationHandler for App {
 
         let two_col = layout.two_column(page.main, 0.5, 1.0);
 
-        layout.set_style(two_col.right, Style {
-            display: Display::Flex,
-            flex_direction: FlexDirection::Column,
-            flex_grow: 1.0,
-            ..Default::default()
-        });
+        layout.set_style(
+            two_col.right,
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                ..Default::default()
+            },
+        );
 
         let badges_strip = layout.new_leaf(Style {
             display: Display::Flex,
@@ -118,12 +123,18 @@ impl ApplicationHandler for App {
 
         let success_badge = layout.new_leaf(Style {
             flex_shrink: 0.0,
-            size: Size { width: length(70.0), height: length(28.0) },
+            size: Size {
+                width: length(70.0),
+                height: length(28.0),
+            },
             ..Default::default()
         });
         let warning_badge = layout.new_leaf(Style {
             flex_shrink: 0.0,
-            size: Size { width: length(70.0), height: length(28.0) },
+            size: Size {
+                width: length(70.0),
+                height: length(28.0),
+            },
             ..Default::default()
         });
         layout.add_child(badges_strip, success_badge);
@@ -133,8 +144,14 @@ impl ApplicationHandler for App {
             flex_grow: 1.0,
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
-            overflow: taffy::geometry::Point { x: taffy::style::Overflow::Clip, y: taffy::style::Overflow::Clip },
-            size: Size { width: Dimension::percent(1.0), height: Dimension::auto() },
+            overflow: taffy::geometry::Point {
+                x: taffy::style::Overflow::Clip,
+                y: taffy::style::Overflow::Clip,
+            },
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: Dimension::auto(),
+            },
             ..Default::default()
         });
 
@@ -188,26 +205,78 @@ impl ApplicationHandler for App {
 
                 state.layout.compute(
                     state.page.root,
-                    (Some(size.width as f32 / scale), Some(size.height as f32 / scale)),
+                    (
+                        Some(size.width as f32 / scale),
+                        Some(size.height as f32 / scale),
+                    ),
                     |_, _, _, _, _| Size::ZERO,
                 );
 
-                akar_container(&mut state.core, &state.layout, state.page.header.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
-                akar_container(&mut state.core, &state.layout, state.page.sidebar_left.unwrap(), &BoxStyle::panel(&AKAR_THEME_DARK));
-                akar_container(&mut state.core, &state.layout, state.page.main, &BoxStyle::surface(&AKAR_THEME_DARK));
-                akar_container(&mut state.core, &state.layout, state.two_col.left, &BoxStyle::flat(0x172554ff));
-                akar_container(&mut state.core, &state.layout, state.two_col.right, &BoxStyle::flat(0x27272aff));
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.page.header.unwrap(),
+                    &BoxStyle::panel(&AKAR_THEME_DARK),
+                );
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.page.sidebar_left.unwrap(),
+                    &BoxStyle::panel(&AKAR_THEME_DARK),
+                );
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.page.main,
+                    &BoxStyle::surface(&AKAR_THEME_DARK),
+                );
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.two_col.left,
+                    &BoxStyle::flat(0x172554ff),
+                );
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.two_col.right,
+                    &BoxStyle::flat(0x27272aff),
+                );
 
-                akar_container(&mut state.core, &state.layout, state.badges_strip, &BoxStyle::card(&AKAR_THEME_DARK));
-                akar_badge(&mut state.core, &state.layout, state.success_badge, "Success", BadgeVariant::Success, &AKAR_THEME_DARK);
-                akar_badge(&mut state.core, &state.layout, state.warning_badge, "Warning", BadgeVariant::Warning, &AKAR_THEME_DARK);
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.badges_strip,
+                    &BoxStyle::card(&AKAR_THEME_DARK),
+                );
+                akar_badge(
+                    &mut state.core,
+                    &state.layout,
+                    state.success_badge,
+                    "Success",
+                    BadgeVariant::Success,
+                    &AKAR_THEME_DARK,
+                );
+                akar_badge(
+                    &mut state.core,
+                    &state.layout,
+                    state.warning_badge,
+                    "Warning",
+                    BadgeVariant::Warning,
+                    &AKAR_THEME_DARK,
+                );
 
                 let scroll_rect = state.layout.rect(state.scroll_container);
                 let total_items = 50_usize;
                 let item_height = 48.0_f32;
                 let content_height = total_items as f32 * item_height;
 
-                let resp = scroll_area_begin(&mut state.core, scroll_rect, &mut state.scroll_y, content_height);
+                let resp = scroll_area_begin(
+                    &mut state.core,
+                    scroll_rect,
+                    &mut state.scroll_y,
+                    content_height,
+                );
                 let visible = list_clip(total_items, item_height, state.scroll_y, scroll_rect[3]);
 
                 for i in visible {
@@ -270,42 +339,18 @@ impl ApplicationHandler for App {
                     let progress_w = inner_rect[2] * 0.35;
                     let progress_h = 8.0;
                     let progress_y = inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
-                    let track_rect = [progress_x, progress_y, progress_w, progress_h];
-                    let fill_rect = [progress_x, progress_y, progress_w * progress_value, progress_h];
-                    let corner = 4.0_f32;
-                    let track_color = 0x27272affu32;
-
-                    state.core.draw_list.push_quad(akar_core::QuadCall {
-                        rect: track_rect,
-                        fill: [
-                            ((track_color >> 24) & 0xFF) as f32 / 255.0,
-                            ((track_color >> 16) & 0xFF) as f32 / 255.0,
-                            ((track_color >> 8) & 0xFF) as f32 / 255.0,
-                            (track_color & 0xFF) as f32 / 255.0,
-                        ],
-                        border_color: [0.0; 4],
-                        corner_radii: [corner; 4],
-                        border_width: 0.0,
-                        z: 0.0,
-                        shadow_blur: 0.0,
-                        shadow_spread: 0.0,
-                        shadow_color: [0.0; 4],
-                        shadow_offset: [0.0; 2],
-                        _pad: [0.0; 2],
-                    });
-                    state.core.draw_list.push_quad(akar_core::QuadCall {
-                        rect: fill_rect,
-                        fill: [0.23, 0.51, 0.96, 1.0],
-                        border_color: [0.0; 4],
-                        corner_radii: [corner; 4],
-                        border_width: 0.0,
-                        z: 0.0,
-                        shadow_blur: 0.0,
-                        shadow_spread: 0.0,
-                        shadow_color: [0.0; 4],
-                        shadow_offset: [0.0; 2],
-                        _pad: [0.0; 2],
-                    });
+                    let progress_rect = [progress_x, progress_y, progress_w, progress_h];
+                    let progress_style = ProgressStyle {
+                        track_color: 0x27272aff,
+                        fill_color: 0x3b82f6ff,
+                        corner_radius: 4.0,
+                    };
+                    progress_at(
+                        &mut state.core,
+                        progress_rect,
+                        progress_value,
+                        &progress_style,
+                    );
                 }
                 scroll_area_end(&mut state.core);
 
@@ -346,8 +391,7 @@ impl ApplicationHandler for App {
 
         process_window_event(&mut state.core.input, &event);
 
-        if let WindowEvent::RedrawRequested = event {
-        } else {
+        if !matches!(event, WindowEvent::RedrawRequested) {
             state.window.request_redraw();
         }
     }
