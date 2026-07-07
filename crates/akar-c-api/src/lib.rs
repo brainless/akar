@@ -463,3 +463,80 @@ pub unsafe extern "C" fn akar_set_margin(
     let nid: akar_layout::NodeId = node_id.into();
     ctx.layout.set_margin(nid, top, right, bottom, left);
 }
+
+#[repr(C)]
+pub struct AkarRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+#[no_mangle]
+pub extern "C" fn akar_list_clip(
+    total: u32,
+    item_height: f32,
+    scroll_y: f32,
+    viewport_height: f32,
+) -> AkarRange {
+    let r = akar_core::list_clip(total as usize, item_height, scroll_y, viewport_height);
+    AkarRange { start: r.start as u32, end: r.end as u32 }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_scroll_area_begin(
+    ctx: *mut AkarCtx,
+    rect: *const f32,
+    scroll_y: *mut f32,
+    content_height: f32,
+) -> f32 {
+    let ctx = unsafe { &mut *ctx };
+    let rect = unsafe { *(rect as *const [f32; 4]) };
+    let resp = akar_components::scroll_area_begin(
+        &mut ctx.core,
+        rect,
+        unsafe { &mut *scroll_y },
+        content_height,
+    );
+    resp.content_y
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_scroll_area_end(ctx: *mut AkarCtx) {
+    let ctx = unsafe { &mut *ctx };
+    akar_components::scroll_area_end(&mut ctx.core);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_progress(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value: f32,
+    track_color: u32,
+    fill_color: u32,
+    corner_radius: f32,
+) {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+    let style = akar_components::ProgressStyle { track_color, fill_color, corner_radius };
+    akar_components::akar_progress(&mut ctx.core, &ctx.layout, nid, value, &style);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_badge(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const std::ffi::c_char,
+    variant: u32,
+) {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+    let text = unsafe { std::ffi::CStr::from_ptr(text) }.to_str().unwrap_or("");
+    let variant = match variant {
+        1 => akar_components::BadgeVariant::Primary,
+        2 => akar_components::BadgeVariant::Success,
+        3 => akar_components::BadgeVariant::Warning,
+        4 => akar_components::BadgeVariant::Error,
+        5 => akar_components::BadgeVariant::Info,
+        _ => akar_components::BadgeVariant::Default,
+    };
+    akar_components::akar_badge(&mut ctx.core, &ctx.layout, nid, text, variant, &ctx.theme);
+}

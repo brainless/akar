@@ -32,6 +32,11 @@ typedef struct AkarBoxStyle {
     float shadow_spread;
 } AkarBoxStyle;
 
+typedef struct AkarRange {
+    uint32_t start;
+    uint32_t end;
+} AkarRange;
+
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
 void akar_ctx_free(struct AkarCtx *ctx);
@@ -99,5 +104,26 @@ void akar_set_margin(struct AkarCtx *ctx,
                      float right,
                      float bottom,
                      float left);
+
+struct AkarRange akar_list_clip(uint32_t total,
+                                float item_height,
+                                float scroll_y,
+                                float viewport_height);
+
+float akar_scroll_area_begin(struct AkarCtx *ctx,
+                             const float *rect,
+                             float *scroll_y,
+                             float content_height);
+
+void akar_scroll_area_end(struct AkarCtx *ctx);
+
+void akar_progress(struct AkarCtx *ctx,
+                   uint64_t node_id,
+                   float value,
+                   uint32_t track_color,
+                   uint32_t fill_color,
+                   float corner_radius);
+
+void akar_badge(struct AkarCtx *ctx, uint64_t node_id, const char *text, uint32_t variant);
 
 #endif  /* AKAR_H */

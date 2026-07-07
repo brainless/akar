@@ -346,6 +346,10 @@ pub use scroll_area::{ScrollAreaResponse, scroll_area_begin, scroll_area_end};
 
 ### Task 4: `Progress` and `Badge` Components
 
+**Status:** Done (commit a903956)
+
+**Review note:** Progress renders track + proportional fill (2 quads at value=1, 1 at value=0). Badge delegates text to `label()` — note the epic spec had a bug (`theme.font_size_sm` passed as theme param) which was corrected to pass `&AkarTheme`. No unit tests for badge (epic doesn't define any). 19 component tests pass.
+
 #### Progress
 
 **File:** `crates/akar-components/src/progress.rs` (new):

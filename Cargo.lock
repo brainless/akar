@@ -533,6 +533,7 @@ dependencies = [
  "akar-core",
  "akar-layout",
  "akar-winit",
+ "glyphon",
  "pollster",
  "taffy",
  "wgpu",

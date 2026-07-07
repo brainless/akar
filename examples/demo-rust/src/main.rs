@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use akar_components::{akar_button, akar_container, akar_label, akar_separator, AKAR_THEME_DARK, ButtonVariant, BoxStyle};
+use akar_components::{akar_badge, akar_container, AKAR_THEME_DARK, BadgeVariant, BoxStyle};
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Style, Size, AlignSelf, Display, FlexDirection, Dimension, length};
+use akar_layout::{Layout, PageConfig, Style, Size, Display, FlexDirection, Dimension, length};
+use akar_components::{scroll_area_begin, scroll_area_end};
+use akar_core::list_clip;
 use akar_winit::process_window_event;
 use wgpu::{CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages};
 use winit::{
@@ -23,11 +25,11 @@ struct AppState {
     layout: Layout,
     page: akar_layout::PageLayout,
     two_col: akar_layout::TwoColumnLayout,
-    btn_node: akar_layout::NodeId,
-    strip: akar_layout::NodeId,
-    btn_zoom_in: akar_layout::NodeId,
-    btn_zoom_out: akar_layout::NodeId,
-    hint_label: akar_layout::NodeId,
+    scroll_y: f32,
+    badges_strip: akar_layout::NodeId,
+    success_badge: akar_layout::NodeId,
+    warning_badge: akar_layout::NodeId,
+    scroll_container: akar_layout::NodeId,
 }
 
 fn main() {
@@ -86,16 +88,6 @@ impl ApplicationHandler for App {
 
         let two_col = layout.two_column(page.main, 0.5, 1.0);
 
-        let btn_node = layout.new_leaf(Style {
-            size: Size {
-                width: length(160.0),
-                height: length(48.0),
-            },
-            align_self: Some(AlignSelf::FLEX_START),
-            ..Default::default()
-        });
-        layout.add_child(two_col.right, btn_node);
-
         layout.set_style(two_col.right, Style {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
@@ -103,19 +95,19 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
-        let strip = layout.new_leaf(Style {
+        let badges_strip = layout.new_leaf(Style {
             display: Display::Flex,
             flex_direction: FlexDirection::Row,
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(48.0),
+                height: length(36.0),
             },
-            gap: taffy::prelude::Size {
+            gap: taffy::geometry::Size {
                 width: length(8.0),
                 height: length(0.0),
             },
-            padding: taffy::prelude::Rect {
+            padding: taffy::geometry::Rect {
                 left: length(8.0),
                 right: length(8.0),
                 top: length(4.0),
@@ -124,33 +116,30 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
-        let btn_zoom_in = layout.new_leaf(Style {
+        let success_badge = layout.new_leaf(Style {
             flex_shrink: 0.0,
-            size: Size {
-                width: length(80.0),
-                height: length(36.0),
-            },
+            size: Size { width: length(70.0), height: length(28.0) },
             ..Default::default()
         });
-
-        let btn_zoom_out = layout.new_leaf(Style {
+        let warning_badge = layout.new_leaf(Style {
             flex_shrink: 0.0,
-            size: Size {
-                width: length(80.0),
-                height: length(36.0),
-            },
+            size: Size { width: length(70.0), height: length(28.0) },
             ..Default::default()
         });
+        layout.add_child(badges_strip, success_badge);
+        layout.add_child(badges_strip, warning_badge);
 
-        let hint_label = layout.new_leaf(Style {
+        let scroll_container = layout.new_leaf(Style {
             flex_grow: 1.0,
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            overflow: taffy::geometry::Point { x: taffy::style::Overflow::Clip, y: taffy::style::Overflow::Clip },
+            size: Size { width: Dimension::percent(1.0), height: Dimension::auto() },
             ..Default::default()
         });
 
-        layout.add_child(strip, btn_zoom_in);
-        layout.add_child(strip, btn_zoom_out);
-        layout.add_child(strip, hint_label);
-        layout.add_child(two_col.right, strip);
+        layout.add_child(two_col.right, badges_strip);
+        layout.add_child(two_col.right, scroll_container);
 
         self.state = Some(AppState {
             window,
@@ -162,11 +151,11 @@ impl ApplicationHandler for App {
             layout,
             page,
             two_col,
-            btn_node,
-            strip,
-            btn_zoom_in,
-            btn_zoom_out,
-            hint_label,
+            scroll_y: 0.0,
+            badges_strip,
+            success_badge,
+            warning_badge,
+            scroll_container,
         });
     }
 
@@ -208,47 +197,117 @@ impl ApplicationHandler for App {
                 akar_container(&mut state.core, &state.layout, state.page.main, &BoxStyle::surface(&AKAR_THEME_DARK));
                 akar_container(&mut state.core, &state.layout, state.two_col.left, &BoxStyle::flat(0x172554ff));
                 akar_container(&mut state.core, &state.layout, state.two_col.right, &BoxStyle::flat(0x27272aff));
-                akar_separator(&mut state.core, &state.layout, state.two_col.separator, &AKAR_THEME_DARK);
 
-                let result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.btn_node,
-                    "Click me",
-                    ButtonVariant::Solid,
-                    &AKAR_THEME_DARK,
-                );
-                if result.clicked {
-                    println!("clicked!");
+                akar_container(&mut state.core, &state.layout, state.badges_strip, &BoxStyle::card(&AKAR_THEME_DARK));
+                akar_badge(&mut state.core, &state.layout, state.success_badge, "Success", BadgeVariant::Success, &AKAR_THEME_DARK);
+                akar_badge(&mut state.core, &state.layout, state.warning_badge, "Warning", BadgeVariant::Warning, &AKAR_THEME_DARK);
+
+                let scroll_rect = state.layout.rect(state.scroll_container);
+                let total_items = 50_usize;
+                let item_height = 48.0_f32;
+                let content_height = total_items as f32 * item_height;
+
+                let resp = scroll_area_begin(&mut state.core, scroll_rect, &mut state.scroll_y, content_height);
+                let visible = list_clip(total_items, item_height, state.scroll_y, scroll_rect[3]);
+
+                for i in visible {
+                    let y = resp.content_y + i as f32 * item_height;
+                    let item_rect = [scroll_rect[0], y, scroll_rect[2], item_height];
+                    let inner_pad = 4.0_f32;
+                    let inner_rect = [
+                        item_rect[0] + inner_pad,
+                        item_rect[1] + inner_pad,
+                        item_rect[2] - 2.0 * inner_pad,
+                        item_rect[3] - 2.0 * inner_pad,
+                    ];
+
+                    let item_bg = 0x1e293bffu32;
+                    let item_border = 0x334155ffu32;
+
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: item_rect,
+                        fill: [
+                            ((item_bg >> 24) & 0xFF) as f32 / 255.0,
+                            ((item_bg >> 16) & 0xFF) as f32 / 255.0,
+                            ((item_bg >> 8) & 0xFF) as f32 / 255.0,
+                            (item_bg & 0xFF) as f32 / 255.0,
+                        ],
+                        border_color: [
+                            ((item_border >> 24) & 0xFF) as f32 / 255.0,
+                            ((item_border >> 16) & 0xFF) as f32 / 255.0,
+                            ((item_border >> 8) & 0xFF) as f32 / 255.0,
+                            (item_border & 0xFF) as f32 / 255.0,
+                        ],
+                        corner_radii: [6.0; 4],
+                        border_width: 1.0,
+                        z: 0.0,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
+
+                    let label_text = format!("Item {}", i + 1);
+                    let buffer_id = state.core.text_pipeline.set_text(
+                        Some(i as u64),
+                        &label_text,
+                        glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                        Some(inner_rect[2] * 0.6),
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id,
+                        x: inner_rect[0],
+                        y: inner_rect[1],
+                        clip: inner_rect,
+                        color: [0.98, 0.98, 0.98, 1.0],
+                        z: 0.0,
+                    });
+
+                    let progress_value = (i + 1) as f32 / total_items as f32;
+                    let progress_x = inner_rect[0] + inner_rect[2] * 0.65;
+                    let progress_w = inner_rect[2] * 0.35;
+                    let progress_h = 8.0;
+                    let progress_y = inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
+                    let track_rect = [progress_x, progress_y, progress_w, progress_h];
+                    let fill_rect = [progress_x, progress_y, progress_w * progress_value, progress_h];
+                    let corner = 4.0_f32;
+                    let track_color = 0x27272affu32;
+
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: track_rect,
+                        fill: [
+                            ((track_color >> 24) & 0xFF) as f32 / 255.0,
+                            ((track_color >> 16) & 0xFF) as f32 / 255.0,
+                            ((track_color >> 8) & 0xFF) as f32 / 255.0,
+                            (track_color & 0xFF) as f32 / 255.0,
+                        ],
+                        border_color: [0.0; 4],
+                        corner_radii: [corner; 4],
+                        border_width: 0.0,
+                        z: 0.0,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: fill_rect,
+                        fill: [0.23, 0.51, 0.96, 1.0],
+                        border_color: [0.0; 4],
+                        corner_radii: [corner; 4],
+                        border_width: 0.0,
+                        z: 0.0,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
                 }
-
-                akar_container(&mut state.core, &state.layout, state.strip, &BoxStyle::card(&AKAR_THEME_DARK));
-
-                let _zoom_in_result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.btn_zoom_in,
-                    "Zoom In",
-                    ButtonVariant::Solid,
-                    &AKAR_THEME_DARK,
-                );
-                let _zoom_out_result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.btn_zoom_out,
-                    "Zoom Out",
-                    ButtonVariant::Outline,
-                    &AKAR_THEME_DARK,
-                );
-
-                akar_label(
-                    &mut state.core,
-                    &state.layout,
-                    state.hint_label,
-                    "Pan: middle-mouse drag  |  Zoom: scroll",
-                    AKAR_THEME_DARK.base_content,
-                    &AKAR_THEME_DARK,
-                );
+                scroll_area_end(&mut state.core);
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
