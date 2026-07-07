@@ -1,6 +1,6 @@
 # Epic 011: Overlay Stack
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Floating UI elements — Tooltip, Modal/Dialog, Toast, and the Dropdown primitive. All render at `Z_OVERLAY` (introduced in Epic 010), above the drawer layer. This epic completes the layering model and provides the infrastructure that Select (Epic 012) depends on for its option list.
 
 **Prerequisite:** Epic 010 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -61,6 +61,16 @@
 - `akar_dropdown_begin(ctx, anchor_rect, item_height, viewport_rect, is_open)` — wraps `dropdown_begin`
 - `akar_dropdown_end(ctx)` — wraps `dropdown_end`
 - `akar.h` regenerated — all 4 new struct types + 6 function declarations confirmed present
+- 117 total workspace tests pass, clippy clean
+
+### Task 6 — Demo Update (Done)
+
+`examples/demo-rust/src/main.rs`:
+- Tooltip on each progress bar showing "N% complete" (TooltipSide::Top)
+- "New Item" button in navbar opens modal centered at 400×300 with placeholder content; close via scrim or close button
+- Tab-switch events push ToastItem::Info toasts (bottom-right stack, max 3, dismiss-on-click)
+- "Dropdown" button in navbar opens dropdown with 4 options (Option A-D); hover highlight, click to close
+- `viewport_rect` computed once and reused across all overlay components
 - 117 total workspace tests pass, clippy clean
 
 ---
@@ -150,12 +160,12 @@ The demo gains:
 
 ## Acceptance Criteria
 
-- [ ] `tooltip` renders only when the trigger rect is hovered; position is viewport-clamped.
-- [ ] `position_tooltip` is a public free function usable independently of the tooltip component.
-- [ ] `modal_begin/end` renders a centered panel with scrim; `close_requested` fires on scrim click.
-- [ ] Modal content node is a valid taffy NodeId the caller can render into.
-- [ ] `toasts` renders all items stacked in the correct corner; `dismissed` index is correct.
-- [ ] `dropdown_begin/end` renders a card-background list at Z_OVERLAY; opens above anchor if near viewport bottom.
-- [ ] All components exposed in `akar.h`.
-- [ ] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean.
-- [ ] No retained timer state — toast lifetime is caller-managed.
+- [x] `tooltip` renders only when the trigger rect is hovered; position is viewport-clamped.
+- [x] `position_tooltip` is a public free function usable independently of the tooltip component.
+- [x] `modal_begin/end` renders a centered panel with scrim; `close_requested` fires on scrim click.
+- [x] Modal content node is a valid taffy NodeId the caller can render into.
+- [x] `toasts` renders all items stacked in the correct corner; `dismissed` index is correct.
+- [x] `dropdown_begin/end` renders a card-background list at Z_OVERLAY; opens above anchor if near viewport bottom.
+- [x] All components exposed in `akar.h`.
+- [x] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean.
+- [x] No retained timer state — toast lifetime is caller-managed.
