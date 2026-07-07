@@ -83,3 +83,9 @@ pub use slider::slider as akar_slider;
 
 pub mod select;
 pub use select::select as akar_select;
+
+pub mod text_input;
+pub use text_input::{text_input as akar_text_input, TextInputResponse};
+
+pub mod textarea;
+pub use textarea::{textarea as akar_textarea, TextAreaResponse};

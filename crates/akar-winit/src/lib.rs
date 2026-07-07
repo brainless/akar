@@ -25,6 +25,28 @@ pub fn process_window_event(input: &mut InputState, event: &WindowEvent) {
                     input.push_char(c);
                 }
             }
+            if event.state == ElementState::Pressed {
+                match &event.logical_key {
+                    winit::keyboard::Key::Named(name) => {
+                        let key = match name {
+                            winit::keyboard::NamedKey::Backspace => akar_core::Key::Backspace,
+                            winit::keyboard::NamedKey::Delete => akar_core::Key::Delete,
+                            winit::keyboard::NamedKey::ArrowLeft => akar_core::Key::Left,
+                            winit::keyboard::NamedKey::ArrowRight => akar_core::Key::Right,
+                            winit::keyboard::NamedKey::ArrowUp => akar_core::Key::Up,
+                            winit::keyboard::NamedKey::ArrowDown => akar_core::Key::Down,
+                            winit::keyboard::NamedKey::Home => akar_core::Key::Home,
+                            winit::keyboard::NamedKey::End => akar_core::Key::End,
+                            winit::keyboard::NamedKey::Enter => akar_core::Key::Enter,
+                            winit::keyboard::NamedKey::Escape => akar_core::Key::Escape,
+                            winit::keyboard::NamedKey::Tab => akar_core::Key::Tab,
+                            _ => return,
+                        };
+                        input.push_key(key);
+                    }
+                    _ => {}
+                }
+            }
         }
         _ => {}
     }

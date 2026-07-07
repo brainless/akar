@@ -218,3 +218,33 @@ All form values are owned by the demo's app state struct.
 - `crates/akar-components/src/switch.rs` (new)
 - `crates/akar-components/src/slider.rs` (new)
 - `crates/akar-components/src/select.rs` (new)
+
+### Round 2 (2026-07-07)
+
+**Task 2 — Winit key translation (akar-winit):**
+- Extended `KeyboardInput` handler: on `ElementState::Pressed`, matches `event.logical_key` against `Key::Named(named)` for all 11 `NamedKey` variants
+- Maps to `akar_core::Key` and calls `input.push_key(key)`
+- Uses `logical_key` (correct for compose/IME-processed keys)
+
+**Task 8 — TextInput:**
+- File: `crates/akar-components/src/text_input.rs` (233 lines)
+- `TextInputResponse { changed, submitted }`
+- Focus on click, click-outside defocus; char insertion, Backspace/Delete with UTF-8 char boundary safety; Left/Right/Home/End cursor movement; Enter → `submitted`; Escape → defocus
+- Cursor quad (2px, `theme.primary`) controlled by `cursor_visible`
+- Placeholder text in muted color when empty + not focused
+- UTF-8 char boundary helpers `prev_char_boundary`/`next_char_boundary`
+
+**Task 9 — Textarea:**
+- File: `crates/akar-components/src/textarea.rs` (288 lines)
+- `TextAreaResponse { changed }`
+- All TextInput key handling, plus Enter inserts `'\n'`; Up/Down cursor between lines; Home/End to line start/end
+- `scroll_y` for vertical scroll (mouse wheel + caller-managed); scissor push/pop for clipping
+- Cursor Y tracks line count from newlines
+
+`cargo check --workspace` and `cargo test --workspace` pass clean.
+
+**Files changed in Round 2:**
+- `crates/akar-winit/src/lib.rs`
+- `crates/akar-components/src/text_input.rs` (new)
+- `crates/akar-components/src/textarea.rs` (new)
+- `crates/akar-components/src/lib.rs`
