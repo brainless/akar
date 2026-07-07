@@ -1,9 +1,22 @@
 # Epic 011: Overlay Stack
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Floating UI elements — Tooltip, Modal/Dialog, Toast, and the Dropdown primitive. All render at `Z_OVERLAY` (introduced in Epic 010), above the drawer layer. This epic completes the layering model and provides the infrastructure that Select (Epic 012) depends on for its option list.
 
 **Prerequisite:** Epic 010 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
+
+---
+
+## Task Notes
+
+### Task 1 — Tooltip + position_tooltip (Done)
+
+`crates/akar-components/src/tooltip.rs`:
+- `TooltipSide` enum: `Top`, `Bottom`, `Left`, `Right`
+- `position_tooltip()` — public free function; places rect relative to trigger, flips to opposite side when preferred side doesn't fit viewport, clamps result to viewport bounds
+- `tooltip()` — renders only when trigger rect is hovered; measures text via `text_pipeline.set_text()` + `measure()`, positions via `position_tooltip()`, pushes rounded quad background + text at `Z_OVERLAY`
+- 5 tests: not-hovered (0 calls, visible=false), hovered (≥1 call, visible=true), above placement, flip-to-bottom, right-edge clamping
+- All 5 pass, 54 total component tests, clippy clean
 
 ---
 
