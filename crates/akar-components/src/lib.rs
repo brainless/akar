@@ -50,3 +50,6 @@ pub use canvas::{
     canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasPainter, CanvasResponse,
     CanvasState, PanButton,
 };
+
+pub mod tabs;
+pub use tabs::{tab_bar as akar_tab_bar, TabBarResponse, TabVariant};

@@ -15,6 +15,17 @@
 - `Z_BASE = 0.0`, `Z_SCRIM = 0.5`, `Z_FLOAT = 1.0`, `Z_OVERLAY = 2.0` added as public constants.
 - Exported from `akar-core` crate root. Clippy and tests pass.
 
+### Task 2 — Tabs Component (Done)
+
+`crates/akar-components/src/tabs.rs`:
+- `TabVariant` enum: `Boxed`, `Lifted`, `Pills`, `Underline`
+- `tab_bar()` renders evenly-spaced tabs across node width; uses manual rect math (no sub-layout)
+- Each variant renders: Boxed (border + distinct fill), Lifted (rounded top, flat bottom on active), Pills (full pill), Underline (3px accent bar on active)
+- Text via `text_pipeline.set_text()` with per-variant active/inactive colors
+- Hit-testing via `core.input.is_clicked()` per tab rect
+- Tests: zero labels (0 calls, no click), all tabs rendered (3 quads, active fill check), click detection (simulated click returns Some(0)), all variants no panic (4 variants > 0 calls)
+- 4 tests pass, 43 total component tests, clippy clean
+
 
 
 ---
