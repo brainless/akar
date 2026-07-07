@@ -79,6 +79,18 @@ All 6 components exposed in `crates/akar-c-api/src/lib.rs`:
 - `akar.h` regenerated via cbindgen — all 6 new APIs present
 - All 5 existing C ABI integration tests still pass
 
+### Task 8 — Demo Update (Done)
+
+`examples/demo-rust/src/main.rs` — completely reworked layout:
+- Navbar (top, using page header): title "akar" in start slot, badge "3" + "Notifications" button in end slot
+- Alert (info, dismissible with "×" button, sets `Display::None` on dismiss)
+- Stat row (3 cards): Revenue ($12,345), Users (1,234), Active (89%)
+- Steps: 4 steps (Plan→Build→Test→Launch), current=1
+- Avatar row: 3 avatars ("JD", "AK", "MR") with "Show Skeleton"/"Show Avatars" toggle button
+- Skeleton toggle: switches between real avatar circles and skeleton placeholders
+- Scrollable list (unchanged from Epic 008) at bottom
+- `cargo check -p demo-rust` passes clean
+
 ---
 
 ## Scope

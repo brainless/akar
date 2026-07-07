@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use akar_components::{
-    akar_badge, akar_container, progress_at, BadgeVariant, BoxStyle, ProgressStyle, AKAR_THEME_DARK,
+    akar_alert, akar_avatar, akar_badge, akar_button, akar_container, akar_label, akar_navbar,
+    akar_skeleton, akar_stat, akar_steps, progress_at, AlertVariant, BadgeVariant, BoxStyle,
+    ButtonVariant, NavbarSlots, ProgressStyle, SkeletonVariant, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -30,10 +32,18 @@ struct AppState {
     page: akar_layout::PageLayout,
     two_col: akar_layout::TwoColumnLayout,
     scroll_y: f32,
-    badges_strip: akar_layout::NodeId,
-    success_badge: akar_layout::NodeId,
-    warning_badge: akar_layout::NodeId,
     scroll_container: akar_layout::NodeId,
+    navbar_slots: Option<NavbarSlots>,
+    navbar_title_node: akar_layout::NodeId,
+    navbar_badge_node: akar_layout::NodeId,
+    navbar_btn_node: akar_layout::NodeId,
+    alert_node: akar_layout::NodeId,
+    alert_dismissed: bool,
+    stat_nodes: [akar_layout::NodeId; 3],
+    steps_node: akar_layout::NodeId,
+    avatar_nodes: [akar_layout::NodeId; 3],
+    skeleton_toggle_node: akar_layout::NodeId,
+    show_skeleton: bool,
 }
 
 fn main() {
@@ -96,17 +106,30 @@ impl ApplicationHandler for App {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Column,
                 flex_grow: 1.0,
+                gap: taffy::geometry::Size {
+                    width: length(0.0),
+                    height: length(8.0),
+                },
                 ..Default::default()
             },
         );
 
-        let badges_strip = layout.new_leaf(Style {
+        let alert_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(48.0),
+            },
+            ..Default::default()
+        });
+
+        let stat_row = layout.new_leaf(Style {
             display: Display::Flex,
             flex_direction: FlexDirection::Row,
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(36.0),
+                height: length(100.0),
             },
             gap: taffy::geometry::Size {
                 width: length(8.0),
@@ -121,24 +144,104 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
-        let success_badge = layout.new_leaf(Style {
-            flex_shrink: 0.0,
+        let stat_1 = layout.new_leaf(Style {
+            flex_grow: 1.0,
             size: Size {
-                width: length(70.0),
-                height: length(28.0),
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
             },
             ..Default::default()
         });
-        let warning_badge = layout.new_leaf(Style {
-            flex_shrink: 0.0,
+        let stat_2 = layout.new_leaf(Style {
+            flex_grow: 1.0,
             size: Size {
-                width: length(70.0),
-                height: length(28.0),
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
             },
             ..Default::default()
         });
-        layout.add_child(badges_strip, success_badge);
-        layout.add_child(badges_strip, warning_badge);
+        let stat_3 = layout.new_leaf(Style {
+            flex_grow: 1.0,
+            size: Size {
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
+            },
+            ..Default::default()
+        });
+        let stat_nodes = [stat_1, stat_2, stat_3];
+        for &n in &stat_nodes {
+            layout.add_child(stat_row, n);
+        }
+
+        let steps_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(56.0),
+            },
+            ..Default::default()
+        });
+
+        let avatar_row = layout.new_leaf(Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            flex_shrink: 0.0,
+            align_items: Some(taffy::prelude::AlignItems::CENTER),
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(56.0),
+            },
+            gap: taffy::geometry::Size {
+                width: length(8.0),
+                height: length(0.0),
+            },
+            padding: taffy::geometry::Rect {
+                left: length(8.0),
+                right: length(0.0),
+                top: length(0.0),
+                bottom: length(0.0),
+            },
+            ..Default::default()
+        });
+
+        let avatar_1 = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(40.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        let avatar_2 = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(40.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        let avatar_3 = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(40.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        let avatar_nodes = [avatar_1, avatar_2, avatar_3];
+        for &n in &avatar_nodes {
+            layout.add_child(avatar_row, n);
+        }
+
+        let skeleton_toggle_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(140.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+        layout.add_child(avatar_row, skeleton_toggle_node);
 
         let scroll_container = layout.new_leaf(Style {
             flex_grow: 1.0,
@@ -155,8 +258,36 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
-        layout.add_child(two_col.right, badges_strip);
+        layout.add_child(two_col.right, alert_node);
+        layout.add_child(two_col.right, stat_row);
+        layout.add_child(two_col.right, steps_node);
+        layout.add_child(two_col.right, avatar_row);
         layout.add_child(two_col.right, scroll_container);
+
+        let navbar_title_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(80.0),
+                height: length(48.0),
+            },
+            ..Default::default()
+        });
+        let navbar_badge_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(32.0),
+                height: length(24.0),
+            },
+            ..Default::default()
+        });
+        let navbar_btn_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(120.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
 
         self.state = Some(AppState {
             window,
@@ -169,10 +300,18 @@ impl ApplicationHandler for App {
             page,
             two_col,
             scroll_y: 0.0,
-            badges_strip,
-            success_badge,
-            warning_badge,
             scroll_container,
+            navbar_slots: None,
+            navbar_title_node,
+            navbar_badge_node,
+            navbar_btn_node,
+            alert_node,
+            alert_dismissed: false,
+            stat_nodes,
+            steps_node,
+            avatar_nodes,
+            skeleton_toggle_node,
+            show_skeleton: false,
         });
     }
 
@@ -203,6 +342,31 @@ impl ApplicationHandler for App {
 
                 state.core.begin_frame(size.width, size.height, scale);
 
+                let navbar_id = state.page.header.unwrap();
+
+                if state.navbar_slots.is_none() {
+                    let slots = akar_navbar(
+                        &mut state.core,
+                        &mut state.layout,
+                        navbar_id,
+                        &AKAR_THEME_DARK,
+                    );
+                    state.layout.add_child(slots.start, state.navbar_title_node);
+                    state.layout.add_child(slots.end, state.navbar_badge_node);
+                    state.layout.add_child(slots.end, state.navbar_btn_node);
+                    state.navbar_slots = Some(slots);
+                }
+
+                if state.alert_dismissed {
+                    state.layout.set_style(
+                        state.alert_node,
+                        Style {
+                            display: Display::None,
+                            ..Default::default()
+                        },
+                    );
+                }
+
                 state.layout.compute(
                     state.page.root,
                     (
@@ -215,9 +379,34 @@ impl ApplicationHandler for App {
                 akar_container(
                     &mut state.core,
                     &state.layout,
-                    state.page.header.unwrap(),
+                    navbar_id,
                     &BoxStyle::panel(&AKAR_THEME_DARK),
                 );
+                akar_label(
+                    &mut state.core,
+                    &state.layout,
+                    state.navbar_title_node,
+                    "akar",
+                    AKAR_THEME_DARK.base_content,
+                    &AKAR_THEME_DARK,
+                );
+                akar_badge(
+                    &mut state.core,
+                    &state.layout,
+                    state.navbar_badge_node,
+                    "3",
+                    BadgeVariant::Primary,
+                    &AKAR_THEME_DARK,
+                );
+                akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.navbar_btn_node,
+                    "Notifications",
+                    ButtonVariant::Ghost,
+                    &AKAR_THEME_DARK,
+                );
+
                 akar_container(
                     &mut state.core,
                     &state.layout,
@@ -243,28 +432,82 @@ impl ApplicationHandler for App {
                     &BoxStyle::flat(0x27272aff),
                 );
 
-                akar_container(
+                if !state.alert_dismissed {
+                    let result = akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_node,
+                        "Welcome to akar demo!",
+                        AlertVariant::Info,
+                        true,
+                        &AKAR_THEME_DARK,
+                    );
+                    state.alert_dismissed = result.dismissed;
+                }
+
+                let stat_data = [
+                    ("Revenue", "$12,345", Some("+12% vs last month")),
+                    ("Users", "1,234", Some("+8% vs last month")),
+                    ("Active", "89%", Some("+3% vs last month")),
+                ];
+                for (i, &(title, value, desc)) in stat_data.iter().enumerate() {
+                    akar_stat(
+                        &mut state.core,
+                        &state.layout,
+                        state.stat_nodes[i],
+                        title,
+                        value,
+                        desc,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+
+                akar_steps(
                     &mut state.core,
                     &state.layout,
-                    state.badges_strip,
-                    &BoxStyle::card(&AKAR_THEME_DARK),
-                );
-                akar_badge(
-                    &mut state.core,
-                    &state.layout,
-                    state.success_badge,
-                    "Success",
-                    BadgeVariant::Success,
+                    state.steps_node,
+                    &["Plan", "Build", "Test", "Launch"],
+                    1,
                     &AKAR_THEME_DARK,
                 );
-                akar_badge(
+
+                let avatar_initials = ["JD", "AK", "MR"];
+                for (i, initials) in avatar_initials.iter().enumerate() {
+                    if state.show_skeleton {
+                        akar_skeleton(
+                            &mut state.core,
+                            &state.layout,
+                            state.avatar_nodes[i],
+                            SkeletonVariant::Circle,
+                            &AKAR_THEME_DARK,
+                        );
+                    } else {
+                        akar_avatar(
+                            &mut state.core,
+                            &state.layout,
+                            state.avatar_nodes[i],
+                            initials,
+                            None,
+                            &AKAR_THEME_DARK,
+                        );
+                    }
+                }
+                let toggle_label = if state.show_skeleton {
+                    "Show Avatars"
+                } else {
+                    "Show Skeleton"
+                };
+                let toggle_result = akar_button(
                     &mut state.core,
                     &state.layout,
-                    state.warning_badge,
-                    "Warning",
-                    BadgeVariant::Warning,
+                    state.skeleton_toggle_node,
+                    toggle_label,
+                    ButtonVariant::Solid,
                     &AKAR_THEME_DARK,
                 );
+                if toggle_result.clicked {
+                    state.show_skeleton = !state.show_skeleton;
+                }
 
                 let scroll_rect = state.layout.rect(state.scroll_container);
                 let total_items = 50_usize;
