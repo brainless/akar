@@ -47,6 +47,16 @@
 - Tests: three distinct slots, panel quad pushed, children position correctly in slots
 - 3 tests pass, clippy clean
 
+### Task 5 — Steps (Done)
+
+`crates/akar-components/src/steps.rs`:
+- `steps()` renders: circle dots (completed = primary, current = primary + larger, future = base_300), connector lines, and labels below each step
+- Steps distributed evenly across node width
+- `current` clamped to `0..labels.len()-1`
+- No interaction, no return value
+- Tests: empty labels, all completed (all primary), first step current (first=primary, rest=base_300)
+- 3 tests pass, clippy clean
+
 ---
 
 ## Scope
