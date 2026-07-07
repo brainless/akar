@@ -26,6 +26,17 @@
 - Tests: zero labels (0 calls, no click), all tabs rendered (3 quads, active fill check), click detection (simulated click returns Some(0)), all variants no panic (4 variants > 0 calls)
 - 4 tests pass, 43 total component tests, clippy clean
 
+### Task 3 — Drawer Component (Done)
+
+`crates/akar-components/src/drawer.rs`:
+- `DrawerEdge` enum: `Left`, `Right`
+- `drawer_begin()` renders scrim at `Z_SCRIM` (0.5) and panel background at `Z_FLOAT` (1.0), pushes scissor for panel rect, returns `DrawerResponse { close_requested }`
+- `drawer_end()` pops the scissor
+- Panel radii: outer edge flat, inner edge rounded via `theme.radius_box`
+- Panel shadow direction depends on edge
+- Tests: zero width (no draw calls), left/right edge (2 quads at correct positions), scrim click (close_requested=true), panel click (close_requested=false), scissor push/pop
+- 6 tests pass, 49 total component tests, clippy clean
+
 
 
 ---

@@ -53,3 +53,6 @@ pub use canvas::{
 
 pub mod tabs;
 pub use tabs::{tab_bar as akar_tab_bar, TabBarResponse, TabVariant};
+
+pub mod drawer;
+pub use drawer::{drawer_begin, drawer_end, DrawerEdge, DrawerResponse};
