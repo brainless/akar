@@ -1,6 +1,6 @@
 # Epic 010: Tabs and Drawer
 
-**Status:** Planned
+**Status:** Done
 **Goal:** Two structural components that organize content into switchable regions (Tabs) and a collapsible side panel (Drawer). This epic introduces Z-layer rendering — the ability to render content above the normal page layer — required for Drawer and foundational for Epic 011's overlay stack.
 
 **Prerequisite:** Epic 009 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -153,12 +153,12 @@ The demo gains:
 
 ## Acceptance Criteria
 
-- [ ] `Z_BASE`, `Z_SCRIM`, `Z_FLOAT`, `Z_OVERLAY` constants exported from `akar-core`.
-- [ ] `tab_bar` renders all tab labels; active tab is visually distinct; returns clicked index correctly.
-- [ ] All four tab variants (Boxed, Lifted, Pills, Underline) render without panic.
-- [ ] `drawer_begin` / `drawer_end` render the scrim and panel at the correct z-levels.
-- [ ] Drawer scissor clips content to the panel rect.
-- [ ] `close_requested` is true when the scrim is clicked.
-- [ ] All components exposed in `akar.h`.
-- [ ] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean.
-- [ ] No retained animation state — width is caller-provided.
+- [x] `Z_BASE`, `Z_SCRIM`, `Z_FLOAT`, `Z_OVERLAY` constants exported from `akar-core`.
+- [x] `tab_bar` renders all tab labels; active tab is visually distinct; returns clicked index correctly.
+- [x] All four tab variants (Boxed, Lifted, Pills, Underline) render without panic.
+- [x] `drawer_begin` / `drawer_end` render the scrim and panel at the correct z-levels.
+- [x] Drawer scissor clips content to the panel rect.
+- [x] `close_requested` is true when the scrim is clicked.
+- [x] All components exposed in `akar.h`.
+- [x] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean.
+- [x] No retained animation state — width is caller-provided.
