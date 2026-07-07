@@ -629,10 +629,7 @@ pub unsafe extern "C" fn akar_stat(
     } else {
         let desc_bytes =
             unsafe { std::slice::from_raw_parts(description as *const u8, description_len as usize) };
-        match std::str::from_utf8(desc_bytes) {
-            Ok(s) => Some(s),
-            Err(_) => None,
-        }
+        std::str::from_utf8(desc_bytes).ok()
     };
 
     let nid: akar_layout::NodeId = node_id.into();

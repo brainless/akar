@@ -30,7 +30,7 @@ pub fn steps(
     let current_diameter = 14.0;
     let current_radius = current_diameter / 2.0;
 
-    for i in 0..count {
+    for (i, label) in labels.iter().enumerate() {
         let circle_center_x = rect[0] + step_spacing * i as f32 + step_spacing / 2.0;
 
         let is_current = i == current;
@@ -42,7 +42,6 @@ pub fn steps(
 
         let circle_x = circle_center_x - radius;
 
-        // Connector line before this step
         if i > 0 {
             let prev_center_x = rect[0] + step_spacing * (i - 1) as f32 + step_spacing / 2.0;
             let prev_radius = if (i - 1) == current {
@@ -74,7 +73,6 @@ pub fn steps(
             }
         }
 
-        // Circle dot
         let circle_center_y = rect[1] + circle_base_radius + 2.0;
         let circle_y = circle_center_y - radius;
         let circle_fill = if i <= current { theme.primary } else { theme.base_300 };
@@ -93,7 +91,6 @@ pub fn steps(
             _pad: [0.0; 2],
         });
 
-        // Label below circle
         let label_y = rect[1] + circle_base_diameter + 2.0 + 4.0;
         let label_color = if is_current {
             theme.primary
@@ -105,7 +102,7 @@ pub fn steps(
 
         let buffer_id = core.text_pipeline.set_text(
             Some(u64::from(node_id) + i as u64),
-            labels[i],
+            label,
             glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
             Some(step_spacing),
             None,

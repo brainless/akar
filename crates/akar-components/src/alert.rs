@@ -3,18 +3,13 @@ use crate::AkarTheme;
 use akar_core::{AkarCore, QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum AlertVariant {
+    #[default]
     Info,
     Success,
     Warning,
     Error,
-}
-
-impl Default for AlertVariant {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 pub struct AlertResult {

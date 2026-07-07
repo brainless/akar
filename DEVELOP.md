@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / implementation phase**. Epics 007 (Container Styling) and 008 (ScrollArea and Display) are complete. Epics 009–012 are planned: static display and navigation, tabs and drawer, overlay stack, form controls and text input. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / implementation phase**. Epics 007 (Container Styling), 008 (ScrollArea and Display), and 009 (Static Display and Navigation) are complete. Epics 010–012 are planned: tabs and drawer, overlay stack, form controls and text input. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 

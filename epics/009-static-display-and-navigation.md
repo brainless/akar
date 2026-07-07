@@ -1,6 +1,6 @@
 # Epic 009: Static Display and Navigation Components
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Complete the Tier 1 component catalog — components that display data without requiring complex interaction or overlay infrastructure. Add the foundational navigation bar that anchors page-level layout.
 
 **Prerequisite:** Epic 008 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
