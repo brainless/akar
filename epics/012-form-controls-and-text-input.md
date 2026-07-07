@@ -1,6 +1,6 @@
 # Epic 012: Form Controls and Text Input
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** All interactive input components. Discrete controls (Checkbox, Radio, Switch, Slider, Select) come first because they require only existing input infrastructure. Text input components (TextInput, Textarea) come last because they require extending `InputState` and `akar-winit` with named key events.
 
 **Prerequisite:** Epic 011 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -164,3 +164,57 @@ All form values are owned by the demo's app state struct.
 - [ ] All components exposed in `akar.h` with the signatures above.
 - [ ] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean.
 - [ ] No text selection, no clipboard, no IME — deferred per this epic's v1 scope.
+
+---
+
+## Review Notes
+
+### Round 1 (2026-07-07)
+
+**Task 1 — Key enum + push_key (akar-core):**
+- Added `Key` enum (11 variants: Backspace, Delete, Left, Right, Up, Down, Home, End, Enter, Escape, Tab) in `input.rs:3`
+- Added `keys_pressed: Vec<Key>` field to `InputState`
+- Added `push_key(&mut self, key: Key)` method
+- `begin_frame()` clears `keys_pressed`
+- `Key` re-exported from `akar-core/src/lib.rs`
+
+**Task 3 — Checkbox:**
+- File: `crates/akar-components/src/checkbox.rs` (118 lines)
+- Signature: `checkbox(core, layout, node_id, checked: &mut bool, label: &str, theme) -> bool`
+- 18×18 box + `"\u{2713}"` glyph + label text; tick toggles on click
+- Zero-area guard, hover border lighten via `scale_color`
+
+**Task 4 — Radio Group:**
+- File: `crates/akar-components/src/radio.rs` (121 lines)
+- Signature: `radio_group(core, layout, nodes: &[NodeId], labels: &[&str], selected: &mut usize, theme) -> bool`
+- 16×16 outer circle per item, 8×8 inner fill for selected; zero-area nodes skipped
+
+**Task 5 — Switch:**
+- File: `crates/akar-components/src/switch.rs` (98 lines)
+- Signature: `switch(core, layout, node_id, on: &mut bool, theme) -> bool`
+- 36×20 track (pill), 16×16 thumb at left/off or right/on; click toggles
+
+**Task 6 — Slider:**
+- File: `crates/akar-components/src/slider.rs` (121 lines)
+- Signature: `slider(core, layout, node_id, value: &mut f32, min: f32, max: f32, theme) -> bool`
+- Full-width track + fill portion + 14×14 thumb; drag via `is_pressed`, clamps `[min, max]`
+
+**Task 7 — Select:**
+- File: `crates/akar-components/src/select.rs` (207 lines)
+- Signature: `select(core, layout, node_id, options: &[&str], selected: &mut usize, open: &mut bool, theme, viewport_rect: [f32; 4]) -> bool`
+- Closed: bordered rect + selected text + `"\u{25BC}"` chevron. Open: delegates to `dropdown_begin/end`, renders up to 4 items with hover highlight; click-outside closes
+
+**`scale_color` moved to `color.rs`** (previously local to `button.rs`) — shared by checkbox, radio, switch, select.
+
+`cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` all pass.
+
+**Files changed in Round 1:**
+- `crates/akar-core/src/input.rs`
+- `crates/akar-core/src/lib.rs`
+- `crates/akar-components/src/color.rs`
+- `crates/akar-components/src/lib.rs`
+- `crates/akar-components/src/checkbox.rs` (new)
+- `crates/akar-components/src/radio.rs` (new)
+- `crates/akar-components/src/switch.rs` (new)
+- `crates/akar-components/src/slider.rs` (new)
+- `crates/akar-components/src/select.rs` (new)

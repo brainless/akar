@@ -2,7 +2,7 @@ pub mod draw_list;
 pub use draw_list::{DrawCall, DrawList, QuadCall, TextCall};
 
 pub mod input;
-pub use input::InputState;
+pub use input::{InputState, Key};
 
 pub mod quad_pipeline;
 pub use quad_pipeline::QuadPipeline;

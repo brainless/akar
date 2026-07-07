@@ -1,5 +1,20 @@
 use glam;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Key {
+    Backspace,
+    Delete,
+    Left,
+    Right,
+    Up,
+    Down,
+    Home,
+    End,
+    Enter,
+    Escape,
+    Tab,
+}
+
 pub struct InputState {
     pub mouse_pos: glam::Vec2,
     pub mouse_pos_prev: glam::Vec2,
@@ -8,6 +23,7 @@ pub struct InputState {
     pub mouse_buttons_released: [bool; 5],
     pub scroll_delta: glam::Vec2,
     pub chars: Vec<char>,
+    pub keys_pressed: Vec<Key>,
     pub focused_id: Option<u64>,
 }
 
@@ -21,6 +37,7 @@ impl InputState {
             mouse_buttons_released: [false; 5],
             scroll_delta: glam::Vec2::ZERO,
             chars: Vec::new(),
+            keys_pressed: Vec::new(),
             focused_id: None,
         }
     }
@@ -31,6 +48,7 @@ impl InputState {
         self.mouse_buttons_released = [false; 5];
         self.scroll_delta = glam::Vec2::ZERO;
         self.chars.clear();
+        self.keys_pressed.clear();
     }
 
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
@@ -55,6 +73,10 @@ impl InputState {
 
     pub fn push_char(&mut self, c: char) {
         self.chars.push(c);
+    }
+
+    pub fn push_key(&mut self, key: Key) {
+        self.keys_pressed.push(key);
     }
 
     pub fn is_hovering(&self, rect: [f32; 4]) -> bool {

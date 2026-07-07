@@ -68,3 +68,18 @@ pub use toast::{toasts, ToastItem, ToastResponse, ToastVariant};
 
 pub mod dropdown;
 pub use dropdown::{dropdown_begin, dropdown_end, DropdownState};
+
+pub mod checkbox;
+pub use checkbox::checkbox as akar_checkbox;
+
+pub mod radio;
+pub use radio::radio_group as akar_radio_group;
+
+pub mod switch;
+pub use switch::switch as akar_switch;
+
+pub mod slider;
+pub use slider::slider as akar_slider;
+
+pub mod select;
+pub use select::select as akar_select;
