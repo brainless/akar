@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_container, akar_label, akar_navbar,
-    akar_skeleton, akar_stat, akar_steps, akar_tab_bar, drawer_begin, drawer_end, progress_at,
+    akar_skeleton, akar_stat, akar_steps, akar_tab_bar, akar_tooltip, drawer_begin, drawer_end,
+    dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts,
     AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots, ProgressStyle,
-    SkeletonVariant, TabVariant, AKAR_THEME_DARK,
+    SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -56,6 +57,12 @@ struct AppState {
     stats_wrapper: akar_layout::NodeId,
     drawer_open: bool,
     drawer_progress: f32,
+    navbar_new_btn_node: akar_layout::NodeId,
+    navbar_dropdown_btn_node: akar_layout::NodeId,
+    modal_open: bool,
+    toasts_list: Vec<ToastItem>,
+    dropdown_open: bool,
+    prev_active_tab: usize,
 }
 
 fn main() {
@@ -338,6 +345,22 @@ impl ApplicationHandler for App {
             },
             ..Default::default()
         });
+        let navbar_new_btn_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(80.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+        let navbar_dropdown_btn_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(100.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
 
         self.state = Some(AppState {
             window,
@@ -355,6 +378,8 @@ impl ApplicationHandler for App {
             navbar_title_node,
             navbar_badge_node,
             navbar_btn_node,
+            navbar_new_btn_node,
+            navbar_dropdown_btn_node,
             alert_node,
             alert_dismissed: false,
             stat_nodes,
@@ -369,6 +394,10 @@ impl ApplicationHandler for App {
             stats_wrapper,
             drawer_open: false,
             drawer_progress: 0.0,
+            modal_open: false,
+            toasts_list: Vec::new(),
+            dropdown_open: false,
+            prev_active_tab: 0,
         });
     }
 
@@ -398,6 +427,12 @@ impl ApplicationHandler for App {
                 let scale = state.window.scale_factor() as f32;
 
                 state.core.begin_frame(size.width, size.height, scale);
+                let viewport_rect = [
+                    0.0,
+                    0.0,
+                    size.width as f32 / scale,
+                    size.height as f32 / scale,
+                ];
 
                 let navbar_id = state.page.header.unwrap();
 
@@ -411,6 +446,8 @@ impl ApplicationHandler for App {
                     state.layout.add_child(slots.start, state.navbar_title_node);
                     state.layout.add_child(slots.end, state.navbar_badge_node);
                     state.layout.add_child(slots.end, state.navbar_btn_node);
+                    state.layout.add_child(slots.end, state.navbar_new_btn_node);
+                    state.layout.add_child(slots.end, state.navbar_dropdown_btn_node);
                     state.navbar_slots = Some(slots);
                 }
 
@@ -474,6 +511,30 @@ impl ApplicationHandler for App {
                     state.drawer_open = !state.drawer_open;
                 }
 
+                let new_item_result = akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.navbar_new_btn_node,
+                    "New Item",
+                    ButtonVariant::Ghost,
+                    &AKAR_THEME_DARK,
+                );
+                if new_item_result.clicked {
+                    state.modal_open = !state.modal_open;
+                }
+
+                let dropdown_btn_result = akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.navbar_dropdown_btn_node,
+                    "Dropdown",
+                    ButtonVariant::Ghost,
+                    &AKAR_THEME_DARK,
+                );
+                if dropdown_btn_result.clicked {
+                    state.dropdown_open = !state.dropdown_open;
+                }
+
                 akar_container(
                     &mut state.core,
                     &state.layout,
@@ -523,6 +584,19 @@ impl ApplicationHandler for App {
                 );
                 if let Some(index) = tab_result.clicked {
                     state.active_tab = index;
+                }
+
+                if state.active_tab != state.prev_active_tab {
+                    let tab_names = ["List", "Canvas", "Stats"];
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Info,
+                        message: format!("Switched to {} tab", tab_names[state.active_tab]),
+                        dismiss_on_click: true,
+                    });
+                    state.prev_active_tab = state.active_tab;
+                }
+                while state.toasts_list.len() > 3 {
+                    state.toasts_list.remove(0);
                 }
 
                 match state.active_tab {
@@ -614,6 +688,16 @@ impl ApplicationHandler for App {
                                 progress_rect,
                                 progress_value,
                                 &progress_style,
+                            );
+
+                            let tip_text = format!("{:.0}% complete", progress_value * 100.0);
+                            akar_tooltip(
+                                &mut state.core,
+                                progress_rect,
+                                &tip_text,
+                                TooltipSide::Top,
+                                &AKAR_THEME_DARK,
+                                viewport_rect,
                             );
                         }
                         scroll_area_end(&mut state.core);
@@ -715,12 +799,6 @@ impl ApplicationHandler for App {
                 let panel_width = max_width * ease_out_cubic(state.drawer_progress);
 
                 if panel_width > 1.0 {
-                    let viewport_rect = [
-                        0.0,
-                        0.0,
-                        size.width as f32 / scale,
-                        size.height as f32 / scale,
-                    ];
                     let drawer_resp = drawer_begin(
                         &mut state.core,
                         viewport_rect,
@@ -809,6 +887,113 @@ impl ApplicationHandler for App {
                     if drawer_resp.close_requested {
                         state.drawer_open = false;
                     }
+                }
+
+                if state.modal_open {
+                    let modal_resp = modal_begin(
+                        &mut state.core,
+                        &mut state.layout,
+                        viewport_rect,
+                        "New Item",
+                        400.0,
+                        300.0,
+                        &AKAR_THEME_DARK,
+                    );
+
+                    let content_rect = state.layout.rect(modal_resp.content_node);
+
+                    let buffer_id = state.core.text_pipeline.set_text(
+                        Some(5000),
+                        "Modal content area \u{2014} add your form here.",
+                        glyphon::Metrics::new(16.0, 16.0 * 1.2),
+                        Some(content_rect[2] - 32.0),
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id,
+                        x: content_rect[0] + 16.0,
+                        y: content_rect[1] + 16.0,
+                        clip: content_rect,
+                        color: [0.8, 0.8, 0.85, 1.0],
+                        z: akar_core::Z_FLOAT,
+                    });
+
+                    modal_end(&mut state.core);
+
+                    if modal_resp.close_requested {
+                        state.modal_open = false;
+                    }
+                }
+
+                let toast_resp = toasts(
+                    &mut state.core,
+                    viewport_rect,
+                    &mut state.toasts_list,
+                    &AKAR_THEME_DARK,
+                );
+                if let Some(index) = toast_resp.dismissed {
+                    state.toasts_list.remove(index);
+                }
+
+                let dropdown_btn_rect = state.layout.rect(state.navbar_dropdown_btn_node);
+                let dropdown_state = dropdown_begin(
+                    &mut state.core,
+                    dropdown_btn_rect,
+                    28.0,
+                    viewport_rect,
+                    state.dropdown_open,
+                    &AKAR_THEME_DARK,
+                );
+
+                if dropdown_state.is_open {
+                    let items = ["Option A", "Option B", "Option C", "Option D"];
+                    for (i, item) in items.iter().enumerate() {
+                        let item_y = dropdown_state.content_rect[1] + i as f32 * 28.0;
+                        let item_rect = [
+                            dropdown_state.content_rect[0],
+                            item_y,
+                            dropdown_state.content_rect[2],
+                            28.0,
+                        ];
+
+                        if state.core.input.is_hovering(item_rect) {
+                            state.core.draw_list.push_quad(akar_core::QuadCall {
+                                rect: item_rect,
+                                fill: [0.2, 0.22, 0.25, 1.0],
+                                border_color: [0.0; 4],
+                                corner_radii: [0.0; 4],
+                                border_width: 0.0,
+                                z: akar_core::Z_OVERLAY,
+                                shadow_blur: 0.0,
+                                shadow_spread: 0.0,
+                                shadow_color: [0.0; 4],
+                                shadow_offset: [0.0; 2],
+                                _pad: [0.0; 2],
+                            });
+                        }
+
+                        let item_buf = state.core.text_pipeline.set_text(
+                            Some(6000 + i as u64),
+                            item,
+                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                            Some(item_rect[2] - 8.0),
+                            None,
+                        );
+                        state.core.draw_list.push_text(akar_core::TextCall {
+                            buffer_id: item_buf,
+                            x: item_rect[0] + 4.0,
+                            y: item_rect[1] + 5.0,
+                            clip: item_rect,
+                            color: [0.9, 0.9, 0.92, 1.0],
+                            z: akar_core::Z_OVERLAY,
+                        });
+
+                        if state.core.input.is_clicked(item_rect) {
+                            state.dropdown_open = false;
+                        }
+                    }
+
+                    dropdown_end(&mut state.core);
                 }
 
                 let output = match state.surface.get_current_texture() {
