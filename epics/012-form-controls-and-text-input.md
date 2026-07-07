@@ -248,3 +248,25 @@ All form values are owned by the demo's app state struct.
 - `crates/akar-components/src/text_input.rs` (new)
 - `crates/akar-components/src/textarea.rs` (new)
 - `crates/akar-components/src/lib.rs`
+
+### Round 3 (2026-07-07)
+
+**Task 10 — C ABI wrappers (akar-c-api):**
+- Added `pub const AKAR_KEY_BACKSPACE`..`AKAR_KEY_TAB` (11 key constants) → generate C `#define` macros in `akar.h`
+- `akar_push_key(ctx, key: u32)` — routes u32 → `Key` enum → `InputState::push_key`
+- `akar_checkbox(ctx, node_id, label, label_len, checked) -> bool`
+- `akar_radio_group(ctx, nodes, node_count, labels, label_lengths, selected) -> bool`
+- `akar_switch(ctx, node_id, on) -> bool`
+- `akar_slider(ctx, node_id, value, min, max) -> bool`
+- `akar_select(ctx, node_id, options, option_count, option_lengths, selected, open, viewport) -> AkarSelectResponse`
+- `akar_text_input(ctx, node_id, value_buf, buf_len, cursor_pos, placeholder, cursor_visible) -> AkarTextInputResponse`
+- `akar_textarea(ctx, node_id, value_buf, buf_len, cursor_pos, scroll_y, placeholder, cursor_visible) -> AkarTextAreaResponse`
+- New C structs: `AkarSelectResponse`, `AkarTextInputResponse`, `AkaraTextAreaResponse`
+- Import updated to `use akar_core::{AkarCore, Key}`
+- `akar.h` regenerated (329 lines, up from 247)
+
+`cargo check --workspace` and `cargo build -p akar-c-api` pass clean. Header regenerated.
+
+**Files changed in Round 3:**
+- `crates/akar-c-api/src/lib.rs`
+- `akar.h` (regenerated)

@@ -6,6 +6,28 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define AKAR_KEY_BACKSPACE 0
+
+#define AKAR_KEY_DELETE 1
+
+#define AKAR_KEY_LEFT 2
+
+#define AKAR_KEY_RIGHT 3
+
+#define AKAR_KEY_UP 4
+
+#define AKAR_KEY_DOWN 5
+
+#define AKAR_KEY_HOME 6
+
+#define AKAR_KEY_END 7
+
+#define AKAR_KEY_ENTER 8
+
+#define AKAR_KEY_ESCAPE 9
+
+#define AKAR_KEY_TAB 10
+
 typedef struct AkarCtx AkarCtx;
 
 typedef struct AkarRect {
@@ -78,6 +100,21 @@ typedef struct AkarDropdownState {
     bool is_open;
     float content_rect[4];
 } AkarDropdownState;
+
+typedef struct AkarSelectResponse {
+    bool changed;
+} AkarSelectResponse;
+
+typedef struct AkarTextInputResponse {
+    bool changed;
+    bool submitted;
+    uint32_t new_cursor_pos;
+} AkarTextInputResponse;
+
+typedef struct AkarTextAreaResponse {
+    bool changed;
+    uint32_t new_cursor_pos;
+} AkarTextAreaResponse;
 
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
@@ -243,5 +280,50 @@ struct AkarDropdownState akar_dropdown_begin(struct AkarCtx *ctx,
                                              bool is_open);
 
 void akar_dropdown_end(struct AkarCtx *ctx);
+
+void akar_push_key(struct AkarCtx *ctx, uint32_t key);
+
+bool akar_checkbox(struct AkarCtx *ctx,
+                   uint64_t node_id,
+                   const char *label,
+                   int32_t label_len,
+                   bool *checked);
+
+bool akar_radio_group(struct AkarCtx *ctx,
+                      const uint64_t *nodes,
+                      uint32_t node_count,
+                      const char *const *labels,
+                      const int32_t *label_lengths,
+                      uint32_t *selected);
+
+bool akar_switch(struct AkarCtx *ctx, uint64_t node_id, bool *on);
+
+bool akar_slider(struct AkarCtx *ctx, uint64_t node_id, float *value, float min, float max);
+
+struct AkarSelectResponse akar_select(struct AkarCtx *ctx,
+                                      uint64_t node_id,
+                                      const char *const *options,
+                                      uint32_t option_count,
+                                      const int32_t *option_lengths,
+                                      uint32_t *selected,
+                                      bool *open,
+                                      const float *viewport_rect);
+
+struct AkarTextInputResponse akar_text_input(struct AkarCtx *ctx,
+                                             uint64_t node_id,
+                                             uint8_t *value_buf,
+                                             uint32_t buf_len,
+                                             uint32_t *cursor_pos,
+                                             const char *placeholder,
+                                             bool cursor_visible);
+
+struct AkarTextAreaResponse akar_textarea(struct AkarCtx *ctx,
+                                          uint64_t node_id,
+                                          uint8_t *value_buf,
+                                          uint32_t buf_len,
+                                          uint32_t *cursor_pos,
+                                          float *scroll_y,
+                                          const char *placeholder,
+                                          bool cursor_visible);
 
 #endif  /* AKAR_H */

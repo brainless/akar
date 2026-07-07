@@ -4,7 +4,7 @@ use std::ffi::{c_char, c_void};
 use std::ptr;
 
 use akar_components::{AkarTheme, ButtonVariant, AKAR_THEME_DARK};
-use akar_core::AkarCore;
+use akar_core::{AkarCore, Key};
 use akar_layout::Layout;
 
 pub struct AkarCtx {
@@ -1053,4 +1053,254 @@ pub unsafe extern "C" fn akar_dropdown_begin(
 pub unsafe extern "C" fn akar_dropdown_end(ctx: *mut AkarCtx) {
     let ctx = unsafe { &mut *ctx };
     akar_components::dropdown_end(&mut ctx.core);
+}
+
+pub const AKAR_KEY_BACKSPACE: u32 = 0;
+pub const AKAR_KEY_DELETE: u32 = 1;
+pub const AKAR_KEY_LEFT: u32 = 2;
+pub const AKAR_KEY_RIGHT: u32 = 3;
+pub const AKAR_KEY_UP: u32 = 4;
+pub const AKAR_KEY_DOWN: u32 = 5;
+pub const AKAR_KEY_HOME: u32 = 6;
+pub const AKAR_KEY_END: u32 = 7;
+pub const AKAR_KEY_ENTER: u32 = 8;
+pub const AKAR_KEY_ESCAPE: u32 = 9;
+pub const AKAR_KEY_TAB: u32 = 10;
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_push_key(ctx: *mut AkarCtx, key: u32) {
+    let ctx = unsafe { &mut *ctx };
+    let k = match key {
+        0 => Key::Backspace,
+        1 => Key::Delete,
+        2 => Key::Left,
+        3 => Key::Right,
+        4 => Key::Up,
+        5 => Key::Down,
+        6 => Key::Home,
+        7 => Key::End,
+        8 => Key::Enter,
+        9 => Key::Escape,
+        10 => Key::Tab,
+        _ => return,
+    };
+    ctx.core.input.push_key(k);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_checkbox(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    label: *const c_char,
+    label_len: i32,
+    checked: *mut bool,
+) -> bool {
+    let ctx = unsafe { &mut *ctx };
+    if label.is_null() || label_len <= 0 || checked.is_null() {
+        return false;
+    }
+    let label_bytes = unsafe { std::slice::from_raw_parts(label as *const u8, label_len as usize) };
+    let Ok(label_str) = std::str::from_utf8(label_bytes) else {
+        return false;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_checkbox(&mut ctx.core, &ctx.layout, nid, unsafe { &mut *checked }, label_str, &ctx.theme)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_radio_group(
+    ctx: *mut AkarCtx,
+    nodes: *const u64,
+    node_count: u32,
+    labels: *const *const c_char,
+    label_lengths: *const i32,
+    selected: *mut u32,
+) -> bool {
+    let ctx = unsafe { &mut *ctx };
+    if nodes.is_null() || node_count == 0 || labels.is_null() || label_lengths.is_null() || selected.is_null() {
+        return false;
+    }
+
+    let mut node_ids = Vec::with_capacity(node_count as usize);
+    let mut label_strs: Vec<&str> = Vec::with_capacity(node_count as usize);
+    for i in 0..node_count as usize {
+        let nid: akar_layout::NodeId = unsafe { *nodes.add(i) }.into();
+        node_ids.push(nid);
+        let ptr = unsafe { *labels.add(i) };
+        let len = unsafe { *label_lengths.add(i) };
+        if ptr.is_null() || len <= 0 { return false; }
+        let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) };
+        match std::str::from_utf8(bytes) { Ok(s) => label_strs.push(s), Err(_) => return false }
+    }
+
+    let mut sel = unsafe { *selected } as usize;
+    let changed = akar_components::akar_radio_group(&mut ctx.core, &ctx.layout, &node_ids, &label_strs, &mut sel, &ctx.theme);
+    unsafe { *selected = sel as u32 };
+    changed
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_switch(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    on: *mut bool,
+) -> bool {
+    let ctx = unsafe { &mut *ctx };
+    if on.is_null() { return false; }
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_switch(&mut ctx.core, &ctx.layout, nid, unsafe { &mut *on }, &ctx.theme)
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_slider(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value: *mut f32,
+    min: f32,
+    max: f32,
+) -> bool {
+    let ctx = unsafe { &mut *ctx };
+    if value.is_null() { return false; }
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_slider(&mut ctx.core, &ctx.layout, nid, unsafe { &mut *value }, min, max, &ctx.theme)
+}
+
+#[repr(C)]
+pub struct AkarSelectResponse {
+    pub changed: bool,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_select(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    options: *const *const c_char,
+    option_count: u32,
+    option_lengths: *const i32,
+    selected: *mut u32,
+    open: *mut bool,
+    viewport_rect: *const f32,
+) -> AkarSelectResponse {
+    let ctx = unsafe { &mut *ctx };
+    if options.is_null() || option_count == 0 || option_lengths.is_null() || selected.is_null() || open.is_null() || viewport_rect.is_null() {
+        return AkarSelectResponse { changed: false };
+    }
+
+    let mut option_strs: Vec<&str> = Vec::with_capacity(option_count as usize);
+    for i in 0..option_count as usize {
+        let ptr = unsafe { *options.add(i) };
+        let len = unsafe { *option_lengths.add(i) };
+        if ptr.is_null() || len <= 0 { return AkarSelectResponse { changed: false }; }
+        let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) };
+        match std::str::from_utf8(bytes) { Ok(s) => option_strs.push(s), Err(_) => return AkarSelectResponse { changed: false } }
+    }
+
+    let viewport = unsafe { *(viewport_rect as *const [f32; 4]) };
+    let nid: akar_layout::NodeId = node_id.into();
+    let mut sel = unsafe { *selected } as usize;
+    let mut is_open = unsafe { *open };
+    let changed = akar_components::akar_select(&mut ctx.core, &ctx.layout, nid, &option_strs, &mut sel, &mut is_open, &ctx.theme, viewport);
+    unsafe { *selected = sel as u32 };
+    unsafe { *open = is_open };
+    AkarSelectResponse { changed }
+}
+
+#[repr(C)]
+pub struct AkarTextInputResponse {
+    pub changed: bool,
+    pub submitted: bool,
+    pub new_cursor_pos: u32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_text_input(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value_buf: *mut u8,
+    buf_len: u32,
+    cursor_pos: *mut u32,
+    placeholder: *const c_char,
+    cursor_visible: bool,
+) -> AkarTextInputResponse {
+    let ctx = unsafe { &mut *ctx };
+    if value_buf.is_null() || buf_len == 0 || cursor_pos.is_null() || placeholder.is_null() {
+        return AkarTextInputResponse { changed: false, submitted: false, new_cursor_pos: 0 };
+    }
+
+    let Ok(placeholder_str) = unsafe { std::ffi::CStr::from_ptr(placeholder) }.to_str() else {
+        return AkarTextInputResponse { changed: false, submitted: false, new_cursor_pos: 0 };
+    };
+
+    let slice = unsafe { std::slice::from_raw_parts_mut(value_buf, buf_len as usize) };
+    let Ok(mut value) = String::from_utf8(slice.to_vec()) else {
+        return AkarTextInputResponse { changed: false, submitted: false, new_cursor_pos: 0 };
+    };
+
+    let mut cp = unsafe { *cursor_pos } as usize;
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::akar_text_input(&mut ctx.core, &ctx.layout, nid, &mut value, &mut cp, placeholder_str, cursor_visible, &ctx.theme);
+
+    let value_bytes = value.as_bytes();
+    let copy_len = value_bytes.len().min(buf_len as usize);
+    unsafe { std::ptr::copy_nonoverlapping(value_bytes.as_ptr(), slice.as_mut_ptr(), copy_len) };
+
+    if copy_len < buf_len as usize {
+        unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
+    }
+
+    unsafe { *cursor_pos = cp as u32 };
+    AkarTextInputResponse {
+        changed: result.changed,
+        submitted: result.submitted,
+        new_cursor_pos: cp as u32,
+    }
+}
+
+#[repr(C)]
+pub struct AkarTextAreaResponse {
+    pub changed: bool,
+    pub new_cursor_pos: u32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_textarea(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value_buf: *mut u8,
+    buf_len: u32,
+    cursor_pos: *mut u32,
+    scroll_y: *mut f32,
+    placeholder: *const c_char,
+    cursor_visible: bool,
+) -> AkarTextAreaResponse {
+    let ctx = unsafe { &mut *ctx };
+    if value_buf.is_null() || buf_len == 0 || cursor_pos.is_null() || scroll_y.is_null() || placeholder.is_null() {
+        return AkarTextAreaResponse { changed: false, new_cursor_pos: 0 };
+    }
+
+    let Ok(placeholder_str) = unsafe { std::ffi::CStr::from_ptr(placeholder) }.to_str() else {
+        return AkarTextAreaResponse { changed: false, new_cursor_pos: 0 };
+    };
+
+    let slice = unsafe { std::slice::from_raw_parts_mut(value_buf, buf_len as usize) };
+    let Ok(mut value) = String::from_utf8(slice.to_vec()) else {
+        return AkarTextAreaResponse { changed: false, new_cursor_pos: 0 };
+    };
+
+    let mut cp = unsafe { *cursor_pos } as usize;
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::akar_textarea(&mut ctx.core, &ctx.layout, nid, &mut value, &mut cp, unsafe { &mut *scroll_y }, placeholder_str, cursor_visible, &ctx.theme);
+
+    let value_bytes = value.as_bytes();
+    let copy_len = value_bytes.len().min(buf_len as usize);
+    unsafe { std::ptr::copy_nonoverlapping(value_bytes.as_ptr(), slice.as_mut_ptr(), copy_len) };
+    if copy_len < buf_len as usize {
+        unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
+    }
+
+    unsafe { *cursor_pos = cp as u32 };
+    AkarTextAreaResponse {
+        changed: result.changed,
+        new_cursor_pos: cp as u32,
+    }
 }
