@@ -37,6 +37,16 @@ typedef struct AkarRange {
     uint32_t end;
 } AkarRange;
 
+typedef struct AkarAlertResult {
+    bool dismissed;
+} AkarAlertResult;
+
+typedef struct AkarNavbarSlots {
+    uint64_t start;
+    uint64_t center;
+    uint64_t end;
+} AkarNavbarSlots;
+
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
 void akar_ctx_free(struct AkarCtx *ctx);
@@ -125,5 +135,38 @@ void akar_progress(struct AkarCtx *ctx,
                    float corner_radius);
 
 void akar_badge(struct AkarCtx *ctx, uint64_t node_id, const char *text, uint32_t variant);
+
+struct AkarAlertResult akar_alert(struct AkarCtx *ctx,
+                                  uint64_t node_id,
+                                  const char *text,
+                                  int32_t text_len,
+                                  uint32_t variant,
+                                  bool closable);
+
+void akar_stat(struct AkarCtx *ctx,
+               uint64_t node_id,
+               const char *title,
+               int32_t title_len,
+               const char *value,
+               int32_t value_len,
+               const char *description,
+               int32_t description_len);
+
+void akar_skeleton(struct AkarCtx *ctx, uint64_t node_id, uint32_t variant);
+
+struct AkarNavbarSlots akar_navbar(struct AkarCtx *ctx, uint64_t node_id);
+
+void akar_steps(struct AkarCtx *ctx,
+                uint64_t node_id,
+                const char *const *labels,
+                uint32_t label_count,
+                const int32_t *label_lengths,
+                uint32_t current);
+
+void akar_avatar(struct AkarCtx *ctx,
+                 uint64_t node_id,
+                 const char *initials,
+                 int32_t initials_len,
+                 uint32_t color);
 
 #endif  /* AKAR_H */

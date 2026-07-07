@@ -547,3 +547,205 @@ pub unsafe extern "C" fn akar_badge(
     };
     akar_components::akar_badge(&mut ctx.core, &ctx.layout, nid, text, variant, &ctx.theme);
 }
+
+#[repr(C)]
+pub struct AkarAlertResult {
+    pub dismissed: bool,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_alert(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    text_len: i32,
+    variant: u32,
+    closable: bool,
+) -> AkarAlertResult {
+    let ctx = unsafe { &mut *ctx };
+
+    if text.is_null() || text_len <= 0 {
+        return AkarAlertResult { dismissed: false };
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(text as *const u8, text_len as usize) };
+    let Ok(text_str) = std::str::from_utf8(bytes) else {
+        return AkarAlertResult { dismissed: false };
+    };
+
+    let variant = match variant {
+        0 => akar_components::AlertVariant::Info,
+        1 => akar_components::AlertVariant::Success,
+        2 => akar_components::AlertVariant::Warning,
+        3 => akar_components::AlertVariant::Error,
+        _ => akar_components::AlertVariant::Info,
+    };
+
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::akar_alert(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        variant,
+        closable,
+        &ctx.theme,
+    );
+
+    AkarAlertResult {
+        dismissed: result.dismissed,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_stat(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    title: *const c_char,
+    title_len: i32,
+    value: *const c_char,
+    value_len: i32,
+    description: *const c_char,
+    description_len: i32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    if title.is_null() || title_len <= 0 || value.is_null() || value_len <= 0 {
+        return;
+    }
+
+    let title_bytes = unsafe { std::slice::from_raw_parts(title as *const u8, title_len as usize) };
+    let Ok(title_str) = std::str::from_utf8(title_bytes) else {
+        return;
+    };
+
+    let value_bytes = unsafe { std::slice::from_raw_parts(value as *const u8, value_len as usize) };
+    let Ok(value_str) = std::str::from_utf8(value_bytes) else {
+        return;
+    };
+
+    let description_str = if description.is_null() || description_len <= 0 {
+        None
+    } else {
+        let desc_bytes =
+            unsafe { std::slice::from_raw_parts(description as *const u8, description_len as usize) };
+        match std::str::from_utf8(desc_bytes) {
+            Ok(s) => Some(s),
+            Err(_) => None,
+        }
+    };
+
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_stat(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        title_str,
+        value_str,
+        description_str,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_skeleton(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    variant: u32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    let variant = match variant {
+        0 => akar_components::SkeletonVariant::Text,
+        1 => akar_components::SkeletonVariant::Card,
+        2 => akar_components::SkeletonVariant::Circle,
+        _ => akar_components::SkeletonVariant::Text,
+    };
+
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_skeleton(&mut ctx.core, &ctx.layout, nid, variant, &ctx.theme);
+}
+
+#[repr(C)]
+pub struct AkarNavbarSlots {
+    pub start: u64,
+    pub center: u64,
+    pub end: u64,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_navbar(ctx: *mut AkarCtx, node_id: u64) -> AkarNavbarSlots {
+    let ctx = unsafe { &mut *ctx };
+    let nid: akar_layout::NodeId = node_id.into();
+    let slots = akar_components::akar_navbar(&mut ctx.core, &mut ctx.layout, nid, &ctx.theme);
+    AkarNavbarSlots {
+        start: slots.start.into(),
+        center: slots.center.into(),
+        end: slots.end.into(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_steps(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    labels: *const *const c_char,
+    label_count: u32,
+    label_lengths: *const i32,
+    current: u32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    if labels.is_null() || label_lengths.is_null() || label_count == 0 {
+        return;
+    }
+
+    let mut label_strs: Vec<&str> = Vec::with_capacity(label_count as usize);
+    for i in 0..label_count as usize {
+        let ptr = unsafe { *labels.add(i) };
+        let len = unsafe { *label_lengths.add(i) };
+        if ptr.is_null() || len <= 0 {
+            return;
+        }
+        let bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, len as usize) };
+        match std::str::from_utf8(bytes) {
+            Ok(s) => label_strs.push(s),
+            Err(_) => return,
+        }
+    }
+
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_steps(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &label_strs,
+        current as usize,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_avatar(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    initials: *const c_char,
+    initials_len: i32,
+    color: u32,
+) {
+    let ctx = unsafe { &mut *ctx };
+
+    if initials.is_null() || initials_len <= 0 {
+        return;
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(initials as *const u8, initials_len as usize) };
+    let Ok(initials_str) = std::str::from_utf8(bytes) else {
+        return;
+    };
+
+    let color = if color == 0 { None } else { Some(color) };
+
+    let nid: akar_layout::NodeId = node_id.into();
+    akar_components::akar_avatar(&mut ctx.core, &ctx.layout, nid, initials_str, color, &ctx.theme);
+}

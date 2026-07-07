@@ -67,6 +67,18 @@
 - Tests: zero-area, initials rendered, deterministic color, explicit color override
 - 4 tests pass, clippy clean
 
+### Task 7 — C ABI (Done)
+
+All 6 components exposed in `crates/akar-c-api/src/lib.rs`:
+- `akar_alert` → `AkarAlertResult { dismissed }`, variant mapping 0-3 → Info/Success/Warning/Error
+- `akar_stat` → title/value/description strings, null desc → None
+- `akar_skeleton` → variant mapping 0-2 → Text/Card/Circle
+- `akar_navbar` → `AkarNavbarSlots { start, center, end: u64 }`, takes `&mut Layout`
+- `akar_steps` → `const char**` labels + `label_lengths` array
+- `akar_avatar` → color=0 → None, else Some(color)
+- `akar.h` regenerated via cbindgen — all 6 new APIs present
+- All 5 existing C ABI integration tests still pass
+
 ---
 
 ## Scope
