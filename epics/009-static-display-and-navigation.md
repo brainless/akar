@@ -57,6 +57,16 @@
 - Tests: empty labels, all completed (all primary), first step current (first=primary, rest=base_300)
 - 3 tests pass, clippy clean
 
+### Task 6 — Avatar (Done)
+
+`crates/akar-components/src/avatar.rs`:
+- `avatar()` renders a circle (min of w/h) with derived or explicit color fill, centered initials text
+- Color derivation: hash of first 2 chars → `[primary, secondary, accent, info, success, warning]`
+- Renders exactly 1 quad (circle) + 1 text call (initials)
+- Uses `text_pipeline.measure()` for centering
+- Tests: zero-area, initials rendered, deterministic color, explicit color override
+- 4 tests pass, clippy clean
+
 ---
 
 ## Scope

@@ -24,6 +24,9 @@ pub use progress::{progress as akar_progress, progress_at, ProgressStyle};
 pub mod alert;
 pub use alert::{alert as akar_alert, AlertResult, AlertVariant};
 
+pub mod avatar;
+pub use avatar::avatar as akar_avatar;
+
 pub mod badge;
 pub use badge::{badge as akar_badge, BadgeVariant};
 
