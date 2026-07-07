@@ -21,6 +21,9 @@ pub use label::label as akar_label;
 pub mod progress;
 pub use progress::{progress as akar_progress, progress_at, ProgressStyle};
 
+pub mod alert;
+pub use alert::{alert as akar_alert, AlertResult, AlertVariant};
+
 pub mod badge;
 pub use badge::{badge as akar_badge, BadgeVariant};
 

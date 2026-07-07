@@ -1,9 +1,22 @@
 # Epic 009: Static Display and Navigation Components
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Complete the Tier 1 component catalog — components that display data without requiring complex interaction or overlay infrastructure. Add the foundational navigation bar that anchors page-level layout.
 
 **Prerequisite:** Epic 008 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
+
+---
+
+## Task Notes
+
+### Task 1 — Alert (Done)
+
+`crates/akar-components/src/alert.rs`:
+- `AlertVariant` enum with `Info, Success, Warning, Error`
+- `alert()` renders: bg quad (`base_200`, variant-dimmed border, `radius_field`), 4px accent strip, 20px icon quad, message text, optional "×" close button with click detection
+- Returns `AlertResult { dismissed: bool }`
+- Tests: zero-area return, info variant color, closable count, close click dismisses
+- 4 tests pass, clippy clean
 
 ---
 
