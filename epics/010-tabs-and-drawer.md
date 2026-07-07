@@ -7,6 +7,18 @@
 
 ---
 
+## Task Notes
+
+### Task 1 — Z-Layer Constants (Done)
+
+`crates/akar-core/src/lib.rs`:
+- `Z_BASE = 0.0`, `Z_SCRIM = 0.5`, `Z_FLOAT = 1.0`, `Z_OVERLAY = 2.0` added as public constants.
+- Exported from `akar-core` crate root. Clippy and tests pass.
+
+
+
+---
+
 ## Scope
 
 ### Components
