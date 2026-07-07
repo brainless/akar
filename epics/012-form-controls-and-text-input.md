@@ -1,6 +1,6 @@
 # Epic 012: Form Controls and Text Input
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** All interactive input components. Discrete controls (Checkbox, Radio, Switch, Slider, Select) come first because they require only existing input infrastructure. Text input components (TextInput, Textarea) come last because they require extending `InputState` and `akar-winit` with named key events.
 
 **Prerequisite:** Epic 011 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -270,3 +270,33 @@ All form values are owned by the demo's app state struct.
 **Files changed in Round 3:**
 - `crates/akar-c-api/src/lib.rs`
 - `akar.h` (regenerated)
+
+### Round 4 (2026-07-07)
+
+**Task 11 — Demo Form tab (demo-rust):**
+- Added 21 new state fields for form values, cursor state, and layout nodes
+- Created form layout nodes in `resumed()`: container (flex-column), name input (40px), textarea (100px), checkbox row (32px), radio group row (flex-row, 32px, Dark/Light), switch (32px), slider (32px), select (40px), submit button (120×36px, centered)
+- Extended tab bar labels to `["List", "Canvas", "Stats", "Form"]`
+- Added `3 =>` arm to panel children switching
+- Form rendering: cursor blink (30-frame interval), "Form Demo" title, label texts, all 7 form controls bound to state fields
+- Submit button: success toast if agreed, warning toast if not
+
+`cargo check --workspace` passes clean.
+
+**Files changed in Round 4:**
+- `examples/demo-rust/src/main.rs`
+
+---
+
+### Epic Complete
+
+All acceptance criteria verified:
+- [x] `Key` enum + `push_key` on `InputState`
+- [x] `akar-winit` translates all named keys
+- [x] `checkbox`, `radio_group`, `switch`, `slider`, `select`, `text_input`, `textarea` implemented
+- [x] Cursor blink timer owned by caller (`cursor_visible: bool`)
+- [x] `cursor_pos: &mut usize` updated correctly
+- [x] All components exposed in `akar.h`
+- [x] `cargo clippy --workspace -- -D warnings` and `cargo test --workspace` pass clean
+- [x] No text selection, clipboard, or IME (deferred)
+- [x] Demo updated with Form tab containing all controls

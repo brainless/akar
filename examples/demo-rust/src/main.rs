@@ -1,19 +1,21 @@
 use std::sync::Arc;
 
 use akar_components::{
-    akar_alert, akar_avatar, akar_badge, akar_button, akar_container, akar_label, akar_navbar,
-    akar_skeleton, akar_stat, akar_steps, akar_tab_bar, akar_tooltip, drawer_begin, drawer_end,
-    dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts,
-    AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots, ProgressStyle,
-    SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container,
+    akar_label, akar_navbar, akar_radio_group, akar_select, akar_skeleton, akar_slider,
+    akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_textarea,
+    akar_tooltip, drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin,
+    modal_end, progress_at, toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant,
+    DrawerEdge, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant, ToastItem,
+    ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
 use akar_core::AkarCore;
 use akar_core::Z_FLOAT;
 use akar_layout::{
-    length, AlignItems, Dimension, Display, FlexDirection, JustifyContent, Layout, PageConfig,
-    Size, Style,
+    length, AlignItems, AlignSelf, Dimension, Display, FlexDirection, JustifyContent, Layout,
+    PageConfig, Size, Style,
 };
 use akar_winit::process_window_event;
 use wgpu::{
@@ -63,6 +65,27 @@ struct AppState {
     toasts_list: Vec<ToastItem>,
     dropdown_open: bool,
     prev_active_tab: usize,
+    cursor_tick: u64,
+    form_name: String,
+    form_name_cursor: usize,
+    form_notes: String,
+    form_notes_cursor: usize,
+    form_notes_scroll_y: f32,
+    form_agreed: bool,
+    form_theme_idx: usize,
+    form_notifications_on: bool,
+    form_font_size: f32,
+    form_language_idx: usize,
+    form_language_open: bool,
+    form_container: akar_layout::NodeId,
+    form_name_node: akar_layout::NodeId,
+    form_notes_node: akar_layout::NodeId,
+    form_agreement_node: akar_layout::NodeId,
+    form_radio_nodes: [akar_layout::NodeId; 2],
+    form_notifications_node: akar_layout::NodeId,
+    form_font_size_node: akar_layout::NodeId,
+    form_language_node: akar_layout::NodeId,
+    form_submit_node: akar_layout::NodeId,
 }
 
 fn main() {
@@ -362,6 +385,135 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
+        let form_container = layout.new_leaf(Style {
+            flex_grow: 1.0,
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            padding: taffy::geometry::Rect {
+                left: length(16.0),
+                right: length(16.0),
+                top: length(16.0),
+                bottom: length(16.0),
+            },
+            gap: taffy::geometry::Size {
+                width: length(0.0),
+                height: length(12.0),
+            },
+            ..Default::default()
+        });
+
+        let form_name_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+
+        let form_notes_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(100.0),
+            },
+            ..Default::default()
+        });
+
+        let form_agreement_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+
+        let form_radio_row = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(32.0),
+            },
+            gap: taffy::geometry::Size {
+                width: length(16.0),
+                height: length(0.0),
+            },
+            ..Default::default()
+        });
+        let form_radio_dark = layout.new_leaf(Style {
+            size: Size {
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
+            },
+            flex_grow: 1.0,
+            ..Default::default()
+        });
+        let form_radio_light = layout.new_leaf(Style {
+            size: Size {
+                width: Dimension::auto(),
+                height: Dimension::percent(1.0),
+            },
+            flex_grow: 1.0,
+            ..Default::default()
+        });
+        layout.set_children(form_radio_row, &[form_radio_dark, form_radio_light]);
+
+        let form_notifications_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+
+        let form_font_size_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+
+        let form_language_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+
+        let form_submit_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(120.0),
+                height: length(36.0),
+            },
+            align_self: Some(AlignSelf::CENTER),
+            ..Default::default()
+        });
+
+        layout.set_children(
+            form_container,
+            &[
+                form_name_node,
+                form_notes_node,
+                form_agreement_node,
+                form_radio_row,
+                form_notifications_node,
+                form_font_size_node,
+                form_language_node,
+                form_submit_node,
+            ],
+        );
+
+        let form_radio_nodes = [form_radio_dark, form_radio_light];
+
         self.state = Some(AppState {
             window,
             device,
@@ -398,6 +550,27 @@ impl ApplicationHandler for App {
             toasts_list: Vec::new(),
             dropdown_open: false,
             prev_active_tab: 0,
+            cursor_tick: 0,
+            form_name: String::new(),
+            form_name_cursor: 0,
+            form_notes: String::new(),
+            form_notes_cursor: 0,
+            form_notes_scroll_y: 0.0,
+            form_agreed: false,
+            form_theme_idx: 0,
+            form_notifications_on: true,
+            form_font_size: 16.0,
+            form_language_idx: 0,
+            form_language_open: false,
+            form_container,
+            form_name_node,
+            form_notes_node,
+            form_agreement_node,
+            form_radio_nodes,
+            form_notifications_node,
+            form_font_size_node,
+            form_language_node,
+            form_submit_node,
         });
     }
 
@@ -471,6 +644,9 @@ impl ApplicationHandler for App {
                     2 => state
                         .layout
                         .set_children(state.panel_container, &[state.stats_wrapper]),
+                    3 => state
+                        .layout
+                        .set_children(state.panel_container, &[state.form_container]),
                     _ => {}
                 }
 
@@ -577,7 +753,7 @@ impl ApplicationHandler for App {
                     &mut state.core,
                     &state.layout,
                     state.tab_bar_node,
-                    &["List", "Canvas", "Stats"],
+                    &["List", "Canvas", "Stats", "Form"],
                     state.active_tab,
                     TabVariant::Underline,
                     &AKAR_THEME_DARK,
@@ -587,7 +763,7 @@ impl ApplicationHandler for App {
                 }
 
                 if state.active_tab != state.prev_active_tab {
-                    let tab_names = ["List", "Canvas", "Stats"];
+                    let tab_names = ["List", "Canvas", "Stats", "Form"];
                     state.toasts_list.push(ToastItem {
                         variant: ToastVariant::Info,
                         message: format!("Switched to {} tab", tab_names[state.active_tab]),
@@ -784,6 +960,153 @@ impl ApplicationHandler for App {
                         );
                         if toggle_result.clicked {
                             state.show_skeleton = !state.show_skeleton;
+                        }
+                    }
+                    3 => {
+                        state.cursor_tick += 1;
+                        let cursor_visible = (state.cursor_tick / 30) % 2 == 0;
+                        let form_rect = state.layout.rect(state.form_container);
+
+                        let title_buf = state.core.text_pipeline.set_text(
+                            Some(3000),
+                            "Form Demo",
+                            glyphon::Metrics::new(18.0, 18.0 * 1.2),
+                            Some(form_rect[2] - 32.0),
+                            None,
+                        );
+                        state.core.draw_list.push_text(akar_core::TextCall {
+                            buffer_id: title_buf,
+                            x: form_rect[0],
+                            y: form_rect[1],
+                            clip: form_rect,
+                            color: [0.9, 0.9, 0.95, 1.0],
+                            z: 0.0,
+                        });
+
+                        let name_label_buf = state.core.text_pipeline.set_text(
+                            Some(3001),
+                            "Name",
+                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                            Some(form_rect[2] - 32.0),
+                            None,
+                        );
+                        state.core.draw_list.push_text(akar_core::TextCall {
+                            buffer_id: name_label_buf,
+                            x: form_rect[0],
+                            y: form_rect[1] + 24.0,
+                            clip: form_rect,
+                            color: [0.7, 0.7, 0.75, 1.0],
+                            z: 0.0,
+                        });
+
+                        let _name_result = akar_text_input(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_name_node,
+                            &mut state.form_name,
+                            &mut state.form_name_cursor,
+                            "Enter your name",
+                            cursor_visible,
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let notes_label_buf = state.core.text_pipeline.set_text(
+                            Some(3002),
+                            "Notes",
+                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                            Some(form_rect[2] - 32.0),
+                            None,
+                        );
+                        state.core.draw_list.push_text(akar_core::TextCall {
+                            buffer_id: notes_label_buf,
+                            x: form_rect[0],
+                            y: form_rect[1] + 80.0,
+                            clip: form_rect,
+                            color: [0.7, 0.7, 0.75, 1.0],
+                            z: 0.0,
+                        });
+
+                        let _notes_result = akar_textarea(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_notes_node,
+                            &mut state.form_notes,
+                            &mut state.form_notes_cursor,
+                            &mut state.form_notes_scroll_y,
+                            "Enter notes...",
+                            cursor_visible,
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let _ = akar_checkbox(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_agreement_node,
+                            &mut state.form_agreed,
+                            "I agree to the terms",
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let _theme_changed = akar_radio_group(
+                            &mut state.core,
+                            &state.layout,
+                            &state.form_radio_nodes,
+                            &["Dark", "Light"],
+                            &mut state.form_theme_idx,
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let _notif_toggled = akar_switch(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_notifications_node,
+                            &mut state.form_notifications_on,
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let _font_changed = akar_slider(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_font_size_node,
+                            &mut state.form_font_size,
+                            12.0,
+                            32.0,
+                            &AKAR_THEME_DARK,
+                        );
+
+                        let _lang_changed = akar_select(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_language_node,
+                            &["English", "Spanish", "French", "German"],
+                            &mut state.form_language_idx,
+                            &mut state.form_language_open,
+                            &AKAR_THEME_DARK,
+                            viewport_rect,
+                        );
+
+                        let submit_result = akar_button(
+                            &mut state.core,
+                            &state.layout,
+                            state.form_submit_node,
+                            "Submit",
+                            ButtonVariant::Solid,
+                            &AKAR_THEME_DARK,
+                        );
+                        if submit_result.clicked {
+                            if state.form_agreed {
+                                state.toasts_list.push(ToastItem {
+                                    variant: ToastVariant::Success,
+                                    message: "Form submitted successfully!".to_string(),
+                                    dismiss_on_click: true,
+                                });
+                            } else {
+                                state.toasts_list.push(ToastItem {
+                                    variant: ToastVariant::Warning,
+                                    message: "Please agree to the terms.".to_string(),
+                                    dismiss_on_click: true,
+                                });
+                            }
                         }
                     }
                     _ => {}
