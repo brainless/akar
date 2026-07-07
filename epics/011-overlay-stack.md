@@ -37,6 +37,15 @@
 - 6 tests: empty (0 calls), single (≥2 calls), 3 stack (3 quads, right-aligned, distinct Y), dismiss click, non-dismissable, all 4 variants (≥8 calls)
 - 65 total component tests, clippy clean
 
+### Task 4 — Dropdown primitive (Done)
+
+`crates/akar-components/src/dropdown.rs`:
+- `DropdownState { is_open: bool, content_rect: [f32; 4] }`
+- `dropdown_begin()` — card background at `Z_OVERLAY` with border + shadow; opens below anchor, flips above if near viewport bottom; width matches anchor; height = 4 items × item_height; scissor push
+- `dropdown_end()` — pops scissor
+- 5 tests: closed (0 calls), open (1 quad + scissor), below anchor, above anchor near bottom, scissor balanced
+- 70 total component tests, clippy clean
+
 ---
 
 ## Scope
