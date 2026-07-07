@@ -36,6 +36,9 @@ pub use stat::stat as akar_stat;
 pub mod skeleton;
 pub use skeleton::{skeleton as akar_skeleton, SkeletonVariant};
 
+pub mod navbar;
+pub use navbar::{navbar as akar_navbar, NavbarSlots};
+
 pub mod canvas;
 pub use canvas::{
     canvas_begin, canvas_end, is_visible_world, CanvasConfig, CanvasPainter, CanvasResponse,

@@ -37,6 +37,16 @@
 - Tests: zero-area, text variant quad count + radius, circle radius
 - 3 tests pass, clippy clean
 
+### Task 4 — Navbar (Done)
+
+`crates/akar-components/src/navbar.rs`:
+- `NavbarSlots { start, center, end: NodeId }` struct
+- `navbar()` styles the node as a flex row, creates 3 slot nodes (`set_children`), renders `BoxStyle::panel` background
+- Returns `NavbarSlots` for caller to populate with `layout.add_child()`
+- The first component that takes `layout: &mut Layout` and creates/modifies the taffy tree
+- Tests: three distinct slots, panel quad pushed, children position correctly in slots
+- 3 tests pass, clippy clean
+
 ---
 
 ## Scope
