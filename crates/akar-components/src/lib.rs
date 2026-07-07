@@ -56,3 +56,6 @@ pub use tabs::{tab_bar as akar_tab_bar, TabBarResponse, TabVariant};
 
 pub mod drawer;
 pub use drawer::{drawer_begin, drawer_end, DrawerEdge, DrawerResponse};
+
+pub mod tooltip;
+pub use tooltip::{tooltip as akar_tooltip, position_tooltip, TooltipResponse, TooltipSide};
