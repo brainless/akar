@@ -1,6 +1,6 @@
 # Epic 008: ScrollArea, Canvas-Container Bridge, and Display Components
 
-**Status:** In Progress (Tasks 1–2 Done)
+**Status:** Done
 **Goal:** Four things in priority order:
 1. Rename `akar_layout::Rect` → `WorldRect` (naming cleanup, carried from the TBD placeholder).
 2. Add `Layout::rect_offset` and `list_clip` — the two helpers that make the canvas-container "Figma frame" pattern usable: a container positioned in world space whose internal components are laid out by an independent taffy tree.
@@ -563,6 +563,10 @@ pub use badge::{BadgeVariant, badge as akar_badge};
 ---
 
 ### Task 5: C ABI Exposure and Demo Update
+
+**Status:** Done (commit fda1598)
+
+**Review note:** All 6 C symbols (`AkarRange`, `akar_list_clip`, `akar_scroll_area_begin`, `akar_scroll_area_end`, `akar_progress`, `akar_badge`) confirmed present in regenerated `akar.h`. Demo fully rewritten: replaces old button/strip panel with a 50-item scrollable list using `list_clip` for virtualization, `scroll_area_begin/end` for scissor management, and inline text + quad calls for per-item content. Badges render correctly at the top of the panel. Two layout edge-case fixes: `Overflow::Clip` on scroll container prevents taffy from growing beyond its available space; `glyphon` added as explicit demo dependency for direct `glyphon::Metrics` usage.
 
 **Goal:** Expose `list_clip`, `scroll_area_begin/end`, `progress`, and `badge` in `akar.h`. Update `demo-rust` to demonstrate a scrollable list with a progress bar and badges.
 
