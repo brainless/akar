@@ -65,3 +65,6 @@ pub use modal::{modal_begin, modal_end, ModalResponse};
 
 pub mod toast;
 pub use toast::{toasts, ToastItem, ToastResponse, ToastVariant};
+
+pub mod dropdown;
+pub use dropdown::{dropdown_begin, dropdown_end, DropdownState};
