@@ -18,6 +18,9 @@ pub use box_style::{BoxShadow, BoxStyle};
 pub mod label;
 pub use label::label as akar_label;
 
+pub mod scroll_area;
+pub use scroll_area::{ScrollAreaResponse, scroll_area_begin, scroll_area_end};
+
 pub mod canvas;
 pub use canvas::{
     CanvasConfig, CanvasPainter, CanvasResponse, CanvasState, PanButton,

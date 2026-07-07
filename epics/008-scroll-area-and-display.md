@@ -1,6 +1,6 @@
 # Epic 008: ScrollArea, Canvas-Container Bridge, and Display Components
 
-**Status:** Planned
+**Status:** In Progress (Tasks 1–2 Done)
 **Goal:** Four things in priority order:
 1. Rename `akar_layout::Rect` → `WorldRect` (naming cleanup, carried from the TBD placeholder).
 2. Add `Layout::rect_offset` and `list_clip` — the two helpers that make the canvas-container "Figma frame" pattern usable: a container positioned in world space whose internal components are laid out by an independent taffy tree.
@@ -95,6 +95,10 @@ No logic changes — identifier rename only.
 ---
 
 ### Task 2: Canvas-Container Bridge Helpers
+
+**Status:** Done (commit c1798c3)
+
+**Review note:** `rect_offset` placed above `rect` in Layout impl. `list_clip` defined as free fn in `akar-core/src/lib.rs` with its test module. All tests pass (26 total for workspace, 5 list_clip + 1 rect_offset).
 
 **Goal:** Add `Layout::rect_offset` and the `list_clip` free function.
 
