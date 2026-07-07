@@ -46,6 +46,23 @@
 - 5 tests: closed (0 calls), open (1 quad + scissor), below anchor, above anchor near bottom, scissor balanced
 - 70 total component tests, clippy clean
 
+### Task 5 — C ABI Exposure (Done)
+
+`crates/akar-c-api/src/lib.rs`:
+- `AkarTooltipResponse { visible: bool }` repr(C)
+- `akar_tooltip(ctx, trigger_rect, text, preferred_side, viewport_rect)` — wraps `akar_components::akar_tooltip`, same rect pointer pattern as `akar_drawer_begin`
+- `AkarModalResponse { close_requested: bool, content_node: u64 }` repr(C)
+- `akar_modal_begin(ctx, title, title_len, width, height, viewport_rect)` — wraps `modal_begin`, passes `&mut ctx.layout`
+- `akar_modal_end(ctx)` — wraps `modal_end`
+- `AkarToastItem { variant: u32, message: *const c_char, dismiss_on_click: bool }` repr(C)
+- `AkarToastResponse { dismissed: i32 }` repr(C) (-1 = none)
+- `akar_toasts(ctx, items, item_count, viewport_rect)` — wraps `toasts`
+- `AkarDropdownState { is_open: bool, content_rect: [f32; 4] }` repr(C)
+- `akar_dropdown_begin(ctx, anchor_rect, item_height, viewport_rect, is_open)` — wraps `dropdown_begin`
+- `akar_dropdown_end(ctx)` — wraps `dropdown_end`
+- `akar.h` regenerated — all 4 new struct types + 6 function declarations confirmed present
+- 117 total workspace tests pass, clippy clean
+
 ---
 
 ## Scope
