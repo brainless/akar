@@ -223,6 +223,10 @@ mod list_clip_tests {
 
 ### Task 3: `ScrollArea` Component
 
+**Status:** Done (commit 88368c4)
+
+**Review note:** ScrollArea is behavior-only per ADR-025 — no visual chrome. Four tests cover scissor stack management, scroll clamping (both ends), and content_y computation. Works with `AkarCore::mock()` for testability. One notable design detail: `scroll_delta.y` is subtracted (inverted for conventional scroll direction). All 4 tests pass.
+
 **Goal:** A behavior-only component that reads scroll input, updates the caller's scroll position, pushes a scissor rect, and returns the content y-origin. The matching `scroll_area_end` pops the scissor.
 
 **File:** `crates/akar-components/src/scroll_area.rs` (new):

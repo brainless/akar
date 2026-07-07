@@ -18,6 +18,12 @@ pub use box_style::{BoxShadow, BoxStyle};
 pub mod label;
 pub use label::label as akar_label;
 
+pub mod progress;
+pub use progress::{ProgressStyle, progress as akar_progress};
+
+pub mod badge;
+pub use badge::{BadgeVariant, badge as akar_badge};
+
 pub mod scroll_area;
 pub use scroll_area::{ScrollAreaResponse, scroll_area_begin, scroll_area_end};
 
