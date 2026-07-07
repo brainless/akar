@@ -47,6 +47,17 @@
 - `akar_drawer_end(ctx)` — wraps `drawer_end`
 - `akar.h` regenerated — all 5 new symbols confirmed present (AkarDrawerResponse, AkarTabBarResponse, akar_drawer_begin, akar_drawer_end, akar_tab_bar)
 
+### Task 5 — Demo Update (Done)
+
+`examples/demo-rust/src/main.rs` — reworked layout and rendering:
+- Navbar "Notifications" button → "Menu" button; toggles `drawer_open`
+- Tab bar (Underline variant) with 3 tabs: List, Canvas, Stats; switching reparents `panel_container` children
+- Tab "List": existing 50-item scrollable list with progress bars
+- Tab "Canvas": centered placeholder text
+- Tab "Stats": stat cards + steps + avatar row with skeleton toggle
+- Drawer: animated via `ease_out_cubic` (speed 0.08, max 250px), renders avatar circle + 4 nav links, scrim click closes
+- Clippy and test pass clean
+
 
 
 ---
