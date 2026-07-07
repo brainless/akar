@@ -55,6 +55,30 @@ typedef struct AkarTabBarResponse {
     int32_t clicked_index;
 } AkarTabBarResponse;
 
+typedef struct AkarTooltipResponse {
+    bool visible;
+} AkarTooltipResponse;
+
+typedef struct AkarModalResponse {
+    bool close_requested;
+    uint64_t content_node;
+} AkarModalResponse;
+
+typedef struct AkarToastResponse {
+    int32_t dismissed;
+} AkarToastResponse;
+
+typedef struct AkarToastItem {
+    uint32_t variant;
+    const char *message;
+    bool dismiss_on_click;
+} AkarToastItem;
+
+typedef struct AkarDropdownState {
+    bool is_open;
+    float content_rect[4];
+} AkarDropdownState;
+
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
 void akar_ctx_free(struct AkarCtx *ctx);
@@ -191,5 +215,33 @@ void akar_avatar(struct AkarCtx *ctx,
                  const char *initials,
                  int32_t initials_len,
                  uint32_t color);
+
+struct AkarTooltipResponse akar_tooltip(struct AkarCtx *ctx,
+                                        const float *trigger_rect,
+                                        const char *text,
+                                        uint32_t preferred_side,
+                                        const float *viewport_rect);
+
+struct AkarModalResponse akar_modal_begin(struct AkarCtx *ctx,
+                                          const char *title,
+                                          int32_t title_len,
+                                          float width,
+                                          float height,
+                                          const float *viewport_rect);
+
+void akar_modal_end(struct AkarCtx *ctx);
+
+struct AkarToastResponse akar_toasts(struct AkarCtx *ctx,
+                                     const struct AkarToastItem *items,
+                                     uint32_t item_count,
+                                     const float *viewport_rect);
+
+struct AkarDropdownState akar_dropdown_begin(struct AkarCtx *ctx,
+                                             const float *anchor_rect,
+                                             float item_height,
+                                             const float *viewport_rect,
+                                             bool is_open);
+
+void akar_dropdown_end(struct AkarCtx *ctx);
 
 #endif  /* AKAR_H */

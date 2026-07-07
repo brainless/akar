@@ -838,3 +838,219 @@ pub unsafe extern "C" fn akar_avatar(
         &ctx.theme,
     );
 }
+
+// ---- Tooltip ----
+
+#[repr(C)]
+pub struct AkarTooltipResponse {
+    pub visible: bool,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_tooltip(
+    ctx: *mut AkarCtx,
+    trigger_rect: *const f32,
+    text: *const c_char,
+    preferred_side: u32,
+    viewport_rect: *const f32,
+) -> AkarTooltipResponse {
+    let ctx = unsafe { &mut *ctx };
+
+    if trigger_rect.is_null() || text.is_null() || viewport_rect.is_null() {
+        return AkarTooltipResponse { visible: false };
+    }
+
+    let trigger_rect = unsafe { *(trigger_rect as *const [f32; 4]) };
+    let viewport_rect = unsafe { *(viewport_rect as *const [f32; 4]) };
+
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return AkarTooltipResponse { visible: false };
+    };
+
+    let side = match preferred_side {
+        0 => akar_components::TooltipSide::Top,
+        1 => akar_components::TooltipSide::Bottom,
+        2 => akar_components::TooltipSide::Left,
+        3 => akar_components::TooltipSide::Right,
+        _ => akar_components::TooltipSide::Top,
+    };
+
+    let result = akar_components::akar_tooltip(
+        &mut ctx.core,
+        trigger_rect,
+        text_str,
+        side,
+        &ctx.theme,
+        viewport_rect,
+    );
+
+    AkarTooltipResponse {
+        visible: result.visible,
+    }
+}
+
+// ---- Modal ----
+
+#[repr(C)]
+pub struct AkarModalResponse {
+    pub close_requested: bool,
+    pub content_node: u64,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_modal_begin(
+    ctx: *mut AkarCtx,
+    title: *const c_char,
+    title_len: i32,
+    width: f32,
+    height: f32,
+    viewport_rect: *const f32,
+) -> AkarModalResponse {
+    let ctx = unsafe { &mut *ctx };
+
+    if title.is_null() || title_len <= 0 || viewport_rect.is_null() {
+        return AkarModalResponse {
+            close_requested: false,
+            content_node: 0,
+        };
+    }
+
+    let viewport_rect = unsafe { *(viewport_rect as *const [f32; 4]) };
+    let bytes = unsafe { std::slice::from_raw_parts(title as *const u8, title_len as usize) };
+    let Ok(title_str) = std::str::from_utf8(bytes) else {
+        return AkarModalResponse {
+            close_requested: false,
+            content_node: 0,
+        };
+    };
+
+    let result = akar_components::modal_begin(
+        &mut ctx.core,
+        &mut ctx.layout,
+        viewport_rect,
+        title_str,
+        width,
+        height,
+        &ctx.theme,
+    );
+
+    AkarModalResponse {
+        close_requested: result.close_requested,
+        content_node: result.content_node.into(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_modal_end(ctx: *mut AkarCtx) {
+    let ctx = unsafe { &mut *ctx };
+    akar_components::modal_end(&mut ctx.core);
+}
+
+// ---- Toast ----
+
+#[repr(C)]
+pub struct AkarToastItem {
+    pub variant: u32,
+    pub message: *const c_char,
+    pub dismiss_on_click: bool,
+}
+
+#[repr(C)]
+pub struct AkarToastResponse {
+    pub dismissed: i32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_toasts(
+    ctx: *mut AkarCtx,
+    items: *const AkarToastItem,
+    item_count: u32,
+    viewport_rect: *const f32,
+) -> AkarToastResponse {
+    let ctx = unsafe { &mut *ctx };
+
+    if items.is_null() || item_count == 0 || viewport_rect.is_null() {
+        return AkarToastResponse { dismissed: -1 };
+    }
+
+    let viewport_rect = unsafe { *(viewport_rect as *const [f32; 4]) };
+
+    let mut toast_items: Vec<akar_components::ToastItem> = Vec::with_capacity(item_count as usize);
+    for i in 0..item_count as usize {
+        let item = unsafe { &*items.add(i) };
+        let variant = match item.variant {
+            0 => akar_components::ToastVariant::Info,
+            1 => akar_components::ToastVariant::Success,
+            2 => akar_components::ToastVariant::Warning,
+            3 => akar_components::ToastVariant::Error,
+            _ => akar_components::ToastVariant::Info,
+        };
+        let message = if item.message.is_null() {
+            String::new()
+        } else {
+            unsafe { std::ffi::CStr::from_ptr(item.message) }
+                .to_string_lossy()
+                .into_owned()
+        };
+        toast_items.push(akar_components::ToastItem {
+            variant,
+            message,
+            dismiss_on_click: item.dismiss_on_click,
+        });
+    }
+
+    let result = akar_components::toasts(&mut ctx.core, viewport_rect, &mut toast_items, &ctx.theme);
+
+    AkarToastResponse {
+        dismissed: result.dismissed.map(|i| i as i32).unwrap_or(-1),
+    }
+}
+
+// ---- Dropdown ----
+
+#[repr(C)]
+pub struct AkarDropdownState {
+    pub is_open: bool,
+    pub content_rect: [f32; 4],
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_dropdown_begin(
+    ctx: *mut AkarCtx,
+    anchor_rect: *const f32,
+    item_height: f32,
+    viewport_rect: *const f32,
+    is_open: bool,
+) -> AkarDropdownState {
+    let ctx = unsafe { &mut *ctx };
+
+    if anchor_rect.is_null() || viewport_rect.is_null() {
+        return AkarDropdownState {
+            is_open: false,
+            content_rect: [0.0; 4],
+        };
+    }
+
+    let anchor_rect = unsafe { *(anchor_rect as *const [f32; 4]) };
+    let viewport_rect = unsafe { *(viewport_rect as *const [f32; 4]) };
+
+    let result = akar_components::dropdown_begin(
+        &mut ctx.core,
+        anchor_rect,
+        item_height,
+        viewport_rect,
+        is_open,
+        &ctx.theme,
+    );
+
+    AkarDropdownState {
+        is_open: result.is_open,
+        content_rect: result.content_rect,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_dropdown_end(ctx: *mut AkarCtx) {
+    let ctx = unsafe { &mut *ctx };
+    akar_components::dropdown_end(&mut ctx.core);
+}
