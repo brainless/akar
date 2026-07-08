@@ -1,11 +1,13 @@
 use crate::draw_list::DrawCall;
-use crate::{DrawList, InputState, QuadPipeline, TextPipeline};
+use crate::screenshot::ScreenshotCapture;
+use crate::{CapturedFrame, DrawList, InputState, QuadPipeline, ScreenshotError, TextPipeline};
 
 pub struct AkarCore {
     pub draw_list: DrawList,
     pub input: InputState,
     pub(crate) quad_pipeline: QuadPipeline,
     pub text_pipeline: TextPipeline,
+    screenshot_capture: ScreenshotCapture,
     #[allow(dead_code)]
     surface_format: wgpu::TextureFormat,
     viewport_width: u32,
@@ -24,6 +26,7 @@ impl AkarCore {
             input: InputState::new(),
             quad_pipeline: QuadPipeline::new(device, surface_format),
             text_pipeline: TextPipeline::new(device, queue, surface_format),
+            screenshot_capture: ScreenshotCapture::new(device, surface_format),
             surface_format,
             viewport_width: 0,
             viewport_height: 0,
@@ -93,5 +96,35 @@ impl AkarCore {
         self.input.begin_frame();
 
         Ok(())
+    }
+
+    pub fn request_screenshot(&mut self) {
+        self.screenshot_capture.requested = true;
+    }
+
+    pub fn capture_target_view(
+        &mut self,
+        device: &wgpu::Device,
+        width: u32,
+        height: u32,
+    ) -> Option<wgpu::TextureView> {
+        self.screenshot_capture
+            .capture_view(device, width, height, self.surface_format)
+    }
+
+    pub fn take_screenshot(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: wgpu::CommandEncoder,
+        surface_texture: &wgpu::SurfaceTexture,
+    ) -> Result<CapturedFrame, ScreenshotError> {
+        self.screenshot_capture.take_screenshot(
+            device,
+            queue,
+            encoder,
+            surface_texture,
+            self.surface_format,
+        )
     }
 }

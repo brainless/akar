@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container,
@@ -89,12 +90,39 @@ struct AppState {
 }
 
 fn main() {
+    let mut screenshot_path = None;
+    let mut exit_after = false;
+    let mut args = std::env::args().peekable();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--screenshot" => {
+                screenshot_path = args.next();
+            }
+            "--exit" => {
+                exit_after = true;
+            }
+            _ => {}
+        }
+    }
+
     let event_loop = EventLoop::new().unwrap();
-    event_loop.run_app(&mut App { state: None }).unwrap();
+    event_loop
+        .run_app(&mut App {
+            state: None,
+            screenshot_path,
+            exit_after,
+            start_time: None,
+            screenshot_taken: false,
+        })
+        .unwrap();
 }
 
 struct App {
     state: Option<AppState>,
+    screenshot_path: Option<String>,
+    exit_after: bool,
+    start_time: Option<Instant>,
+    screenshot_taken: bool,
 }
 
 fn ease_out_cubic(t: f32) -> f32 {
@@ -513,6 +541,10 @@ impl ApplicationHandler for App {
         );
 
         let form_radio_nodes = [form_radio_dark, form_radio_light];
+
+        if self.screenshot_path.is_some() {
+            self.start_time = Some(Instant::now());
+        }
 
         self.state = Some(AppState {
             window,
@@ -1319,21 +1351,41 @@ impl ApplicationHandler for App {
                     dropdown_end(&mut state.core);
                 }
 
+                let is_capture_frame = self.screenshot_path.is_some()
+                    && !self.screenshot_taken
+                    && self
+                        .start_time
+                        .map_or(false, |t| t.elapsed() >= std::time::Duration::from_secs(5));
+
+                if is_capture_frame {
+                    state.core.request_screenshot();
+                }
+
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
                     _ => return,
                 };
-                let view = output
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
                 let mut encoder = state
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
                 {
+                    let surface_view = output
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    let render_view = if is_capture_frame {
+                        state
+                            .core
+                            .capture_target_view(&state.device, size.width, size.height)
+                            .unwrap()
+                    } else {
+                        surface_view
+                    };
+
                     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("main pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
+                            view: &render_view,
                             depth_slice: None,
                             resolve_target: None,
                             ops: wgpu::Operations {
@@ -1348,7 +1400,37 @@ impl ApplicationHandler for App {
                     });
                     let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
                 }
-                state.queue.submit(std::iter::once(encoder.finish()));
+
+                if is_capture_frame {
+                    let captured = state
+                        .core
+                        .take_screenshot(&state.device, &state.queue, encoder, &output);
+                    match captured {
+                        Ok(frame) => {
+                            let path = self.screenshot_path.as_ref().unwrap();
+                            if let Ok(file) = std::fs::File::create(path) {
+                                let mut png_encoder =
+                                    png::Encoder::new(file, frame.width, frame.height);
+                                png_encoder.set_color(png::ColorType::Rgba);
+                                png_encoder.set_depth(png::BitDepth::Eight);
+                                if let Ok(mut writer) = png_encoder.write_header() {
+                                    if writer.write_image_data(&frame.rgba).is_ok() {
+                                        eprintln!("Screenshot saved to {path}");
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Screenshot failed: {e}");
+                        }
+                    }
+                    self.screenshot_taken = true;
+                    if self.exit_after {
+                        event_loop.exit();
+                    }
+                } else {
+                    state.queue.submit(std::iter::once(encoder.finish()));
+                }
                 output.present();
             }
             _ => {}
