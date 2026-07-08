@@ -1,6 +1,6 @@
 use akar_core::{AkarCore, QuadCall, TextCall, Z_FLOAT, Z_SCRIM};
 use akar_layout::{
-    AlignItems, Dimension, Display, FlexDirection, Layout, NodeId, Size, Style, length,
+    length, AlignItems, Dimension, Display, FlexDirection, Layout, NodeId, Size, Style,
 };
 
 use crate::color::color_to_f32;
@@ -119,9 +119,11 @@ pub fn modal_begin(
         &[header, content_node],
     );
 
-    layout.compute(column, (Some(clamped_w), Some(clamped_h)), |_, _, _, _, _| {
-        akar_layout::Size::ZERO
-    });
+    layout.compute(
+        column,
+        (Some(clamped_w), Some(clamped_h)),
+        |_, _, _, _, _| akar_layout::Size::ZERO,
+    );
 
     // Render header title
     let title_rect = layout.rect_offset(title_node, [panel_x, panel_y]);

@@ -126,10 +126,9 @@ impl ScreenshotCapture {
         surface_texture: &wgpu::SurfaceTexture,
         format: wgpu::TextureFormat,
     ) -> Result<CapturedFrame, ScreenshotError> {
-        let capture_texture = self
-            .texture
-            .as_ref()
-            .ok_or_else(|| ScreenshotError::BufferMapFailed("capture texture not initialized".into()))?;
+        let capture_texture = self.texture.as_ref().ok_or_else(|| {
+            ScreenshotError::BufferMapFailed("capture texture not initialized".into())
+        })?;
 
         let width = self.width;
         let height = self.height;
@@ -170,8 +169,7 @@ impl ScreenshotCapture {
         let surface_view = surface_texture
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
-        let capture_view =
-            capture_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let capture_view = capture_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let blit_layout = self.pipeline.get_bind_group_layout(0);
         let blit_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("blit bind group"),
@@ -240,6 +238,10 @@ impl ScreenshotCapture {
 
         self.requested = false;
 
-        Ok(CapturedFrame { width, height, rgba })
+        Ok(CapturedFrame {
+            width,
+            height,
+            rgba,
+        })
     }
 }

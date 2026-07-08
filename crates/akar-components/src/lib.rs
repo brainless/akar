@@ -58,7 +58,7 @@ pub mod drawer;
 pub use drawer::{drawer_begin, drawer_end, DrawerEdge, DrawerResponse};
 
 pub mod tooltip;
-pub use tooltip::{tooltip as akar_tooltip, position_tooltip, TooltipResponse, TooltipSide};
+pub use tooltip::{position_tooltip, tooltip as akar_tooltip, TooltipResponse, TooltipSide};
 
 pub mod modal;
 pub use modal::{modal_begin, modal_end, ModalResponse};

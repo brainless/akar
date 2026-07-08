@@ -32,8 +32,10 @@ pub fn select(
     }
     let dropdown_rect = [rect[0], dropdown_y, rect[2], total_height];
 
-    if *open && core.input.mouse_buttons_pressed[0]
-        && !core.input.is_hovering(rect) && !core.input.is_hovering(dropdown_rect)
+    if *open
+        && core.input.mouse_buttons_pressed[0]
+        && !core.input.is_hovering(rect)
+        && !core.input.is_hovering(dropdown_rect)
     {
         *open = false;
     }
@@ -97,14 +99,7 @@ pub fn select(
     });
 
     if *open {
-        let state = dropdown_begin(
-            core,
-            rect,
-            item_height,
-            viewport_rect,
-            true,
-            theme,
-        );
+        let state = dropdown_begin(core, rect, item_height, viewport_rect, true, theme);
 
         if state.is_open {
             for (i, option) in options.iter().enumerate() {
@@ -146,10 +141,7 @@ pub fn select(
                 let option_buffer = core.text_pipeline.set_text(
                     Some(u64::from(node_id) + 2 + i as u64),
                     option,
-                    glyphon::Metrics::new(
-                        theme.font_size_base,
-                        theme.font_size_base * 1.2,
-                    ),
+                    glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
                     Some(state.content_rect[2]),
                     None,
                 );

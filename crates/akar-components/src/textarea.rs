@@ -115,8 +115,7 @@ pub fn textarea(
                     *cursor_pos = next_char_boundary(value, *cursor_pos);
                 }
                 Key::Up => {
-                    let line_start =
-                        value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                     if line_start > 0 {
                         let prev_line_end = value[..line_start.saturating_sub(1)]
                             .rfind('\n')
@@ -134,8 +133,7 @@ pub fn textarea(
                     }
                 }
                 Key::Down => {
-                    let line_start =
-                        value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                     let col = *cursor_pos - line_start;
                     if let Some(next_nl) = value[*cursor_pos..].find('\n') {
                         let next_line_start = *cursor_pos + next_nl + 1;
@@ -149,8 +147,7 @@ pub fn textarea(
                     }
                 }
                 Key::Home => {
-                    let line_start =
-                        value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
+                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
                     *cursor_pos = line_start;
                 }
                 Key::End => {

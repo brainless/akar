@@ -27,9 +27,17 @@ pub fn switch(
     let track_rect = [track_x, track_y, track_w, track_h];
 
     let track_color = if *on {
-        if hovered { scale_color(theme.primary, 1.2) } else { theme.primary }
+        if hovered {
+            scale_color(theme.primary, 1.2)
+        } else {
+            theme.primary
+        }
     } else {
-        if hovered { scale_color(theme.base_300, 1.2) } else { theme.base_300 }
+        if hovered {
+            scale_color(theme.base_300, 1.2)
+        } else {
+            theme.base_300
+        }
     };
 
     core.draw_list.push_quad(QuadCall {

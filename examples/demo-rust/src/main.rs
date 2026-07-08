@@ -2,13 +2,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use akar_components::{
-    akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container,
-    akar_label, akar_navbar, akar_radio_group, akar_select, akar_skeleton, akar_slider,
-    akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_textarea,
-    akar_tooltip, drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin,
-    modal_end, progress_at, toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant,
-    DrawerEdge, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant, ToastItem,
-    ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container, akar_label,
+    akar_navbar, akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat, akar_steps,
+    akar_switch, akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip, drawer_begin,
+    drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts,
+    AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots, ProgressStyle,
+    SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -652,7 +651,9 @@ impl ApplicationHandler for App {
                     state.layout.add_child(slots.end, state.navbar_badge_node);
                     state.layout.add_child(slots.end, state.navbar_btn_node);
                     state.layout.add_child(slots.end, state.navbar_new_btn_node);
-                    state.layout.add_child(slots.end, state.navbar_dropdown_btn_node);
+                    state
+                        .layout
+                        .add_child(slots.end, state.navbar_dropdown_btn_node);
                     state.navbar_slots = Some(slots);
                 }
 
@@ -882,10 +883,8 @@ impl ApplicationHandler for App {
                             let progress_x = inner_rect[0] + inner_rect[2] * 0.65;
                             let progress_w = inner_rect[2] * 0.35;
                             let progress_h = 8.0;
-                            let progress_y =
-                                inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
-                            let progress_rect =
-                                [progress_x, progress_y, progress_w, progress_h];
+                            let progress_y = inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
+                            let progress_rect = [progress_x, progress_y, progress_w, progress_h];
                             let progress_style = ProgressStyle {
                                 track_color: 0x27272aff,
                                 fill_color: 0x3b82f6ff,
@@ -1355,7 +1354,7 @@ impl ApplicationHandler for App {
                     && !self.screenshot_taken
                     && self
                         .start_time
-                        .map_or(false, |t| t.elapsed() >= std::time::Duration::from_secs(5));
+                        .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(5));
 
                 if is_capture_frame {
                     state.core.request_screenshot();
@@ -1402,26 +1401,42 @@ impl ApplicationHandler for App {
                 }
 
                 if is_capture_frame {
-                    let captured = state
-                        .core
-                        .take_screenshot(&state.device, &state.queue, encoder, &output);
+                    let captured =
+                        state
+                            .core
+                            .take_screenshot(&state.device, &state.queue, encoder, &output);
                     match captured {
                         Ok(frame) => {
                             let path = self.screenshot_path.as_ref().unwrap();
-                            if let Ok(file) = std::fs::File::create(path) {
-                                let mut png_encoder =
-                                    png::Encoder::new(file, frame.width, frame.height);
-                                png_encoder.set_color(png::ColorType::Rgba);
-                                png_encoder.set_depth(png::BitDepth::Eight);
-                                if let Ok(mut writer) = png_encoder.write_header() {
-                                    if writer.write_image_data(&frame.rgba).is_ok() {
-                                        eprintln!("Screenshot saved to {path}");
+                            match std::fs::File::create(path) {
+                                Ok(file) => {
+                                    let mut png_encoder =
+                                        png::Encoder::new(file, frame.width, frame.height);
+                                    png_encoder.set_color(png::ColorType::Rgba);
+                                    png_encoder.set_depth(png::BitDepth::Eight);
+                                    match png_encoder.write_header() {
+                                        Ok(mut writer) => {
+                                            if let Err(e) = writer.write_image_data(&frame.rgba) {
+                                                eprintln!("Failed to write PNG data: {e}");
+                                                std::process::exit(1);
+                                            }
+                                            eprintln!("Screenshot saved to {path}");
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Failed to write PNG header: {e}");
+                                            std::process::exit(1);
+                                        }
                                     }
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to create file '{path}': {e}");
+                                    std::process::exit(1);
                                 }
                             }
                         }
                         Err(e) => {
                             eprintln!("Screenshot failed: {e}");
+                            std::process::exit(1);
                         }
                     }
                     self.screenshot_taken = true;
