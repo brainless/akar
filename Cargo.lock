@@ -68,6 +68,8 @@ dependencies = [
  "glyphon",
  "log",
  "pollster",
+ "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "wgpu",
 ]
@@ -558,6 +560,8 @@ dependencies = [
  "glyphon",
  "png",
  "pollster",
+ "serde",
+ "serde_json",
  "taffy",
  "wgpu",
  "winit",

@@ -3,6 +3,9 @@ name = "akar-core"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+serde = ["dep:serde"]
+
 [dependencies]
 wgpu.workspace = true
 glyphon.workspace = true
@@ -11,3 +14,7 @@ thiserror.workspace = true
 log.workspace = true
 bytemuck.workspace = true
 pollster = "0.4"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+serde_json = "1"

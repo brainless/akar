@@ -371,7 +371,7 @@ mod tests {
 
     #[test]
     fn runner_fires_click_same_frame() {
-        let mut layout = Layout::new();
+        let layout = Layout::new();
         let mut input = InputState::new();
         let steps = parse_script("click 10 10\n").unwrap();
         let mut runner = ScriptRunner::new(steps);

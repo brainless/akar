@@ -32,6 +32,42 @@ use winit::{
 
 mod script;
 
+#[derive(serde::Serialize)]
+struct InputSnapshot {
+    mouse_pos: [f32; 2],
+    mouse_buttons: [bool; 5],
+    mouse_buttons_pressed: [bool; 5],
+    mouse_buttons_released: [bool; 5],
+    scroll_delta: [f32; 2],
+    chars: Vec<String>,
+    keys_pressed: Vec<String>,
+    focused_id: Option<u64>,
+}
+
+#[derive(serde::Serialize)]
+struct FrameDump<'a> {
+    recorded_calls: &'a [akar_core::draw_list::RecordedCall],
+    labeled_rects: Vec<(String, [f32; 4])>,
+    input: InputSnapshot,
+}
+
+fn input_snapshot(input: &akar_core::InputState) -> InputSnapshot {
+    InputSnapshot {
+        mouse_pos: [input.mouse_pos.x, input.mouse_pos.y],
+        mouse_buttons: input.mouse_buttons,
+        mouse_buttons_pressed: input.mouse_buttons_pressed,
+        mouse_buttons_released: input.mouse_buttons_released,
+        scroll_delta: [input.scroll_delta.x, input.scroll_delta.y],
+        chars: input.chars.iter().map(|c| c.to_string()).collect(),
+        keys_pressed: input
+            .keys_pressed
+            .iter()
+            .map(|k| format!("{k:?}"))
+            .collect(),
+        focused_id: input.focused_id,
+    }
+}
+
 struct AppState {
     window: Arc<Window>,
     device: wgpu::Device,
@@ -97,6 +133,7 @@ fn main() {
     let mut delay_secs = 5.0;
     let mut script_path = None;
     let mut dump_layout = false;
+    let mut dump_frame_path = None;
     let mut args = std::env::args().peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -118,6 +155,9 @@ fn main() {
             }
             "--dump-layout" => {
                 dump_layout = true;
+            }
+            "--dump-frame" => {
+                dump_frame_path = args.next();
             }
             _ => {}
         }
@@ -154,8 +194,10 @@ fn main() {
             delay_secs,
             script_runner,
             dump_layout,
+            dump_frame_path,
             start_time: None,
             screenshot_taken: false,
+            dump_frame_written: false,
         })
         .unwrap();
 }
@@ -167,8 +209,10 @@ struct App {
     delay_secs: f64,
     script_runner: Option<ScriptRunner>,
     dump_layout: bool,
+    dump_frame_path: Option<String>,
     start_time: Option<Instant>,
     screenshot_taken: bool,
+    dump_frame_written: bool,
 }
 
 fn ease_out_cubic(t: f32) -> f32 {
@@ -701,6 +745,9 @@ impl ApplicationHandler for App {
                 let scale = state.window.scale_factor() as f32;
 
                 state.core.begin_frame(size.width, size.height, scale);
+                if self.dump_frame_path.is_some() && !self.dump_frame_written {
+                    state.core.draw_list.start_recording();
+                }
                 let viewport_rect = [
                     0.0,
                     0.0,
@@ -1483,6 +1530,36 @@ impl ApplicationHandler for App {
                         multiview_mask: None,
                     });
                     let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
+                }
+
+                let is_dump_frame = self.dump_frame_path.is_some()
+                    && !self.dump_frame_written
+                    && (self.screenshot_path.is_none() || is_capture_frame);
+                if is_dump_frame {
+                    let dump = FrameDump {
+                        recorded_calls: state.core.draw_list.recorded_calls(),
+                        labeled_rects: state.layout.labeled_rects(),
+                        input: input_snapshot(&state.core.input),
+                    };
+                    let path = self.dump_frame_path.clone().unwrap();
+                    match std::fs::File::create(&path) {
+                        Ok(file) => {
+                            if let Err(e) = serde_json::to_writer_pretty(file, &dump) {
+                                eprintln!("Failed to write frame dump '{path}': {e}");
+                                std::process::exit(1);
+                            }
+                            eprintln!("Frame dump written to {path}");
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to create file '{path}': {e}");
+                            std::process::exit(1);
+                        }
+                    }
+                    self.dump_frame_written = true;
+                    state.core.draw_list.stop_recording();
+                    if self.exit_after && self.screenshot_path.is_none() {
+                        event_loop.exit();
+                    }
                 }
 
                 if is_capture_frame {

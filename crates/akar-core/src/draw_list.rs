@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub enum DrawCall {
     Quad(QuadCall),
     Text(TextCall),
@@ -8,6 +9,7 @@ pub enum DrawCall {
 
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 #[repr(C)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct QuadCall {
     pub rect: [f32; 4],
     pub fill: [f32; 4],
@@ -25,6 +27,14 @@ pub struct QuadCall {
 const _: () = assert!(std::mem::size_of::<QuadCall>() == 112);
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct RecordedCall {
+    pub call: DrawCall,
+    pub scissor: Option<[f32; 4]>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct TextCall {
     pub buffer_id: u64,
     pub x: f32,
@@ -38,6 +48,8 @@ pub struct DrawList {
     calls: Vec<DrawCall>,
     scissor_stack: Vec<[f32; 4]>,
     scale_factor: f32,
+    recording: bool,
+    recorded: Vec<RecordedCall>,
 }
 
 impl DrawList {
@@ -46,6 +58,8 @@ impl DrawList {
             calls: Vec::new(),
             scissor_stack: Vec::new(),
             scale_factor: 1.0,
+            recording: false,
+            recorded: Vec::new(),
         }
     }
 
@@ -53,6 +67,22 @@ impl DrawList {
         self.calls.clear();
         self.scissor_stack.clear();
         self.scale_factor = scale_factor;
+        if self.recording {
+            self.recorded.clear();
+        }
+    }
+
+    pub fn start_recording(&mut self) {
+        self.recording = true;
+        self.recorded.clear();
+    }
+
+    pub fn stop_recording(&mut self) {
+        self.recording = false;
+    }
+
+    pub fn recorded_calls(&self) -> &[RecordedCall] {
+        &self.recorded
     }
 
     pub fn push_scissor(&mut self, rect: [f32; 4]) {
@@ -98,6 +128,12 @@ impl DrawList {
         call.shadow_spread *= self.scale_factor;
         call.shadow_offset[0] *= self.scale_factor;
         call.shadow_offset[1] *= self.scale_factor;
+        if self.recording {
+            self.recorded.push(RecordedCall {
+                call: DrawCall::Quad(call),
+                scissor: self.active_scissor(),
+            });
+        }
         if let Some(scissor) = self.active_scissor() {
             if !intersects(call.rect, scissor) {
                 return;
@@ -107,6 +143,12 @@ impl DrawList {
     }
 
     pub fn push_text(&mut self, call: TextCall) {
+        if self.recording {
+            self.recorded.push(RecordedCall {
+                call: DrawCall::Text(call.clone()),
+                scissor: self.active_scissor(),
+            });
+        }
         if let Some(scissor) = self.active_scissor() {
             if !intersects(call.clip, scissor) {
                 return;
@@ -242,5 +284,46 @@ mod tests {
         dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
         dl.push_text(text_at(200.0, 200.0, 50.0, 50.0));
         assert!(dl.text_calls().is_empty());
+    }
+
+    #[test]
+    fn recording_captures_culled_quad() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(1.0);
+        dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
+        dl.start_recording();
+        dl.push_quad(quad_at(200.0, 200.0, 50.0, 50.0));
+        dl.stop_recording();
+        assert!(dl.sorted_quads().is_empty());
+        let recorded = dl.recorded_calls();
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].scissor, Some([0.0, 0.0, 100.0, 100.0]));
+        match recorded[0].call {
+            DrawCall::Quad(q) => assert_eq!(q.rect, [200.0, 200.0, 50.0, 50.0]),
+            _ => panic!("expected quad"),
+        }
+    }
+
+    #[test]
+    fn recording_off_is_empty() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(1.0);
+        dl.push_quad(quad_at(10.0, 10.0, 10.0, 10.0));
+        assert!(dl.recorded_calls().is_empty());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn recorded_call_serializes() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
+        dl.start_recording();
+        dl.push_quad(quad_at(10.0, 10.0, 20.0, 20.0));
+        dl.stop_recording();
+        let json = serde_json::to_string_pretty(dl.recorded_calls()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert!(value.is_array());
+        assert_eq!(value.as_array().unwrap().len(), 1);
     }
 }
