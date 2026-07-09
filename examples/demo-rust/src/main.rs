@@ -91,6 +91,7 @@ struct AppState {
 fn main() {
     let mut screenshot_path = None;
     let mut exit_after = false;
+    let mut delay_secs = 5.0;
     let mut args = std::env::args().peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -99,6 +100,13 @@ fn main() {
             }
             "--exit" => {
                 exit_after = true;
+            }
+            "--delay" => {
+                if let Some(secs) = args.next() {
+                    if let Ok(parsed) = secs.parse::<f64>() {
+                        delay_secs = parsed;
+                    }
+                }
             }
             _ => {}
         }
@@ -110,6 +118,7 @@ fn main() {
             state: None,
             screenshot_path,
             exit_after,
+            delay_secs,
             start_time: None,
             screenshot_taken: false,
         })
@@ -120,6 +129,7 @@ struct App {
     state: Option<AppState>,
     screenshot_path: Option<String>,
     exit_after: bool,
+    delay_secs: f64,
     start_time: Option<Instant>,
     screenshot_taken: bool,
 }
@@ -1352,9 +1362,9 @@ impl ApplicationHandler for App {
 
                 let is_capture_frame = self.screenshot_path.is_some()
                     && !self.screenshot_taken
-                    && self
-                        .start_time
-                        .is_some_and(|t| t.elapsed() >= std::time::Duration::from_secs(5));
+                    && self.start_time.is_some_and(|t| {
+                        t.elapsed() >= std::time::Duration::from_secs_f64(self.delay_secs)
+                    });
 
                 if is_capture_frame {
                     state.core.request_screenshot();

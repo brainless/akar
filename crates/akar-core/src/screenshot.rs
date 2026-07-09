@@ -215,11 +215,13 @@ impl ScreenshotCapture {
         buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = sender.send(result);
         });
-        device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
-        receiver
+        if let Err(e) = device.poll(wgpu::PollType::wait_indefinitely()) {
+            return Err(ScreenshotError::BufferMapFailed(e.to_string()));
+        }
+        let result = receiver
             .recv()
-            .unwrap()
-            .map_err(|e| ScreenshotError::BufferMapFailed(e.to_string()))?;
+            .map_err(|_| ScreenshotError::BufferMapFailed("screenshot channel closed".into()))?;
+        result.map_err(|e| ScreenshotError::BufferMapFailed(e.to_string()))?;
 
         let data = buffer_slice.get_mapped_range();
         let mut rgba: Vec<u8> = data

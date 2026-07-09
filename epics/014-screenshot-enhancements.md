@@ -417,3 +417,12 @@ The tasks below align with GLM5.2's Task 014a–014d breakdown. Task 014e (headl
 3. **Task 014c — Structured frame dump:** Gated recording mode in `DrawList` that snapshots `{call, scissor}` at push time, `--dump-frame <PATH>` flag that serializes draw calls, labeled rects, and input state to JSON.
 4. **Task 014d — Diff utility:** Separate `akar-diff` binary with `--diff` (visual diff PNG) and `--compare` (threshold-based exit code) modes.
 5. **Task 014e — Headless rendering:** Deferred to a separate epic.
+
+---
+
+## Review Log
+
+### 014a — Configurable delay + screenshot robustness (merged)
+- **Files:** `crates/akar-core/src/screenshot.rs`, `examples/demo-rust/src/main.rs`.
+- **Verdict:** Implemented as specified. `device.poll(...).unwrap()` and `receiver.recv().unwrap().unwrap()` now return `ScreenshotError::BufferMapFailed`. `--delay <SECS>` (f64, default 5.0) drives capture timing; `--delay 0` captures the first frame. `cargo clippy --workspace -- -D warnings` and `cargo fmt --check` pass.
+- **Note:** `delay_secs` defaults to 5.0 unconditionally (only consulted inside the `is_capture_frame` gate, so it is effectively ignored when no `--screenshot` is set) — matches the intended backward-compatible behavior.
