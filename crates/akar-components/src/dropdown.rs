@@ -27,9 +27,10 @@ pub fn dropdown_begin(
     let width = anchor_rect[2];
     let total_height = item_height * total_items_visible;
 
-    let mut y = anchor_rect[1] + anchor_rect[3];
+    let gap = 4.0;
+    let mut y = anchor_rect[1] + anchor_rect[3] + gap;
     if y + total_height > viewport_rect[1] + viewport_rect[3] {
-        y = anchor_rect[1] - total_height;
+        y = anchor_rect[1] - total_height - gap;
     }
 
     let x = anchor_rect[0];
@@ -37,7 +38,7 @@ pub fn dropdown_begin(
 
     core.draw_list.push_quad(QuadCall {
         rect: dropdown_rect,
-        fill: color_to_f32(theme.base_200),
+        fill: color_to_f32(theme.base_100),
         border_color: color_to_f32(theme.base_300),
         corner_radii: [theme.radius_field; 4],
         border_width: 1.0,
@@ -137,7 +138,7 @@ mod tests {
         );
 
         let quads = core.draw_list.sorted_quads();
-        assert_eq!(quads[0].rect[1], anchor_rect[1] + anchor_rect[3]);
+        assert_eq!(quads[0].rect[1], anchor_rect[1] + anchor_rect[3] + 4.0);
 
         dropdown_end(&mut core);
     }
@@ -159,7 +160,7 @@ mod tests {
         );
 
         let quads = core.draw_list.sorted_quads();
-        assert_eq!(quads[0].rect[1], anchor_rect[1] - total_height);
+        assert_eq!(quads[0].rect[1], anchor_rect[1] - total_height - 4.0);
 
         dropdown_end(&mut core);
     }

@@ -17,9 +17,9 @@ pub mod context;
 pub use context::AkarCore;
 
 pub const Z_BASE: f32 = 0.0;
-pub const Z_SCRIM: f32 = 0.5;
-pub const Z_FLOAT: f32 = 1.0;
-pub const Z_OVERLAY: f32 = 2.0;
+pub const Z_SCRIM: f32 = 0.25;
+pub const Z_FLOAT: f32 = 0.5;
+pub const Z_OVERLAY: f32 = 0.75;
 
 pub fn list_clip(
     total: usize,

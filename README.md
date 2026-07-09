@@ -35,9 +35,19 @@ The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-
 
 ## Status
 
-**Pre-alpha.** Epics 001–012 are complete with 30+ components implemented. Epic 013 (Screenshot Utility) is in progress. The API is functional but may change as development continues.
+**Pre-alpha.** Epics 001–013 are complete with 30+ components implemented and a working screenshot utility. The API is functional but may change as development continues.
 
 See `epics/` for the current design roadmap and completion status.
+
+## Screenshot workflow
+
+akar includes a built-in screenshot tool for visual verification. Coding agents use it to see the UI they are modifying:
+
+```bash
+cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+```
+
+This captures akar's rendered output (no OS chrome) to a PNG file. It is the primary feedback loop for UI development: change code, capture screenshot, inspect, iterate.
 
 ## License
 

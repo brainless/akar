@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / active development**. Epics 001 through 012 are complete, covering the core renderer, layout system, C API, text pipeline, container styling, scroll areas, static display components, navigation, tabs, drawer, overlay stack, and form controls. Epic 013 (Screenshot Utility) is in progress. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / active development**. Epics 001 through 013 are complete, covering the core renderer, layout system, C API, text pipeline, container styling, scroll areas, static display components, navigation, tabs, drawer, overlay stack, form controls, and screenshot utility. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 
@@ -46,6 +46,31 @@ cargo fmt --check
 # Run the demo application
 cargo run --example demo-rust
 ```
+
+## Screenshot Workflow
+
+akar supports a built-in screenshot mechanism for visual verification and coding-agent-led development. The `demo-rust` binary captures its own window and writes a PNG, enabling agents to "see" the UI they are modifying.
+
+```bash
+# Capture the demo window after a 5-second delay
+cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+```
+
+This is the primary feedback loop for UI work:
+
+1. Make a change to a component, theme token, or layout.
+2. Run the screenshot command.
+3. Read the resulting PNG to verify the visual result.
+4. Iterate.
+
+The screenshot captures exactly what akar rendered — no OS chrome, no overlapping windows. It uses wgpu intermediate-texture readback (see `epics/013-screenshot-utility.md`), so it works identically on macOS, Windows, and Linux.
+
+**Current limitations** (planned for a follow-up epic):
+- Fixed 5-second delay before capture — not configurable yet.
+- No programmatic input injection — cannot trigger hover/press states for screenshots.
+- No structured logging of draw calls — debugging relies on visual inspection.
+
+These limitations will be addressed in the next epic to enable fully autonomous coding-agent development cycles.
 
 ## Project Structure
 
@@ -110,8 +135,6 @@ A flat `AkarTheme` struct of color tokens and size tokens. No cascade, no inheri
 - Accessibility — deferred beyond v1.
 
 ## Coding Conventions
-
-*(Will be expanded once implementation begins. Preliminary:)*
 
 - Edition 2021, MSRV TBD (will track wgpu's MSRV).
 - Errors: `thiserror` for library crates, `anyhow` for examples and binaries.

@@ -1,6 +1,6 @@
 # Epic 013: Screenshot Utility
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Add a window screenshot capability to akar and expose it through the `demo-rust` binary via a CLI flag. After a configurable delay the demo captures its own window and writes it to a PNG file, enabling visual regression checks and UI glitch analysis without external tools.
 
 **Revision note (2026-07-08):** The original Approach A design added `COPY_SRC` directly to the surface's `TextureUsages`. Research against wgpu internals and egui's production capture code (see "Implementation Plan" below) showed this is unsafe: surface `COPY_SRC` support is a live driver capability (`wgpu-hal/src/vulkan/adapter.rs` queries `VkSurfaceCapabilitiesKHR.supportedUsageFlags`), not a guarantee, and requesting an unsupported usage fails at `surface.configure()` time (`wgpu-core::present::ConfigureSurfaceError::UnsupportedUsage`) — i.e. at startup, unconditionally, even when no screenshot is requested. The plan below replaces the direct-surface-flag approach with egui's pattern: render the captured frame into a plain intermediate `wgpu::Texture` (which has no driver-dependent usage restrictions) and blit it to the surface, gated so it only happens on the frame a screenshot is actually taken.

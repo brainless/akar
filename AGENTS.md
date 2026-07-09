@@ -8,7 +8,7 @@ A GPU-accelerated immediate-mode UI component library with a C ABI. The Rust cra
 
 ## Before starting any task
 
-1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`). Currently Epic 013 is in progress.
+1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`). Currently Epic 014 is in progress.
 2. Read the full epic before touching any file.
 3. Cross-reference `DEVELOP.md` for local dependency paths and architectural constraints.
 
@@ -35,6 +35,29 @@ Do not fetch URLs for these projects. Read files locally.
 - Do not add windowing (winit, SDL, GLFW) to `akar-core` or `akar-components`. Windowing belongs in `akar-winit` and is always optional.
 - Do not add accessibility scaffolding in v1. Document the punt if relevant.
 - Do not edit `akar.h` directly — it is always `cbindgen`-generated from `akar-c-api`.
+
+## Screenshot workflow
+
+This is the primary feedback loop for UI development. When modifying components, themes, or layout, use the screenshot tool to verify visual results:
+
+```bash
+cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+```
+
+The workflow:
+1. Make your change.
+2. Run the screenshot command.
+3. Read the PNG to verify the visual result.
+4. Iterate.
+
+The screenshot captures exactly what akar rendered (no OS chrome) using wgpu intermediate-texture readback. It works identically on macOS, Windows, and Linux.
+
+**Current limitations:**
+- Fixed 5-second delay before capture (not yet configurable).
+- No programmatic input injection (cannot trigger hover/press states).
+- No structured logging of draw calls.
+
+These will be addressed in a follow-up epic to enable fully autonomous coding-agent development cycles.
 
 ## Crate responsibility boundaries
 
@@ -87,7 +110,7 @@ For scroll containers and list components:
 
 - No live GPU in CI — component logic and layout resolution must be testable without a real wgpu device.
 - A `MockDrawList` that records submitted calls is the primary unit-test tool.
-- Visual regression tests (screenshot comparison) are manual for now.
+- Visual verification uses the screenshot tool: modify code, run `cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit`, read the PNG to confirm the result.
 - C ABI tests are written in C and compiled as integration tests under `crates/akar-c-api/tests/`.
 - Run `cargo test --workspace` to execute all tests.
 
