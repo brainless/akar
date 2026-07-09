@@ -2,7 +2,7 @@
 
 ## Project Status
 
-akar is in **pre-alpha / implementation phase**. Epics 007 (Container Styling), 008 (ScrollArea and Display), 009 (Static Display and Navigation), 010 (Tabs and Drawer), and 011 (Overlay Stack) are complete. Epic 012 (Form Controls and Text Input) is planned. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / active development**. Epics 001 through 012 are complete, covering the core renderer, layout system, C API, text pipeline, container styling, scroll areas, static display components, navigation, tabs, drawer, overlay stack, and form controls. Epic 013 (Screenshot Utility) is in progress. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
 
 ## Local Dependencies
 
@@ -38,14 +38,16 @@ These are not yet present locally but are required reading for Epic 001. Clone t
 ## Build & Run
 
 ```bash
-# (no code yet — these are the target commands once implementation begins)
 cargo check --workspace
 cargo test --workspace
 cargo clippy --workspace -- -D warnings
 cargo fmt --check
+
+# Run the demo application
+cargo run --example demo-rust
 ```
 
-## Planned Project Structure
+## Project Structure
 
 ```
 akar/
@@ -54,21 +56,17 @@ akar/
 ├── DEVELOP.md
 ├── CLAUDE.md
 ├── AGENTS.md
+├── akar.h                        # cbindgen-generated C header
 ├── epics/                        # design roadmap, one file per epic
 ├── crates/
-│   ├── akar-core/                # quad renderer, draw list, text pipeline, input state
+│   ├── akar-core/                # quad renderer, draw list, text pipeline, input state, screenshot
 │   ├── akar-layout/              # taffy wrapper; resolves flex trees to pixel rects
-│   ├── akar-components/          # all UI components (button, card, input, table, ...)
+│   ├── akar-components/          # all UI components (30+ components implemented)
 │   ├── akar-c-api/               # extern "C" bindings; produces libakar + akar.h
 │   └── akar-winit/               # optional: winit event → akar input bridge
-├── bindings/
-│   ├── go/
-│   ├── python/
-│   └── zig/
 └── examples/
-    ├── demo-rust/
-    ├── demo-c/
-    └── demo-go/
+    ├── demo-rust/                # comprehensive demo of all components
+    └── canvas-basic-rust/        # canvas component example
 ```
 
 ## Architecture Notes

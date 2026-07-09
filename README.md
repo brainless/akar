@@ -35,9 +35,9 @@ The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-
 
 ## Status
 
-**Pre-alpha.** Architecture and API are being designed. No stable public API yet.
+**Pre-alpha.** Epics 001–012 are complete with 30+ components implemented. Epic 013 (Screenshot Utility) is in progress. The API is functional but may change as development continues.
 
-See `epics/` for the current design roadmap.
+See `epics/` for the current design roadmap and completion status.
 
 ## License
 

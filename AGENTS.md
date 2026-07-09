@@ -8,10 +8,9 @@ A GPU-accelerated immediate-mode UI component library with a C ABI. The Rust cra
 
 ## Before starting any task
 
-1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`).
+1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`). Currently Epic 013 is in progress.
 2. Read the full epic before touching any file.
 3. Cross-reference `DEVELOP.md` for local dependency paths and architectural constraints.
-4. Do not begin implementation tasks until Epic 001 is `Status: Done`. The architecture is not yet stable.
 
 ## Local source access
 
@@ -31,7 +30,6 @@ Do not fetch URLs for these projects. Read files locally.
 
 ## What NOT to do
 
-- Do not write implementation code before Epic 001 is `Status: Done`. Epic 001 is research and design — its output is Epic 002, where implementation begins.
 - Do not impose an event loop — akar is driven by the developer's loop.
 - Do not impose an async runtime — all akar APIs are synchronous.
 - Do not add windowing (winit, SDL, GLFW) to `akar-core` or `akar-components`. Windowing belongs in `akar-winit` and is always optional.
@@ -87,12 +85,11 @@ For scroll containers and list components:
 
 ## Testing approach
 
-*(Will be defined in Epic 002. Preliminary expectations:)*
-
 - No live GPU in CI — component logic and layout resolution must be testable without a real wgpu device.
 - A `MockDrawList` that records submitted calls is the primary unit-test tool.
 - Visual regression tests (screenshot comparison) are manual for now.
 - C ABI tests are written in C and compiled as integration tests under `crates/akar-c-api/tests/`.
+- Run `cargo test --workspace` to execute all tests.
 
 ## Style
 
