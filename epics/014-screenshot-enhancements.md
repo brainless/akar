@@ -441,3 +441,12 @@ The tasks below align with GLM5.2's Task 014a–014d breakdown. Task 014e (headl
 - **Files:** `examples/akar-diff/Cargo.toml` (new, `png = "0.17"`, `anyhow = "1"`, no `akar-*` deps), `examples/akar-diff/src/main.rs` (new), root `Cargo.toml` (added member), `Cargo.lock`.
 - **Verdict:** Implemented as specified. `akar-diff --diff BASE CUR -o OUT.png` writes a diff PNG (changed pixels red, unchanged dimmed to 30%). `akar-diff --compare BASE CUR --threshold PCT` exits non-zero when changed-pixel ratio exceeds PCT. Size mismatch and missing args return non-zero without panicking. Matches the demo's manual arg-parsing style; uses the `png` crate for both decode and encode. 3 unit tests pass; `clippy -D warnings` and `fmt` clean. Multi-capture (before/after) is expressed via the 014b script format (multiple `screenshot` lines), no new flag. Perceptual diff deferred per the epic.
 - **Note:** No GPU, no akar deps — standalone tool. Baselines are caller-managed file paths.
+
+### 014e — Headless / offscreen rendering (DEFERRED, no code)
+- **Status:** Deferred to a separate epic per the maintainer discussion (see "Notes from GLM5.2" / "Final Design Decisions" decision #7). No code written in Epic 014.
+- **Recorded punt:** Audience is CI, not local agent workflows. Architecturally feasible (`AkarCore::mock` already creates a headless device; capture path renders to an intermediate texture, not a surface), but blocked by adapter availability on CI runners (no software Metal on macOS; `lavapipe` Linux-only; WARP Windows-only). A future epic will address it when CI visual regression is prioritized. Punt documented per `AGENTS.md`.
+
+---
+
+## Epic 014 — overall status
+All five tasks resolved. 014a–014d implemented, reviewed, and committed; 014e documented as deferred. Acceptance criteria met: `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` all pass. The screenshot utility now supports configurable delay, panic-safe capture, scripted input injection with `@label` addressing, `--dump-layout`, structured `--dump-frame` JSON, and an `akar-diff` comparison tool — enabling autonomous coding-agent capture of non-idle UI states.
