@@ -22,6 +22,7 @@ pub struct AkarNodeContext {
 pub struct Layout {
     tree: TaffyTree<AkarNodeContext>,
     parents: HashMap<NodeId, NodeId>,
+    labels: HashMap<String, NodeId>,
 }
 
 impl Layout {
@@ -29,7 +30,23 @@ impl Layout {
         Self {
             tree: TaffyTree::new(),
             parents: HashMap::new(),
+            labels: HashMap::new(),
         }
+    }
+
+    pub fn register_label(&mut self, name: &str, node: NodeId) {
+        self.labels.insert(name.to_string(), node);
+    }
+
+    pub fn resolve_label(&self, name: &str) -> Option<NodeId> {
+        self.labels.get(name).copied()
+    }
+
+    pub fn labeled_rects(&self) -> Vec<(String, [f32; 4])> {
+        self.labels
+            .iter()
+            .map(|(name, node)| (name.clone(), self.rect(*node)))
+            .collect()
     }
 
     pub fn new_leaf(&mut self, style: Style) -> NodeId {
@@ -655,5 +672,55 @@ mod tests {
         let r = layout.rect(child);
         assert!((r[0] - 15.0).abs() < 1.0, "child.x = {}", r[0]);
         assert!((r[1] - 10.0).abs() < 1.0, "child.y = {}", r[1]);
+    }
+
+    #[test]
+    fn register_and_resolve_label() {
+        let mut layout = Layout::new();
+        let child = layout.new_leaf(Style {
+            size: Size {
+                width: length(60.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        layout.register_label("my_box", child);
+        assert_eq!(layout.resolve_label("my_box"), Some(child));
+        assert_eq!(layout.resolve_label("missing"), None);
+
+        layout.register_label("my_box", root);
+        assert_eq!(layout.resolve_label("my_box"), Some(root));
+    }
+
+    #[test]
+    fn labeled_rects_resolves_registered_nodes() {
+        let mut layout = Layout::new();
+        let child = layout.new_leaf(Style {
+            size: Size {
+                width: length(60.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(
+            Style {
+                display: Display::Flex,
+                ..Default::default()
+            },
+            &[child],
+        );
+        layout.set_padding(root, 10.0, 0.0, 0.0, 10.0);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        layout.register_label("child", child);
+        let rects = layout.labeled_rects();
+        assert_eq!(rects.len(), 1);
+        let (name, rect) = &rects[0];
+        assert_eq!(name, "child");
+        assert!((rect[2] - 60.0).abs() < 1.0);
+        assert!((rect[3] - 60.0).abs() < 1.0);
     }
 }

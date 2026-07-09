@@ -1,0 +1,7 @@
+# Open the navbar dropdown, hover its first item, then capture.
+hover @navbar_dropdown
+delay 0.1
+click @navbar_dropdown
+delay 0.2
+hover @navbar_dropdown
+screenshot /tmp/dropdown_open.png

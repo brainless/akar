@@ -18,6 +18,7 @@ use akar_layout::{
     PageConfig, Size, Style,
 };
 use akar_winit::process_window_event;
+use script::{parse_script, ScriptRunner};
 use wgpu::{
     CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
 };
@@ -28,6 +29,8 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Window, WindowAttributes},
 };
+
+mod script;
 
 struct AppState {
     window: Arc<Window>,
@@ -92,6 +95,8 @@ fn main() {
     let mut screenshot_path = None;
     let mut exit_after = false;
     let mut delay_secs = 5.0;
+    let mut script_path = None;
+    let mut dump_layout = false;
     let mut args = std::env::args().peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -108,9 +113,37 @@ fn main() {
                     }
                 }
             }
+            "--script" => {
+                script_path = args.next();
+            }
+            "--dump-layout" => {
+                dump_layout = true;
+            }
             _ => {}
         }
     }
+
+    if screenshot_path.is_some() && script_path.is_some() {
+        eprintln!("--script and --screenshot are mutually exclusive");
+        std::process::exit(1);
+    }
+
+    let script_runner = match script_path {
+        Some(path) => match std::fs::read_to_string(&path) {
+            Ok(contents) => match parse_script(&contents) {
+                Ok(steps) => Some(ScriptRunner::new(steps)),
+                Err(e) => {
+                    eprintln!("Failed to parse script '{path}': {e}");
+                    std::process::exit(1);
+                }
+            },
+            Err(e) => {
+                eprintln!("Failed to read script '{path}': {e}");
+                std::process::exit(1);
+            }
+        },
+        None => None,
+    };
 
     let event_loop = EventLoop::new().unwrap();
     event_loop
@@ -119,6 +152,8 @@ fn main() {
             screenshot_path,
             exit_after,
             delay_secs,
+            script_runner,
+            dump_layout,
             start_time: None,
             screenshot_taken: false,
         })
@@ -130,6 +165,8 @@ struct App {
     screenshot_path: Option<String>,
     exit_after: bool,
     delay_secs: f64,
+    script_runner: Option<ScriptRunner>,
+    dump_layout: bool,
     start_time: Option<Instant>,
     screenshot_taken: bool,
 }
@@ -551,6 +588,29 @@ impl ApplicationHandler for App {
 
         let form_radio_nodes = [form_radio_dark, form_radio_light];
 
+        layout.register_label("navbar_btn", navbar_btn_node);
+        layout.register_label("navbar_new_btn", navbar_new_btn_node);
+        layout.register_label("navbar_dropdown", navbar_dropdown_btn_node);
+        layout.register_label("alert", alert_node);
+        layout.register_label("tab_bar", tab_bar_node);
+        layout.register_label("stat_0", stat_nodes[0]);
+        layout.register_label("stat_1", stat_nodes[1]);
+        layout.register_label("stat_2", stat_nodes[2]);
+        layout.register_label("steps", steps_node);
+        layout.register_label("avatar_0", avatar_nodes[0]);
+        layout.register_label("avatar_1", avatar_nodes[1]);
+        layout.register_label("avatar_2", avatar_nodes[2]);
+        layout.register_label("skeleton_toggle", skeleton_toggle_node);
+        layout.register_label("form_name", form_name_node);
+        layout.register_label("form_notes", form_notes_node);
+        layout.register_label("form_agreement", form_agreement_node);
+        layout.register_label("form_radio_dark", form_radio_nodes[0]);
+        layout.register_label("form_radio_light", form_radio_nodes[1]);
+        layout.register_label("form_notifications", form_notifications_node);
+        layout.register_label("form_font_size", form_font_size_node);
+        layout.register_label("form_language", form_language_node);
+        layout.register_label("form_submit", form_submit_node);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -701,6 +761,20 @@ impl ApplicationHandler for App {
                     ),
                     |_, _, _, _, _| Size::ZERO,
                 );
+
+                if self.dump_layout {
+                    for (name, rect) in state.layout.labeled_rects() {
+                        println!("{} {} {} {} {}", name, rect[0], rect[1], rect[2], rect[3]);
+                    }
+                    event_loop.exit();
+                    return;
+                }
+
+                let script_capture_path = if let Some(runner) = self.script_runner.as_mut() {
+                    runner.advance(&mut state.core.input, &state.layout, Instant::now())
+                } else {
+                    None
+                };
 
                 akar_label(
                     &mut state.core,
@@ -1360,11 +1434,12 @@ impl ApplicationHandler for App {
                     dropdown_end(&mut state.core);
                 }
 
-                let is_capture_frame = self.screenshot_path.is_some()
-                    && !self.screenshot_taken
+                let normal_capture = !self.screenshot_taken
+                    && self.screenshot_path.is_some()
                     && self.start_time.is_some_and(|t| {
                         t.elapsed() >= std::time::Duration::from_secs_f64(self.delay_secs)
                     });
+                let is_capture_frame = normal_capture || script_capture_path.is_some();
 
                 if is_capture_frame {
                     state.core.request_screenshot();
@@ -1411,13 +1486,18 @@ impl ApplicationHandler for App {
                 }
 
                 if is_capture_frame {
+                    let capture_path = if let Some(p) = &script_capture_path {
+                        p.clone()
+                    } else {
+                        self.screenshot_path.clone().unwrap()
+                    };
                     let captured =
                         state
                             .core
                             .take_screenshot(&state.device, &state.queue, encoder, &output);
                     match captured {
                         Ok(frame) => {
-                            let path = self.screenshot_path.as_ref().unwrap();
+                            let path = &capture_path;
                             match std::fs::File::create(path) {
                                 Ok(file) => {
                                     let mut png_encoder =
@@ -1449,9 +1529,11 @@ impl ApplicationHandler for App {
                             std::process::exit(1);
                         }
                     }
-                    self.screenshot_taken = true;
-                    if self.exit_after {
-                        event_loop.exit();
+                    if normal_capture {
+                        self.screenshot_taken = true;
+                        if self.exit_after {
+                            event_loop.exit();
+                        }
                     }
                 } else {
                     state.queue.submit(std::iter::once(encoder.finish()));
@@ -1459,6 +1541,12 @@ impl ApplicationHandler for App {
                 output.present();
             }
             _ => {}
+        }
+
+        if let Some(runner) = &self.script_runner {
+            if self.exit_after && runner.is_exhausted() {
+                event_loop.exit();
+            }
         }
 
         process_window_event(&mut state.core.input, &event);
