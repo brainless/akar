@@ -75,6 +75,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "akar-diff"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "png",
+]
+
+[[package]]
 name = "akar-layout"
 version = "0.1.0"
 dependencies = [
