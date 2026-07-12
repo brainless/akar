@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn diff_marks_changed_red_and_dims_unchanged() {
-        let mut base = img(2, 1, 100);
+        let base = img(2, 1, 100);
         let mut cur = img(2, 1, 100);
         cur.rgba[4..8].copy_from_slice(&[200, 200, 200, 255]);
         let out = build_diff(&base, &cur);
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn changed_count_is_pixel_exact() {
-        let mut base = img(2, 1, 0);
+        let base = img(2, 1, 0);
         let mut cur = img(2, 1, 0);
         cur.rgba[0] = 1;
         cur.rgba[7] = 254;

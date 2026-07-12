@@ -288,7 +288,7 @@ mod tests {
             );
 
             assert!(
-                core.draw_list.len() > 0,
+                !core.draw_list.is_empty(),
                 "variant {:?} produced no draw calls",
                 variant,
             );

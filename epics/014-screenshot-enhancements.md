@@ -448,5 +448,27 @@ The tasks below align with GLM5.2's Task 014a–014d breakdown. Task 014e (headl
 
 ---
 
+## Post-merge follow-up (2026-07-10)
+
+A second-pass review caught three issues after the original review-log entries were written. All are fixed; `cargo clippy --workspace --tests -- -D warnings`, `cargo fmt --check`, and `cargo test --workspace` now all pass clean.
+
+### Follow-up 1 — `--dump-frame` + `--script` misaligned (bug in 014c)
+- **Files:** `examples/demo-rust/src/main.rs`.
+- **Problem:** The `is_dump_frame` gate was `dump_frame_path.is_some() && !written && (screenshot_path.is_none() || is_capture_frame)`. Because `--script` and `--screenshot` are mutually exclusive, a script run has `screenshot_path = None`, so `screenshot_path.is_none()` short-circuited the gate to `true` on frame 1 — the scripted frame was not yet rendered, producing a useless frame-1 idle-state dump instead of the scripted capture-frame dump. The 014c spec's v1 ("one dump on the capture frame only") was therefore only met for the `--screenshot` path, not the `--script` path.
+- **Fix:** Replaced the `screenshot_path.is_none()` clause with an `is_standalone` flag (`screenshot_path.is_none() && script_runner.is_none()`). `is_dump_frame` now aligns with `is_capture_frame` whenever a capture source is present (`--screenshot` OR `--script`); only the true standalone case (`--dump-frame + --exit`, no capture source) dumps frame 1. The dump-path exit gate was updated to `exit_after && is_standalone` so a multi-`screenshot` script with `--exit` is not truncated after the first scripted capture (script exhaustion via the bottom-of-handler `runner.is_exhausted()` check remains the proper exit path for `--script + --exit`).
+- **Coverage matrix:** (a) `--dump-frame + --screenshot` — unchanged, aligns with delayed `is_capture_frame`. (b) `--dump-frame + --script` — now dumps on the first scripted `screenshot` line. (c) `--dump-frame` standalone — dumps frame 1, exits after. (d) `--script + --screenshot` — forbidden at CLI.
+
+### Follow-up 2 — `akar-diff` test code `unused mut` (clippy `--tests` failure in 014d)
+- **Files:** `examples/akar-diff/src/main.rs`.
+- **Problem:** Two test functions declared `let mut base` where `base` is never mutated. `cargo clippy --workspace --tests -- -D warnings` failed to compile `akar-diff`. The 014d review log claimed "clippy -D warnings clean" but that only covered the narrower `cargo clippy --workspace -- -D warnings` invocation (without `--tests`), which skips test code.
+- **Fix:** Dropped `mut` on both `base` bindings (`diff_marks_changed_red_and_dims_unchanged`, `changed_count_is_pixel_exact`). `cur` remains `mut` — it is mutated. `cargo clippy --workspace --tests -- -D warnings` now passes.
+
+### Follow-up 3 — pre-existing `akar-components` test lints (`len_zero`, Epic 011 regressions)
+- **Files:** `crates/akar-components/src/tabs.rs`, `crates/akar-components/src/tooltip.rs`.
+- **Problem:** `tabs.rs:291` used `core.draw_list.len() > 0` and `tooltip.rs:194` used `core.draw_list.len() >= 1` in test assertions. Both trip `clippy::len_zero` under `-D warnings`. These predate Epic 014 (git-confirmed: Epic 011 task 1) and the 014c review-log noted leaving them "untouched." Now fixed so that `cargo clippy --workspace --tests -- -D warnings` is fully clean across the workspace, matching the bar the original review log implicitly set.
+- **Fix:** Both replaced with `!core.draw_list.is_empty()`.
+
+---
+
 ## Epic 014 — overall status
 All five tasks resolved. 014a–014d implemented, reviewed, and committed; 014e documented as deferred. Acceptance criteria met: `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` all pass. The screenshot utility now supports configurable delay, panic-safe capture, scripted input injection with `@label` addressing, `--dump-layout`, structured `--dump-frame` JSON, and an `akar-diff` comparison tool — enabling autonomous coding-agent capture of non-idle UI states.

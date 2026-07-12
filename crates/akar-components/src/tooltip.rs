@@ -191,7 +191,7 @@ mod tests {
         );
 
         assert!(resp.visible);
-        assert!(core.draw_list.len() >= 1);
+        assert!(!core.draw_list.is_empty());
     }
 
     #[test]

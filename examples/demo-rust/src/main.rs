@@ -1532,9 +1532,10 @@ impl ApplicationHandler for App {
                     let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
                 }
 
+                let is_standalone = self.screenshot_path.is_none() && self.script_runner.is_none();
                 let is_dump_frame = self.dump_frame_path.is_some()
                     && !self.dump_frame_written
-                    && (self.screenshot_path.is_none() || is_capture_frame);
+                    && (is_capture_frame || is_standalone);
                 if is_dump_frame {
                     let dump = FrameDump {
                         recorded_calls: state.core.draw_list.recorded_calls(),
@@ -1557,7 +1558,7 @@ impl ApplicationHandler for App {
                     }
                     self.dump_frame_written = true;
                     state.core.draw_list.stop_recording();
-                    if self.exit_after && self.screenshot_path.is_none() {
+                    if self.exit_after && is_standalone {
                         event_loop.exit();
                     }
                 }
