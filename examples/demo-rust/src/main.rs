@@ -134,6 +134,8 @@ fn main() {
     let mut script_path = None;
     let mut dump_layout = false;
     let mut dump_frame_path = None;
+    let mut component_name: Option<String> = None;
+    let mut list_components = false;
     let mut args = std::env::args().peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -159,14 +161,41 @@ fn main() {
             "--dump-frame" => {
                 dump_frame_path = args.next();
             }
+            "--component" => {
+                component_name = args.next();
+            }
+            "--list-components" => {
+                list_components = true;
+            }
             _ => {}
         }
+    }
+
+    if list_components {
+        for name in Component::names() {
+            println!("{name}");
+        }
+        std::process::exit(0);
     }
 
     if screenshot_path.is_some() && script_path.is_some() {
         eprintln!("--script and --screenshot are mutually exclusive");
         std::process::exit(1);
     }
+
+    let isolated_component = match component_name {
+        Some(name) => match Component::from_name(&name) {
+            Some(c) => Some(c),
+            None => {
+                eprintln!("Unknown component '{name}'. Valid components:");
+                for n in Component::names() {
+                    eprintln!("  {n}");
+                }
+                std::process::exit(1);
+            }
+        },
+        None => None,
+    };
 
     let script_runner = match script_path {
         Some(path) => match std::fs::read_to_string(&path) {
@@ -195,6 +224,8 @@ fn main() {
             script_runner,
             dump_layout,
             dump_frame_path,
+            isolated_component,
+            forced_initial_state: false,
             start_time: None,
             screenshot_taken: false,
             dump_frame_written: false,
@@ -210,6 +241,8 @@ struct App {
     script_runner: Option<ScriptRunner>,
     dump_layout: bool,
     dump_frame_path: Option<String>,
+    isolated_component: Option<Component>,
+    forced_initial_state: bool,
     start_time: Option<Instant>,
     screenshot_taken: bool,
     dump_frame_written: bool,
@@ -966,6 +999,126 @@ fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
     render_dropdown(state, viewport_rect);
 }
 
+enum Component {
+    Navbar,
+    Alert,
+    TabBar,
+    ListTab,
+    CanvasTab,
+    StatsTab,
+    FormTab,
+    Drawer,
+    Modal,
+    Toasts,
+    Dropdown,
+}
+
+fn ensure_navbar_slots(state: &mut AppState) {
+    if state.navbar_slots.is_none() {
+        let navbar_id = state.page.header.unwrap();
+        let slots = akar_navbar(
+            &mut state.core,
+            &mut state.layout,
+            navbar_id,
+            &AKAR_THEME_DARK,
+        );
+        state.layout.add_child(slots.start, state.navbar_title_node);
+        state.layout.add_child(slots.end, state.navbar_badge_node);
+        state.layout.add_child(slots.end, state.navbar_btn_node);
+        state.layout.add_child(slots.end, state.navbar_new_btn_node);
+        state
+            .layout
+            .add_child(slots.end, state.navbar_dropdown_btn_node);
+        state.navbar_slots = Some(slots);
+    }
+}
+
+impl Component {
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "navbar" => Some(Self::Navbar),
+            "alert" => Some(Self::Alert),
+            "tab_bar" => Some(Self::TabBar),
+            "list" => Some(Self::ListTab),
+            "canvas" => Some(Self::CanvasTab),
+            "stats" => Some(Self::StatsTab),
+            "form" => Some(Self::FormTab),
+            "drawer" => Some(Self::Drawer),
+            "modal" => Some(Self::Modal),
+            "toasts" => Some(Self::Toasts),
+            "dropdown" => Some(Self::Dropdown),
+            _ => None,
+        }
+    }
+
+    fn names() -> &'static [&'static str] {
+        &[
+            "navbar", "alert", "tab_bar", "list", "canvas", "stats", "form", "drawer", "modal",
+            "toasts", "dropdown",
+        ]
+    }
+
+    fn render(&self, state: &mut AppState, viewport_rect: [f32; 4]) {
+        match self {
+            Self::Navbar => render_navbar(state, viewport_rect),
+            Self::Alert => render_alert(state),
+            Self::TabBar => render_tab_bar(state),
+            Self::ListTab => render_list_tab(state, viewport_rect),
+            Self::CanvasTab => render_canvas_tab(state),
+            Self::StatsTab => render_stats_tab(state),
+            Self::FormTab => render_form_tab(state, viewport_rect),
+            Self::Drawer => render_drawer(state, viewport_rect),
+            Self::Modal => render_modal(state, viewport_rect),
+            Self::Toasts => render_toasts(state, viewport_rect),
+            Self::Dropdown => render_dropdown(state, viewport_rect),
+        }
+    }
+
+    fn force_state_initial(&self, state: &mut AppState) {
+        match self {
+            Self::Alert => {
+                state.alert_dismissed = false;
+            }
+            Self::ListTab => {
+                state.active_tab = 0;
+                state.prev_active_tab = 0;
+            }
+            Self::CanvasTab => {
+                state.active_tab = 1;
+                state.prev_active_tab = 1;
+            }
+            Self::StatsTab => {
+                state.active_tab = 2;
+                state.prev_active_tab = 2;
+            }
+            Self::FormTab => {
+                state.active_tab = 3;
+                state.prev_active_tab = 3;
+            }
+            Self::Drawer => {
+                state.drawer_open = true;
+                state.drawer_progress = 1.0;
+            }
+            Self::Dropdown => {
+                state.dropdown_open = true;
+            }
+            Self::Modal => {
+                state.modal_open = true;
+            }
+            Self::Toasts => {
+                if state.toasts_list.is_empty() {
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Info,
+                        message: "Sample toast".to_string(),
+                        dismiss_on_click: false,
+                    });
+                }
+            }
+            Self::Navbar | Self::TabBar => {}
+        }
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.state.is_some() {
@@ -1502,6 +1655,16 @@ impl ApplicationHandler for App {
                     size.height as f32 / scale,
                 ];
 
+                if let Some(component) = &self.isolated_component {
+                    if !self.forced_initial_state {
+                        component.force_state_initial(state);
+                        self.forced_initial_state = true;
+                    }
+                    if matches!(component, Component::Dropdown) {
+                        ensure_navbar_slots(state);
+                    }
+                }
+
                 prepare_layout(state, size, scale);
 
                 if self.dump_layout {
@@ -1518,7 +1681,11 @@ impl ApplicationHandler for App {
                     None
                 };
 
-                render_all(state, viewport_rect);
+                if let Some(component) = &self.isolated_component {
+                    component.render(state, viewport_rect);
+                } else {
+                    render_all(state, viewport_rect);
+                }
 
                 let normal_capture = !self.screenshot_taken
                     && self.screenshot_path.is_some()

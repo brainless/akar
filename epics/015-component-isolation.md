@@ -806,3 +806,23 @@ Refactored `examples/demo-rust/src/main.rs` (1636 → 1675 lines, +39 net; 750 i
 
 **Reviewer check:** dispatcher shape matches the spec pseudocode exactly. State mutations (drawer/dropdown/modal toggles, toasts push/trim, active_tab updates, form cursor/text updates) all stay in their owning render functions. `--screenshot` / `--script` / `--dump-layout` / `--dump-frame` capture flow is unchanged.
 
+### 2026-07-13 — Task 015b landed
+
+Added the `Component` enum, `--component` / `--list-components` flags, selective render dispatch, and a one-shot `force_state_initial` guard. Only `examples/demo-rust/src/main.rs` touched (+168/-1). `App` gained two fields: `isolated_component: Option<Component>` and `forced_initial_state: bool` (Option A from the spec — AppState is built lazily in `App::resumed`, so the one-shot force lives on `App` and runs in the first `RedrawRequested`).
+
+**Spec amendment required (new pitfall, surfaced by implementation):**
+
+> **Pitfall #12 — Cross-component layout dependencies.** Some overlay components reach into layout nodes owned by another component. `--component dropdown` was producing a black screenshot because `render_dropdown` reads `state.layout.rect(state.navbar_dropdown_btn_node)` for its anchor, and those nodes are only registered with the layout tree by `render_navbar`'s lazy `if state.navbar_slots.is_none() { akar_navbar(...); add_child(...) }` block. When `render_navbar` is skipped, the anchor rect is zero and `dropdown_begin` returns `is_open=false`. **Fix:** an `ensure_navbar_slots(state: &mut AppState)` helper extracted from the navbar init block, called from the dispatcher when `isolated_component == Some(Component::Dropdown)`, before `prepare_layout`. Drawer / modal / toasts do not have this issue (they use `viewport_rect` for positioning and have no cross-component anchors). Future isolates with cross-component anchors need the same treatment.
+
+**Verification:** `cargo check` / `clippy` / `test` (145 tests pass) / `fmt --check` all pass. Seven flows confirmed:
+- `--screenshot /tmp/demo.png --exit` → full demo, 800x600.
+- `--component drawer --screenshot /tmp/drawer.png --exit` → drawer open on left (AK avatar + 4 nav links), rest black.
+- `--component dropdown --screenshot /tmp/dropdown.png --exit` → dropdown menu (Option A–D) anchored to navbar dropdown-button position, rest black.
+- `--component form --screenshot /tmp/form.png --exit` → all form fields visible.
+- `--list-components` → exit 0, 11 names in spec order.
+- `--component unknown` → exit 1, stderr lists the 11 valid names.
+- `--component` + `--script` and `--component` + `--screenshot` both pass the arg-validation check; `--script` + `--screenshot` still rejected.
+
+**Reviewer check:** `Component::from_name` and `force_state_initial` bodies match the spec pseudocode verbatim (modulo the `ensure_navbar_slots` fix above). Tab variants correctly set both `active_tab` AND `prev_active_tab` to suppress the spurious tab-change toast. The one-shot guard is not on `AppState` (per the spec's Option A guidance) and does not re-run on subsequent frames, so `--component` + `--script` composition works.
+
+
