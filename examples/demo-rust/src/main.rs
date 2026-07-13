@@ -24,7 +24,7 @@ use wgpu::{
 };
 use winit::{
     application::ApplicationHandler,
-    dpi::LogicalSize,
+    dpi::{LogicalSize, PhysicalSize},
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Window, WindowAttributes},
@@ -217,6 +217,753 @@ struct App {
 
 fn ease_out_cubic(t: f32) -> f32 {
     1.0 - (1.0 - t).powf(3.0)
+}
+
+fn prepare_layout(state: &mut AppState, size: PhysicalSize<u32>, scale: f32) {
+    if state.alert_dismissed {
+        state.layout.set_style(
+            state.alert_node,
+            Style {
+                display: Display::None,
+                ..Default::default()
+            },
+        );
+    }
+
+    match state.active_tab {
+        0 => state
+            .layout
+            .set_children(state.panel_container, &[state.scroll_container]),
+        1 => state
+            .layout
+            .set_children(state.panel_container, &[state.canvas_wrapper]),
+        2 => state
+            .layout
+            .set_children(state.panel_container, &[state.stats_wrapper]),
+        3 => state
+            .layout
+            .set_children(state.panel_container, &[state.form_container]),
+        _ => {}
+    }
+
+    state.layout.compute(
+        state.page.root,
+        (
+            Some(size.width as f32 / scale),
+            Some(size.height as f32 / scale),
+        ),
+        |_, _, _, _, _| Size::ZERO,
+    );
+}
+
+fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
+    let navbar_id = state.page.header.unwrap();
+
+    if state.navbar_slots.is_none() {
+        let slots = akar_navbar(
+            &mut state.core,
+            &mut state.layout,
+            navbar_id,
+            &AKAR_THEME_DARK,
+        );
+        state.layout.add_child(slots.start, state.navbar_title_node);
+        state.layout.add_child(slots.end, state.navbar_badge_node);
+        state.layout.add_child(slots.end, state.navbar_btn_node);
+        state.layout.add_child(slots.end, state.navbar_new_btn_node);
+        state
+            .layout
+            .add_child(slots.end, state.navbar_dropdown_btn_node);
+        state.navbar_slots = Some(slots);
+    }
+
+    akar_label(
+        &mut state.core,
+        &state.layout,
+        state.navbar_title_node,
+        "akar",
+        AKAR_THEME_DARK.base_content,
+        &AKAR_THEME_DARK,
+    );
+    akar_badge(
+        &mut state.core,
+        &state.layout,
+        state.navbar_badge_node,
+        "3",
+        BadgeVariant::Primary,
+        &AKAR_THEME_DARK,
+    );
+    let menu_result = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.navbar_btn_node,
+        "Menu",
+        ButtonVariant::Ghost,
+        &AKAR_THEME_DARK,
+    );
+    if menu_result.clicked {
+        state.drawer_open = !state.drawer_open;
+    }
+
+    let new_item_result = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.navbar_new_btn_node,
+        "New Item",
+        ButtonVariant::Ghost,
+        &AKAR_THEME_DARK,
+    );
+    if new_item_result.clicked {
+        state.modal_open = !state.modal_open;
+    }
+
+    let dropdown_btn_result = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.navbar_dropdown_btn_node,
+        "Dropdown",
+        ButtonVariant::Ghost,
+        &AKAR_THEME_DARK,
+    );
+    if dropdown_btn_result.clicked {
+        state.dropdown_open = !state.dropdown_open;
+    }
+}
+
+fn render_containers(state: &mut AppState) {
+    akar_container(
+        &mut state.core,
+        &state.layout,
+        state.page.sidebar_left.unwrap(),
+        &BoxStyle::panel(&AKAR_THEME_DARK),
+    );
+    akar_container(
+        &mut state.core,
+        &state.layout,
+        state.page.main,
+        &BoxStyle::surface(&AKAR_THEME_DARK),
+    );
+    akar_container(
+        &mut state.core,
+        &state.layout,
+        state.two_col.left,
+        &BoxStyle::flat(0x172554ff),
+    );
+    akar_container(
+        &mut state.core,
+        &state.layout,
+        state.two_col.right,
+        &BoxStyle::flat(0x27272aff),
+    );
+}
+
+fn render_alert(state: &mut AppState) {
+    if !state.alert_dismissed {
+        let result = akar_alert(
+            &mut state.core,
+            &state.layout,
+            state.alert_node,
+            "Welcome to akar demo!",
+            AlertVariant::Info,
+            true,
+            &AKAR_THEME_DARK,
+        );
+        state.alert_dismissed = result.dismissed;
+    }
+}
+
+fn render_tab_bar(state: &mut AppState) {
+    let tab_result = akar_tab_bar(
+        &mut state.core,
+        &state.layout,
+        state.tab_bar_node,
+        &["List", "Canvas", "Stats", "Form"],
+        state.active_tab,
+        TabVariant::Underline,
+        &AKAR_THEME_DARK,
+    );
+    if let Some(index) = tab_result.clicked {
+        state.active_tab = index;
+    }
+
+    if state.active_tab != state.prev_active_tab {
+        let tab_names = ["List", "Canvas", "Stats", "Form"];
+        state.toasts_list.push(ToastItem {
+            variant: ToastVariant::Info,
+            message: format!("Switched to {} tab", tab_names[state.active_tab]),
+            dismiss_on_click: true,
+        });
+        state.prev_active_tab = state.active_tab;
+    }
+    while state.toasts_list.len() > 3 {
+        state.toasts_list.remove(0);
+    }
+}
+
+fn render_list_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
+    let scroll_rect = state.layout.rect(state.scroll_container);
+    let total_items = 50_usize;
+    let item_height = 48.0_f32;
+    let content_height = total_items as f32 * item_height;
+
+    let resp = scroll_area_begin(
+        &mut state.core,
+        scroll_rect,
+        &mut state.scroll_y,
+        content_height,
+    );
+    let visible = list_clip(total_items, item_height, state.scroll_y, scroll_rect[3]);
+
+    for i in visible {
+        let y = resp.content_y + i as f32 * item_height;
+        let item_rect = [scroll_rect[0], y, scroll_rect[2], item_height];
+        let inner_pad = 4.0_f32;
+        let inner_rect = [
+            item_rect[0] + inner_pad,
+            item_rect[1] + inner_pad,
+            item_rect[2] - 2.0 * inner_pad,
+            item_rect[3] - 2.0 * inner_pad,
+        ];
+
+        let item_bg = 0x1e293bffu32;
+        let item_border = 0x334155ffu32;
+
+        state.core.draw_list.push_quad(akar_core::QuadCall {
+            rect: item_rect,
+            fill: [
+                ((item_bg >> 24) & 0xFF) as f32 / 255.0,
+                ((item_bg >> 16) & 0xFF) as f32 / 255.0,
+                ((item_bg >> 8) & 0xFF) as f32 / 255.0,
+                (item_bg & 0xFF) as f32 / 255.0,
+            ],
+            border_color: [
+                ((item_border >> 24) & 0xFF) as f32 / 255.0,
+                ((item_border >> 16) & 0xFF) as f32 / 255.0,
+                ((item_border >> 8) & 0xFF) as f32 / 255.0,
+                (item_border & 0xFF) as f32 / 255.0,
+            ],
+            corner_radii: [6.0; 4],
+            border_width: 1.0,
+            z: 0.0,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        });
+
+        let label_text = format!("Item {}", i + 1);
+        let buffer_id = state.core.text_pipeline.set_text(
+            Some(i as u64),
+            &label_text,
+            glyphon::Metrics::new(14.0, 14.0 * 1.2),
+            Some(inner_rect[2] * 0.6),
+            None,
+        );
+        state.core.draw_list.push_text(akar_core::TextCall {
+            buffer_id,
+            x: inner_rect[0],
+            y: inner_rect[1],
+            clip: inner_rect,
+            color: [0.98, 0.98, 0.98, 1.0],
+            z: 0.0,
+        });
+
+        let progress_value = (i + 1) as f32 / total_items as f32;
+        let progress_x = inner_rect[0] + inner_rect[2] * 0.65;
+        let progress_w = inner_rect[2] * 0.35;
+        let progress_h = 8.0;
+        let progress_y = inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
+        let progress_rect = [progress_x, progress_y, progress_w, progress_h];
+        let progress_style = ProgressStyle {
+            track_color: 0x27272aff,
+            fill_color: 0x3b82f6ff,
+            corner_radius: 4.0,
+        };
+        progress_at(
+            &mut state.core,
+            progress_rect,
+            progress_value,
+            &progress_style,
+        );
+
+        let tip_text = format!("{:.0}% complete", progress_value * 100.0);
+        akar_tooltip(
+            &mut state.core,
+            progress_rect,
+            &tip_text,
+            TooltipSide::Top,
+            &AKAR_THEME_DARK,
+            viewport_rect,
+        );
+    }
+    scroll_area_end(&mut state.core);
+}
+
+fn render_canvas_tab(state: &mut AppState) {
+    let canvas_rect = state.layout.rect(state.canvas_wrapper);
+    let text = "Canvas View — coming soon";
+    let buffer_id = state.core.text_pipeline.set_text(
+        Some(2000),
+        text,
+        glyphon::Metrics::new(18.0, 18.0 * 1.2),
+        Some(canvas_rect[2]),
+        None,
+    );
+    state.core.draw_list.push_text(akar_core::TextCall {
+        buffer_id,
+        x: canvas_rect[0] + 16.0,
+        y: canvas_rect[1] + canvas_rect[3] / 2.0 - 10.0,
+        clip: canvas_rect,
+        color: [0.6, 0.6, 0.65, 1.0],
+        z: 0.0,
+    });
+}
+
+fn render_stats_tab(state: &mut AppState) {
+    let stat_data = [
+        ("Revenue", "$12,345", Some("+12% vs last month")),
+        ("Users", "1,234", Some("+8% vs last month")),
+        ("Active", "89%", Some("+3% vs last month")),
+    ];
+    for (i, &(title, value, desc)) in stat_data.iter().enumerate() {
+        akar_stat(
+            &mut state.core,
+            &state.layout,
+            state.stat_nodes[i],
+            title,
+            value,
+            desc,
+            &AKAR_THEME_DARK,
+        );
+    }
+
+    akar_steps(
+        &mut state.core,
+        &state.layout,
+        state.steps_node,
+        &["Plan", "Build", "Test", "Launch"],
+        1,
+        &AKAR_THEME_DARK,
+    );
+
+    let avatar_initials = ["JD", "AK", "MR"];
+    for (i, initials) in avatar_initials.iter().enumerate() {
+        if state.show_skeleton {
+            akar_skeleton(
+                &mut state.core,
+                &state.layout,
+                state.avatar_nodes[i],
+                SkeletonVariant::Circle,
+                &AKAR_THEME_DARK,
+            );
+        } else {
+            akar_avatar(
+                &mut state.core,
+                &state.layout,
+                state.avatar_nodes[i],
+                initials,
+                None,
+                &AKAR_THEME_DARK,
+            );
+        }
+    }
+    let toggle_label = if state.show_skeleton {
+        "Show Avatars"
+    } else {
+        "Show Skeleton"
+    };
+    let toggle_result = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.skeleton_toggle_node,
+        toggle_label,
+        ButtonVariant::Solid,
+        &AKAR_THEME_DARK,
+    );
+    if toggle_result.clicked {
+        state.show_skeleton = !state.show_skeleton;
+    }
+}
+
+fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
+    state.cursor_tick += 1;
+    let cursor_visible = (state.cursor_tick / 30).is_multiple_of(2);
+    let form_rect = state.layout.rect(state.form_container);
+
+    let title_buf = state.core.text_pipeline.set_text(
+        Some(3000),
+        "Form Demo",
+        glyphon::Metrics::new(18.0, 18.0 * 1.2),
+        Some(form_rect[2] - 32.0),
+        None,
+    );
+    state.core.draw_list.push_text(akar_core::TextCall {
+        buffer_id: title_buf,
+        x: form_rect[0],
+        y: form_rect[1],
+        clip: form_rect,
+        color: [0.9, 0.9, 0.95, 1.0],
+        z: 0.0,
+    });
+
+    let name_label_buf = state.core.text_pipeline.set_text(
+        Some(3001),
+        "Name",
+        glyphon::Metrics::new(14.0, 14.0 * 1.2),
+        Some(form_rect[2] - 32.0),
+        None,
+    );
+    state.core.draw_list.push_text(akar_core::TextCall {
+        buffer_id: name_label_buf,
+        x: form_rect[0],
+        y: form_rect[1] + 24.0,
+        clip: form_rect,
+        color: [0.7, 0.7, 0.75, 1.0],
+        z: 0.0,
+    });
+
+    let _name_result = akar_text_input(
+        &mut state.core,
+        &state.layout,
+        state.form_name_node,
+        &mut state.form_name,
+        &mut state.form_name_cursor,
+        "Enter your name",
+        cursor_visible,
+        &AKAR_THEME_DARK,
+    );
+
+    let notes_label_buf = state.core.text_pipeline.set_text(
+        Some(3002),
+        "Notes",
+        glyphon::Metrics::new(14.0, 14.0 * 1.2),
+        Some(form_rect[2] - 32.0),
+        None,
+    );
+    state.core.draw_list.push_text(akar_core::TextCall {
+        buffer_id: notes_label_buf,
+        x: form_rect[0],
+        y: form_rect[1] + 80.0,
+        clip: form_rect,
+        color: [0.7, 0.7, 0.75, 1.0],
+        z: 0.0,
+    });
+
+    let _notes_result = akar_textarea(
+        &mut state.core,
+        &state.layout,
+        state.form_notes_node,
+        &mut state.form_notes,
+        &mut state.form_notes_cursor,
+        &mut state.form_notes_scroll_y,
+        "Enter notes...",
+        cursor_visible,
+        &AKAR_THEME_DARK,
+    );
+
+    let _ = akar_checkbox(
+        &mut state.core,
+        &state.layout,
+        state.form_agreement_node,
+        &mut state.form_agreed,
+        "I agree to the terms",
+        &AKAR_THEME_DARK,
+    );
+
+    let _theme_changed = akar_radio_group(
+        &mut state.core,
+        &state.layout,
+        &state.form_radio_nodes,
+        &["Dark", "Light"],
+        &mut state.form_theme_idx,
+        &AKAR_THEME_DARK,
+    );
+
+    let _notif_toggled = akar_switch(
+        &mut state.core,
+        &state.layout,
+        state.form_notifications_node,
+        &mut state.form_notifications_on,
+        &AKAR_THEME_DARK,
+    );
+
+    let _font_changed = akar_slider(
+        &mut state.core,
+        &state.layout,
+        state.form_font_size_node,
+        &mut state.form_font_size,
+        12.0,
+        32.0,
+        &AKAR_THEME_DARK,
+    );
+
+    let _lang_changed = akar_select(
+        &mut state.core,
+        &state.layout,
+        state.form_language_node,
+        &["English", "Spanish", "French", "German"],
+        &mut state.form_language_idx,
+        &mut state.form_language_open,
+        &AKAR_THEME_DARK,
+        viewport_rect,
+    );
+
+    let submit_result = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.form_submit_node,
+        "Submit",
+        ButtonVariant::Solid,
+        &AKAR_THEME_DARK,
+    );
+    if submit_result.clicked {
+        if state.form_agreed {
+            state.toasts_list.push(ToastItem {
+                variant: ToastVariant::Success,
+                message: "Form submitted successfully!".to_string(),
+                dismiss_on_click: true,
+            });
+        } else {
+            state.toasts_list.push(ToastItem {
+                variant: ToastVariant::Warning,
+                message: "Please agree to the terms.".to_string(),
+                dismiss_on_click: true,
+            });
+        }
+    }
+}
+
+fn render_drawer(state: &mut AppState, viewport_rect: [f32; 4]) {
+    let max_width = 250.0_f32;
+    let speed = 0.08;
+    if state.drawer_open {
+        state.drawer_progress = (state.drawer_progress + speed).min(1.0);
+    } else {
+        state.drawer_progress = (state.drawer_progress - speed).max(0.0);
+    }
+    let panel_width = max_width * ease_out_cubic(state.drawer_progress);
+
+    if panel_width > 1.0 {
+        let drawer_resp = drawer_begin(
+            &mut state.core,
+            viewport_rect,
+            DrawerEdge::Left,
+            panel_width,
+            &AKAR_THEME_DARK,
+        );
+
+        let padding = 16.0_f32;
+        let y_offset = 24.0_f32;
+
+        let avatar_rect = [padding, y_offset, 40.0, 40.0];
+        state.core.draw_list.push_quad(akar_core::QuadCall {
+            rect: avatar_rect,
+            fill: [0.23, 0.51, 0.96, 1.0],
+            border_color: [0.0; 4],
+            corner_radii: [20.0; 4],
+            border_width: 0.0,
+            z: Z_FLOAT,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        });
+
+        let initials_buf = state.core.text_pipeline.set_text(
+            Some(9001),
+            "AK",
+            glyphon::Metrics::new(16.0, 16.0 * 1.2),
+            Some(40.0),
+            None,
+        );
+        state.core.draw_list.push_text(akar_core::TextCall {
+            buffer_id: initials_buf,
+            x: avatar_rect[0] + 10.0,
+            y: avatar_rect[1] + 10.0,
+            clip: avatar_rect,
+            color: [1.0; 4],
+            z: Z_FLOAT,
+        });
+
+        let nav_links = ["Dashboard", "Settings", "Profile", "Help"];
+        let link_start_y = y_offset + 40.0 + 24.0;
+        for (i, link) in nav_links.iter().enumerate() {
+            let link_rect = [
+                padding,
+                link_start_y + i as f32 * 40.0,
+                panel_width - 2.0 * padding,
+                32.0,
+            ];
+
+            state.core.draw_list.push_quad(akar_core::QuadCall {
+                rect: link_rect,
+                fill: [0.15, 0.16, 0.17, 1.0],
+                border_color: [0.0; 4],
+                corner_radii: [4.0; 4],
+                border_width: 0.0,
+                z: Z_FLOAT,
+                shadow_blur: 0.0,
+                shadow_spread: 0.0,
+                shadow_color: [0.0; 4],
+                shadow_offset: [0.0; 2],
+                _pad: [0.0; 2],
+            });
+
+            let link_buf = state.core.text_pipeline.set_text(
+                Some(10000 + i as u64),
+                link,
+                glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                Some(link_rect[2]),
+                None,
+            );
+            state.core.draw_list.push_text(akar_core::TextCall {
+                buffer_id: link_buf,
+                x: link_rect[0] + 8.0,
+                y: link_rect[1] + 6.0,
+                clip: link_rect,
+                color: [0.9, 0.9, 0.92, 1.0],
+                z: Z_FLOAT,
+            });
+        }
+
+        drawer_end(&mut state.core);
+
+        if drawer_resp.close_requested {
+            state.drawer_open = false;
+        }
+    }
+}
+
+fn render_modal(state: &mut AppState, viewport_rect: [f32; 4]) {
+    if state.modal_open {
+        let modal_resp = modal_begin(
+            &mut state.core,
+            &mut state.layout,
+            viewport_rect,
+            "New Item",
+            400.0,
+            300.0,
+            &AKAR_THEME_DARK,
+        );
+
+        let content_rect = state.layout.rect(modal_resp.content_node);
+
+        let buffer_id = state.core.text_pipeline.set_text(
+            Some(5000),
+            "Modal content area \u{2014} add your form here.",
+            glyphon::Metrics::new(16.0, 16.0 * 1.2),
+            Some(content_rect[2] - 32.0),
+            None,
+        );
+        state.core.draw_list.push_text(akar_core::TextCall {
+            buffer_id,
+            x: content_rect[0] + 16.0,
+            y: content_rect[1] + 16.0,
+            clip: content_rect,
+            color: [0.8, 0.8, 0.85, 1.0],
+            z: akar_core::Z_FLOAT,
+        });
+
+        modal_end(&mut state.core);
+
+        if modal_resp.close_requested {
+            state.modal_open = false;
+        }
+    }
+}
+
+fn render_toasts(state: &mut AppState, viewport_rect: [f32; 4]) {
+    let toast_resp = toasts(
+        &mut state.core,
+        viewport_rect,
+        &mut state.toasts_list,
+        &AKAR_THEME_DARK,
+    );
+    if let Some(index) = toast_resp.dismissed {
+        state.toasts_list.remove(index);
+    }
+}
+
+fn render_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
+    let dropdown_btn_rect = state.layout.rect(state.navbar_dropdown_btn_node);
+    let dropdown_state = dropdown_begin(
+        &mut state.core,
+        dropdown_btn_rect,
+        28.0,
+        viewport_rect,
+        state.dropdown_open,
+        &AKAR_THEME_DARK,
+    );
+
+    if dropdown_state.is_open {
+        let items = ["Option A", "Option B", "Option C", "Option D"];
+        for (i, item) in items.iter().enumerate() {
+            let item_y = dropdown_state.content_rect[1] + i as f32 * 28.0;
+            let item_rect = [
+                dropdown_state.content_rect[0],
+                item_y,
+                dropdown_state.content_rect[2],
+                28.0,
+            ];
+
+            if state.core.input.is_hovering(item_rect) {
+                state.core.draw_list.push_quad(akar_core::QuadCall {
+                    rect: item_rect,
+                    fill: [0.2, 0.22, 0.25, 1.0],
+                    border_color: [0.0; 4],
+                    corner_radii: [0.0; 4],
+                    border_width: 0.0,
+                    z: akar_core::Z_OVERLAY,
+                    shadow_blur: 0.0,
+                    shadow_spread: 0.0,
+                    shadow_color: [0.0; 4],
+                    shadow_offset: [0.0; 2],
+                    _pad: [0.0; 2],
+                });
+            }
+
+            let item_buf = state.core.text_pipeline.set_text(
+                Some(6000 + i as u64),
+                item,
+                glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                Some(item_rect[2] - 8.0),
+                None,
+            );
+            state.core.draw_list.push_text(akar_core::TextCall {
+                buffer_id: item_buf,
+                x: item_rect[0] + 4.0,
+                y: item_rect[1] + 5.0,
+                clip: item_rect,
+                color: [0.9, 0.9, 0.92, 1.0],
+                z: akar_core::Z_OVERLAY,
+            });
+
+            if state.core.input.is_clicked(item_rect) {
+                state.dropdown_open = false;
+            }
+        }
+
+        dropdown_end(&mut state.core);
+    }
+}
+
+fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
+    render_containers(state);
+    render_navbar(state, viewport_rect);
+    render_alert(state);
+    render_tab_bar(state);
+    match state.active_tab {
+        0 => render_list_tab(state, viewport_rect),
+        1 => render_canvas_tab(state),
+        2 => render_stats_tab(state),
+        3 => render_form_tab(state, viewport_rect),
+        _ => {}
+    }
+    render_drawer(state, viewport_rect);
+    render_modal(state, viewport_rect);
+    render_toasts(state, viewport_rect);
+    render_dropdown(state, viewport_rect);
 }
 
 impl ApplicationHandler for App {
@@ -755,59 +1502,7 @@ impl ApplicationHandler for App {
                     size.height as f32 / scale,
                 ];
 
-                let navbar_id = state.page.header.unwrap();
-
-                if state.navbar_slots.is_none() {
-                    let slots = akar_navbar(
-                        &mut state.core,
-                        &mut state.layout,
-                        navbar_id,
-                        &AKAR_THEME_DARK,
-                    );
-                    state.layout.add_child(slots.start, state.navbar_title_node);
-                    state.layout.add_child(slots.end, state.navbar_badge_node);
-                    state.layout.add_child(slots.end, state.navbar_btn_node);
-                    state.layout.add_child(slots.end, state.navbar_new_btn_node);
-                    state
-                        .layout
-                        .add_child(slots.end, state.navbar_dropdown_btn_node);
-                    state.navbar_slots = Some(slots);
-                }
-
-                if state.alert_dismissed {
-                    state.layout.set_style(
-                        state.alert_node,
-                        Style {
-                            display: Display::None,
-                            ..Default::default()
-                        },
-                    );
-                }
-
-                match state.active_tab {
-                    0 => state
-                        .layout
-                        .set_children(state.panel_container, &[state.scroll_container]),
-                    1 => state
-                        .layout
-                        .set_children(state.panel_container, &[state.canvas_wrapper]),
-                    2 => state
-                        .layout
-                        .set_children(state.panel_container, &[state.stats_wrapper]),
-                    3 => state
-                        .layout
-                        .set_children(state.panel_container, &[state.form_container]),
-                    _ => {}
-                }
-
-                state.layout.compute(
-                    state.page.root,
-                    (
-                        Some(size.width as f32 / scale),
-                        Some(size.height as f32 / scale),
-                    ),
-                    |_, _, _, _, _| Size::ZERO,
-                );
+                prepare_layout(state, size, scale);
 
                 if self.dump_layout {
                     for (name, rect) in state.layout.labeled_rects() {
@@ -823,663 +1518,7 @@ impl ApplicationHandler for App {
                     None
                 };
 
-                akar_label(
-                    &mut state.core,
-                    &state.layout,
-                    state.navbar_title_node,
-                    "akar",
-                    AKAR_THEME_DARK.base_content,
-                    &AKAR_THEME_DARK,
-                );
-                akar_badge(
-                    &mut state.core,
-                    &state.layout,
-                    state.navbar_badge_node,
-                    "3",
-                    BadgeVariant::Primary,
-                    &AKAR_THEME_DARK,
-                );
-                let menu_result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.navbar_btn_node,
-                    "Menu",
-                    ButtonVariant::Ghost,
-                    &AKAR_THEME_DARK,
-                );
-                if menu_result.clicked {
-                    state.drawer_open = !state.drawer_open;
-                }
-
-                let new_item_result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.navbar_new_btn_node,
-                    "New Item",
-                    ButtonVariant::Ghost,
-                    &AKAR_THEME_DARK,
-                );
-                if new_item_result.clicked {
-                    state.modal_open = !state.modal_open;
-                }
-
-                let dropdown_btn_result = akar_button(
-                    &mut state.core,
-                    &state.layout,
-                    state.navbar_dropdown_btn_node,
-                    "Dropdown",
-                    ButtonVariant::Ghost,
-                    &AKAR_THEME_DARK,
-                );
-                if dropdown_btn_result.clicked {
-                    state.dropdown_open = !state.dropdown_open;
-                }
-
-                akar_container(
-                    &mut state.core,
-                    &state.layout,
-                    state.page.sidebar_left.unwrap(),
-                    &BoxStyle::panel(&AKAR_THEME_DARK),
-                );
-                akar_container(
-                    &mut state.core,
-                    &state.layout,
-                    state.page.main,
-                    &BoxStyle::surface(&AKAR_THEME_DARK),
-                );
-                akar_container(
-                    &mut state.core,
-                    &state.layout,
-                    state.two_col.left,
-                    &BoxStyle::flat(0x172554ff),
-                );
-                akar_container(
-                    &mut state.core,
-                    &state.layout,
-                    state.two_col.right,
-                    &BoxStyle::flat(0x27272aff),
-                );
-
-                if !state.alert_dismissed {
-                    let result = akar_alert(
-                        &mut state.core,
-                        &state.layout,
-                        state.alert_node,
-                        "Welcome to akar demo!",
-                        AlertVariant::Info,
-                        true,
-                        &AKAR_THEME_DARK,
-                    );
-                    state.alert_dismissed = result.dismissed;
-                }
-
-                let tab_result = akar_tab_bar(
-                    &mut state.core,
-                    &state.layout,
-                    state.tab_bar_node,
-                    &["List", "Canvas", "Stats", "Form"],
-                    state.active_tab,
-                    TabVariant::Underline,
-                    &AKAR_THEME_DARK,
-                );
-                if let Some(index) = tab_result.clicked {
-                    state.active_tab = index;
-                }
-
-                if state.active_tab != state.prev_active_tab {
-                    let tab_names = ["List", "Canvas", "Stats", "Form"];
-                    state.toasts_list.push(ToastItem {
-                        variant: ToastVariant::Info,
-                        message: format!("Switched to {} tab", tab_names[state.active_tab]),
-                        dismiss_on_click: true,
-                    });
-                    state.prev_active_tab = state.active_tab;
-                }
-                while state.toasts_list.len() > 3 {
-                    state.toasts_list.remove(0);
-                }
-
-                match state.active_tab {
-                    0 => {
-                        let scroll_rect = state.layout.rect(state.scroll_container);
-                        let total_items = 50_usize;
-                        let item_height = 48.0_f32;
-                        let content_height = total_items as f32 * item_height;
-
-                        let resp = scroll_area_begin(
-                            &mut state.core,
-                            scroll_rect,
-                            &mut state.scroll_y,
-                            content_height,
-                        );
-                        let visible =
-                            list_clip(total_items, item_height, state.scroll_y, scroll_rect[3]);
-
-                        for i in visible {
-                            let y = resp.content_y + i as f32 * item_height;
-                            let item_rect = [scroll_rect[0], y, scroll_rect[2], item_height];
-                            let inner_pad = 4.0_f32;
-                            let inner_rect = [
-                                item_rect[0] + inner_pad,
-                                item_rect[1] + inner_pad,
-                                item_rect[2] - 2.0 * inner_pad,
-                                item_rect[3] - 2.0 * inner_pad,
-                            ];
-
-                            let item_bg = 0x1e293bffu32;
-                            let item_border = 0x334155ffu32;
-
-                            state.core.draw_list.push_quad(akar_core::QuadCall {
-                                rect: item_rect,
-                                fill: [
-                                    ((item_bg >> 24) & 0xFF) as f32 / 255.0,
-                                    ((item_bg >> 16) & 0xFF) as f32 / 255.0,
-                                    ((item_bg >> 8) & 0xFF) as f32 / 255.0,
-                                    (item_bg & 0xFF) as f32 / 255.0,
-                                ],
-                                border_color: [
-                                    ((item_border >> 24) & 0xFF) as f32 / 255.0,
-                                    ((item_border >> 16) & 0xFF) as f32 / 255.0,
-                                    ((item_border >> 8) & 0xFF) as f32 / 255.0,
-                                    (item_border & 0xFF) as f32 / 255.0,
-                                ],
-                                corner_radii: [6.0; 4],
-                                border_width: 1.0,
-                                z: 0.0,
-                                shadow_blur: 0.0,
-                                shadow_spread: 0.0,
-                                shadow_color: [0.0; 4],
-                                shadow_offset: [0.0; 2],
-                                _pad: [0.0; 2],
-                            });
-
-                            let label_text = format!("Item {}", i + 1);
-                            let buffer_id = state.core.text_pipeline.set_text(
-                                Some(i as u64),
-                                &label_text,
-                                glyphon::Metrics::new(14.0, 14.0 * 1.2),
-                                Some(inner_rect[2] * 0.6),
-                                None,
-                            );
-                            state.core.draw_list.push_text(akar_core::TextCall {
-                                buffer_id,
-                                x: inner_rect[0],
-                                y: inner_rect[1],
-                                clip: inner_rect,
-                                color: [0.98, 0.98, 0.98, 1.0],
-                                z: 0.0,
-                            });
-
-                            let progress_value = (i + 1) as f32 / total_items as f32;
-                            let progress_x = inner_rect[0] + inner_rect[2] * 0.65;
-                            let progress_w = inner_rect[2] * 0.35;
-                            let progress_h = 8.0;
-                            let progress_y = inner_rect[1] + (inner_rect[3] - progress_h) / 2.0;
-                            let progress_rect = [progress_x, progress_y, progress_w, progress_h];
-                            let progress_style = ProgressStyle {
-                                track_color: 0x27272aff,
-                                fill_color: 0x3b82f6ff,
-                                corner_radius: 4.0,
-                            };
-                            progress_at(
-                                &mut state.core,
-                                progress_rect,
-                                progress_value,
-                                &progress_style,
-                            );
-
-                            let tip_text = format!("{:.0}% complete", progress_value * 100.0);
-                            akar_tooltip(
-                                &mut state.core,
-                                progress_rect,
-                                &tip_text,
-                                TooltipSide::Top,
-                                &AKAR_THEME_DARK,
-                                viewport_rect,
-                            );
-                        }
-                        scroll_area_end(&mut state.core);
-                    }
-                    1 => {
-                        let canvas_rect = state.layout.rect(state.canvas_wrapper);
-                        let text = "Canvas View — coming soon";
-                        let buffer_id = state.core.text_pipeline.set_text(
-                            Some(2000),
-                            text,
-                            glyphon::Metrics::new(18.0, 18.0 * 1.2),
-                            Some(canvas_rect[2]),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id,
-                            x: canvas_rect[0] + 16.0,
-                            y: canvas_rect[1] + canvas_rect[3] / 2.0 - 10.0,
-                            clip: canvas_rect,
-                            color: [0.6, 0.6, 0.65, 1.0],
-                            z: 0.0,
-                        });
-                    }
-                    2 => {
-                        let stat_data = [
-                            ("Revenue", "$12,345", Some("+12% vs last month")),
-                            ("Users", "1,234", Some("+8% vs last month")),
-                            ("Active", "89%", Some("+3% vs last month")),
-                        ];
-                        for (i, &(title, value, desc)) in stat_data.iter().enumerate() {
-                            akar_stat(
-                                &mut state.core,
-                                &state.layout,
-                                state.stat_nodes[i],
-                                title,
-                                value,
-                                desc,
-                                &AKAR_THEME_DARK,
-                            );
-                        }
-
-                        akar_steps(
-                            &mut state.core,
-                            &state.layout,
-                            state.steps_node,
-                            &["Plan", "Build", "Test", "Launch"],
-                            1,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let avatar_initials = ["JD", "AK", "MR"];
-                        for (i, initials) in avatar_initials.iter().enumerate() {
-                            if state.show_skeleton {
-                                akar_skeleton(
-                                    &mut state.core,
-                                    &state.layout,
-                                    state.avatar_nodes[i],
-                                    SkeletonVariant::Circle,
-                                    &AKAR_THEME_DARK,
-                                );
-                            } else {
-                                akar_avatar(
-                                    &mut state.core,
-                                    &state.layout,
-                                    state.avatar_nodes[i],
-                                    initials,
-                                    None,
-                                    &AKAR_THEME_DARK,
-                                );
-                            }
-                        }
-                        let toggle_label = if state.show_skeleton {
-                            "Show Avatars"
-                        } else {
-                            "Show Skeleton"
-                        };
-                        let toggle_result = akar_button(
-                            &mut state.core,
-                            &state.layout,
-                            state.skeleton_toggle_node,
-                            toggle_label,
-                            ButtonVariant::Solid,
-                            &AKAR_THEME_DARK,
-                        );
-                        if toggle_result.clicked {
-                            state.show_skeleton = !state.show_skeleton;
-                        }
-                    }
-                    3 => {
-                        state.cursor_tick += 1;
-                        let cursor_visible = (state.cursor_tick / 30) % 2 == 0;
-                        let form_rect = state.layout.rect(state.form_container);
-
-                        let title_buf = state.core.text_pipeline.set_text(
-                            Some(3000),
-                            "Form Demo",
-                            glyphon::Metrics::new(18.0, 18.0 * 1.2),
-                            Some(form_rect[2] - 32.0),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id: title_buf,
-                            x: form_rect[0],
-                            y: form_rect[1],
-                            clip: form_rect,
-                            color: [0.9, 0.9, 0.95, 1.0],
-                            z: 0.0,
-                        });
-
-                        let name_label_buf = state.core.text_pipeline.set_text(
-                            Some(3001),
-                            "Name",
-                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
-                            Some(form_rect[2] - 32.0),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id: name_label_buf,
-                            x: form_rect[0],
-                            y: form_rect[1] + 24.0,
-                            clip: form_rect,
-                            color: [0.7, 0.7, 0.75, 1.0],
-                            z: 0.0,
-                        });
-
-                        let _name_result = akar_text_input(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_name_node,
-                            &mut state.form_name,
-                            &mut state.form_name_cursor,
-                            "Enter your name",
-                            cursor_visible,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let notes_label_buf = state.core.text_pipeline.set_text(
-                            Some(3002),
-                            "Notes",
-                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
-                            Some(form_rect[2] - 32.0),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id: notes_label_buf,
-                            x: form_rect[0],
-                            y: form_rect[1] + 80.0,
-                            clip: form_rect,
-                            color: [0.7, 0.7, 0.75, 1.0],
-                            z: 0.0,
-                        });
-
-                        let _notes_result = akar_textarea(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_notes_node,
-                            &mut state.form_notes,
-                            &mut state.form_notes_cursor,
-                            &mut state.form_notes_scroll_y,
-                            "Enter notes...",
-                            cursor_visible,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let _ = akar_checkbox(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_agreement_node,
-                            &mut state.form_agreed,
-                            "I agree to the terms",
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let _theme_changed = akar_radio_group(
-                            &mut state.core,
-                            &state.layout,
-                            &state.form_radio_nodes,
-                            &["Dark", "Light"],
-                            &mut state.form_theme_idx,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let _notif_toggled = akar_switch(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_notifications_node,
-                            &mut state.form_notifications_on,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let _font_changed = akar_slider(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_font_size_node,
-                            &mut state.form_font_size,
-                            12.0,
-                            32.0,
-                            &AKAR_THEME_DARK,
-                        );
-
-                        let _lang_changed = akar_select(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_language_node,
-                            &["English", "Spanish", "French", "German"],
-                            &mut state.form_language_idx,
-                            &mut state.form_language_open,
-                            &AKAR_THEME_DARK,
-                            viewport_rect,
-                        );
-
-                        let submit_result = akar_button(
-                            &mut state.core,
-                            &state.layout,
-                            state.form_submit_node,
-                            "Submit",
-                            ButtonVariant::Solid,
-                            &AKAR_THEME_DARK,
-                        );
-                        if submit_result.clicked {
-                            if state.form_agreed {
-                                state.toasts_list.push(ToastItem {
-                                    variant: ToastVariant::Success,
-                                    message: "Form submitted successfully!".to_string(),
-                                    dismiss_on_click: true,
-                                });
-                            } else {
-                                state.toasts_list.push(ToastItem {
-                                    variant: ToastVariant::Warning,
-                                    message: "Please agree to the terms.".to_string(),
-                                    dismiss_on_click: true,
-                                });
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-
-                let max_width = 250.0_f32;
-                let speed = 0.08;
-                if state.drawer_open {
-                    state.drawer_progress = (state.drawer_progress + speed).min(1.0);
-                } else {
-                    state.drawer_progress = (state.drawer_progress - speed).max(0.0);
-                }
-                let panel_width = max_width * ease_out_cubic(state.drawer_progress);
-
-                if panel_width > 1.0 {
-                    let drawer_resp = drawer_begin(
-                        &mut state.core,
-                        viewport_rect,
-                        DrawerEdge::Left,
-                        panel_width,
-                        &AKAR_THEME_DARK,
-                    );
-
-                    let padding = 16.0_f32;
-                    let y_offset = 24.0_f32;
-
-                    let avatar_rect = [padding, y_offset, 40.0, 40.0];
-                    state.core.draw_list.push_quad(akar_core::QuadCall {
-                        rect: avatar_rect,
-                        fill: [0.23, 0.51, 0.96, 1.0],
-                        border_color: [0.0; 4],
-                        corner_radii: [20.0; 4],
-                        border_width: 0.0,
-                        z: Z_FLOAT,
-                        shadow_blur: 0.0,
-                        shadow_spread: 0.0,
-                        shadow_color: [0.0; 4],
-                        shadow_offset: [0.0; 2],
-                        _pad: [0.0; 2],
-                    });
-
-                    let initials_buf = state.core.text_pipeline.set_text(
-                        Some(9001),
-                        "AK",
-                        glyphon::Metrics::new(16.0, 16.0 * 1.2),
-                        Some(40.0),
-                        None,
-                    );
-                    state.core.draw_list.push_text(akar_core::TextCall {
-                        buffer_id: initials_buf,
-                        x: avatar_rect[0] + 10.0,
-                        y: avatar_rect[1] + 10.0,
-                        clip: avatar_rect,
-                        color: [1.0; 4],
-                        z: Z_FLOAT,
-                    });
-
-                    let nav_links = ["Dashboard", "Settings", "Profile", "Help"];
-                    let link_start_y = y_offset + 40.0 + 24.0;
-                    for (i, link) in nav_links.iter().enumerate() {
-                        let link_rect = [
-                            padding,
-                            link_start_y + i as f32 * 40.0,
-                            panel_width - 2.0 * padding,
-                            32.0,
-                        ];
-
-                        state.core.draw_list.push_quad(akar_core::QuadCall {
-                            rect: link_rect,
-                            fill: [0.15, 0.16, 0.17, 1.0],
-                            border_color: [0.0; 4],
-                            corner_radii: [4.0; 4],
-                            border_width: 0.0,
-                            z: Z_FLOAT,
-                            shadow_blur: 0.0,
-                            shadow_spread: 0.0,
-                            shadow_color: [0.0; 4],
-                            shadow_offset: [0.0; 2],
-                            _pad: [0.0; 2],
-                        });
-
-                        let link_buf = state.core.text_pipeline.set_text(
-                            Some(10000 + i as u64),
-                            link,
-                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
-                            Some(link_rect[2]),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id: link_buf,
-                            x: link_rect[0] + 8.0,
-                            y: link_rect[1] + 6.0,
-                            clip: link_rect,
-                            color: [0.9, 0.9, 0.92, 1.0],
-                            z: Z_FLOAT,
-                        });
-                    }
-
-                    drawer_end(&mut state.core);
-
-                    if drawer_resp.close_requested {
-                        state.drawer_open = false;
-                    }
-                }
-
-                if state.modal_open {
-                    let modal_resp = modal_begin(
-                        &mut state.core,
-                        &mut state.layout,
-                        viewport_rect,
-                        "New Item",
-                        400.0,
-                        300.0,
-                        &AKAR_THEME_DARK,
-                    );
-
-                    let content_rect = state.layout.rect(modal_resp.content_node);
-
-                    let buffer_id = state.core.text_pipeline.set_text(
-                        Some(5000),
-                        "Modal content area \u{2014} add your form here.",
-                        glyphon::Metrics::new(16.0, 16.0 * 1.2),
-                        Some(content_rect[2] - 32.0),
-                        None,
-                    );
-                    state.core.draw_list.push_text(akar_core::TextCall {
-                        buffer_id,
-                        x: content_rect[0] + 16.0,
-                        y: content_rect[1] + 16.0,
-                        clip: content_rect,
-                        color: [0.8, 0.8, 0.85, 1.0],
-                        z: akar_core::Z_FLOAT,
-                    });
-
-                    modal_end(&mut state.core);
-
-                    if modal_resp.close_requested {
-                        state.modal_open = false;
-                    }
-                }
-
-                let toast_resp = toasts(
-                    &mut state.core,
-                    viewport_rect,
-                    &mut state.toasts_list,
-                    &AKAR_THEME_DARK,
-                );
-                if let Some(index) = toast_resp.dismissed {
-                    state.toasts_list.remove(index);
-                }
-
-                let dropdown_btn_rect = state.layout.rect(state.navbar_dropdown_btn_node);
-                let dropdown_state = dropdown_begin(
-                    &mut state.core,
-                    dropdown_btn_rect,
-                    28.0,
-                    viewport_rect,
-                    state.dropdown_open,
-                    &AKAR_THEME_DARK,
-                );
-
-                if dropdown_state.is_open {
-                    let items = ["Option A", "Option B", "Option C", "Option D"];
-                    for (i, item) in items.iter().enumerate() {
-                        let item_y = dropdown_state.content_rect[1] + i as f32 * 28.0;
-                        let item_rect = [
-                            dropdown_state.content_rect[0],
-                            item_y,
-                            dropdown_state.content_rect[2],
-                            28.0,
-                        ];
-
-                        if state.core.input.is_hovering(item_rect) {
-                            state.core.draw_list.push_quad(akar_core::QuadCall {
-                                rect: item_rect,
-                                fill: [0.2, 0.22, 0.25, 1.0],
-                                border_color: [0.0; 4],
-                                corner_radii: [0.0; 4],
-                                border_width: 0.0,
-                                z: akar_core::Z_OVERLAY,
-                                shadow_blur: 0.0,
-                                shadow_spread: 0.0,
-                                shadow_color: [0.0; 4],
-                                shadow_offset: [0.0; 2],
-                                _pad: [0.0; 2],
-                            });
-                        }
-
-                        let item_buf = state.core.text_pipeline.set_text(
-                            Some(6000 + i as u64),
-                            item,
-                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
-                            Some(item_rect[2] - 8.0),
-                            None,
-                        );
-                        state.core.draw_list.push_text(akar_core::TextCall {
-                            buffer_id: item_buf,
-                            x: item_rect[0] + 4.0,
-                            y: item_rect[1] + 5.0,
-                            clip: item_rect,
-                            color: [0.9, 0.9, 0.92, 1.0],
-                            z: akar_core::Z_OVERLAY,
-                        });
-
-                        if state.core.input.is_clicked(item_rect) {
-                            state.dropdown_open = false;
-                        }
-                    }
-
-                    dropdown_end(&mut state.core);
-                }
+                render_all(state, viewport_rect);
 
                 let normal_capture = !self.screenshot_taken
                     && self.screenshot_path.is_some()

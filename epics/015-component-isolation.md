@@ -788,3 +788,21 @@ A codebase-grounded review caught four spec bugs in the original implementation 
 ## Open questions (remaining)
 
 None. All six original questions are resolved (see "Review log" above), and the four spec bugs found during review are fixed. The remaining items in "Deferred alternatives" are enhancements, not blockers.
+
+---
+
+## Implementation log
+
+### 2026-07-13 — Task 015a landed
+
+Refactored `examples/demo-rust/src/main.rs` (1636 → 1675 lines, +39 net; 750 insertions / 711 deletions). Extracted exactly the function set from the spec: `prepare_layout`, `render_navbar`, `render_containers`, `render_alert`, `render_tab_bar`, `render_list_tab`, `render_canvas_tab`, `render_stats_tab`, `render_form_tab`, `render_drawer`, `render_modal`, `render_toasts`, `render_dropdown`, `render_all`. Dispatcher at `examples/demo-rust/src/main.rs:1505-1521` calls `prepare_layout` unconditionally, then `render_all` (no `--component` logic yet — that is 015b).
+
+**Verification:** `cargo check --workspace`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace` (145 tests pass, 0 failures), `cargo fmt --check` all pass. Screenshot at `/tmp/demo.png` is pixel-identical to pre-refactor (navbar + alert + tabs + list items render unchanged).
+
+**Deviations from spec:**
+1. Added `winit::dpi::PhysicalSize` to the import list — `state.window.inner_size()` returns `PhysicalSize<u32>` and `prepare_layout(state, size, scale)` needs the type.
+2. `render_navbar` accepts `_viewport_rect` (prefixed-underscore) — the navbar has no overlay that needs it, so the param is unused. All other overlay-using renderers take a live `viewport_rect` per Pitfall #4.
+3. One clippy fix beyond pure refactor: `(state.cursor_tick / 30) % 2 == 0` → `(state.cursor_tick / 30).is_multiple_of(2)` in `render_form_tab` (clippy 1.95 `manual_is_multiple_of` lint). Semantically identical; flagged here for traceability.
+
+**Reviewer check:** dispatcher shape matches the spec pseudocode exactly. State mutations (drawer/dropdown/modal toggles, toasts push/trim, active_tab updates, form cursor/text updates) all stay in their owning render functions. `--screenshot` / `--script` / `--dump-layout` / `--dump-frame` capture flow is unchanged.
+
