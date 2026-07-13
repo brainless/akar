@@ -1,6 +1,6 @@
 # Epic 015: Component Isolation for Screenshot-Driven Debugging
 
-**Status:** Drafting (revised 2026-07-12 after design review — open questions resolved, spec bugs fixed)
+**Status:** Done
 **Goal:** Enable agents to isolate specific components for screenshot capture, producing tight, focused images of a single component. This extends Epic 014's screenshot infrastructure with a `--component <name>` flag that renders only the specified component and auto-crops the output to its bounding box.
 
 **Prerequisite:** Epic 014 is `Status: Done` (screenshot enhancements complete).

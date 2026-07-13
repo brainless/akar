@@ -8,7 +8,7 @@ A GPU-accelerated immediate-mode UI component library with a C ABI. The Rust cra
 
 ## Before starting any task
 
-1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`). Currently Epic 015 is in progress.
+1. Confirm which epic is active (`epics/` — lowest-numbered without `Status: Done`). All numbered epics through 015 are complete; pick the next epic from the roadmap or open a new one.
 2. Read the full epic before touching any file.
 3. Cross-reference `DEVELOP.md` for local dependency paths and architectural constraints.
 
