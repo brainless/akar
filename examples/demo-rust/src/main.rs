@@ -1033,6 +1033,70 @@ fn ensure_navbar_slots(state: &mut AppState) {
     }
 }
 
+fn compute_component_aabb(recorded: &[akar_core::draw_list::RecordedCall]) -> Option<[f32; 4]> {
+    let mut min_x = f32::MAX;
+    let mut min_y = f32::MAX;
+    let mut max_x = f32::MIN;
+    let mut max_y = f32::MIN;
+
+    for call in recorded {
+        let (rect, z) = match &call.call {
+            akar_core::DrawCall::Quad(q) => (q.rect, q.z),
+            akar_core::DrawCall::Text(t) => (t.clip, t.z),
+        };
+        if z == akar_core::Z_SCRIM {
+            continue;
+        }
+        if let Some(scissor) = call.scissor {
+            if rect[0] + rect[2] <= scissor[0]
+                || rect[1] + rect[3] <= scissor[1]
+                || rect[0] >= scissor[0] + scissor[2]
+                || rect[1] >= scissor[1] + scissor[3]
+            {
+                continue;
+            }
+        }
+        min_x = min_x.min(rect[0]);
+        min_y = min_y.min(rect[1]);
+        max_x = max_x.max(rect[0] + rect[2]);
+        max_y = max_y.max(rect[1] + rect[3]);
+    }
+
+    if min_x == f32::MAX {
+        None
+    } else {
+        Some([min_x, min_y, max_x - min_x, max_y - min_y])
+    }
+}
+
+fn crop_and_write_png(
+    frame: &akar_core::screenshot::CapturedFrame,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    path: &str,
+) -> Result<(), String> {
+    let mut cropped = vec![0u8; (w * h * 4) as usize];
+    for row in 0..h {
+        let src_start = ((y + row) * frame.width + x) as usize * 4;
+        let dst_start = (row * w) as usize * 4;
+        let row_bytes = w as usize * 4;
+        let src_end = src_start + row_bytes;
+        cropped[dst_start..dst_start + row_bytes].copy_from_slice(&frame.rgba[src_start..src_end]);
+    }
+
+    let file = std::fs::File::create(path).map_err(|e| e.to_string())?;
+    let mut encoder = png::Encoder::new(file, w, h);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
+    writer
+        .write_image_data(&cropped)
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 impl Component {
     fn from_name(name: &str) -> Option<Self> {
         match name {
@@ -1645,7 +1709,9 @@ impl ApplicationHandler for App {
                 let scale = state.window.scale_factor() as f32;
 
                 state.core.begin_frame(size.width, size.height, scale);
-                if self.dump_frame_path.is_some() && !self.dump_frame_written {
+                let needs_recording = (self.dump_frame_path.is_some() && !self.dump_frame_written)
+                    || self.isolated_component.is_some();
+                if needs_recording {
                     state.core.draw_list.start_recording();
                 }
                 let viewport_rect = [
@@ -1782,29 +1848,60 @@ impl ApplicationHandler for App {
                     match captured {
                         Ok(frame) => {
                             let path = &capture_path;
-                            match std::fs::File::create(path) {
-                                Ok(file) => {
-                                    let mut png_encoder =
-                                        png::Encoder::new(file, frame.width, frame.height);
-                                    png_encoder.set_color(png::ColorType::Rgba);
-                                    png_encoder.set_depth(png::BitDepth::Eight);
-                                    match png_encoder.write_header() {
-                                        Ok(mut writer) => {
-                                            if let Err(e) = writer.write_image_data(&frame.rgba) {
-                                                eprintln!("Failed to write PNG data: {e}");
-                                                std::process::exit(1);
-                                            }
-                                            eprintln!("Screenshot saved to {path}");
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Failed to write PNG header: {e}");
+                            let mut cropped = false;
+                            if let Some(_component) = &self.isolated_component {
+                                let recorded = state.core.draw_list.recorded_calls();
+                                let crop_params = compute_component_aabb(recorded).map(|aabb| {
+                                    const PAD: f32 = 16.0;
+                                    let x = (aabb[0] - PAD).max(0.0) as u32;
+                                    let y = (aabb[1] - PAD).max(0.0) as u32;
+                                    let right =
+                                        (aabb[0] + aabb[2] + PAD).min(frame.width as f32) as u32;
+                                    let bottom =
+                                        (aabb[1] + aabb[3] + PAD).min(frame.height as f32) as u32;
+                                    let w = right.saturating_sub(x);
+                                    let h = bottom.saturating_sub(y);
+                                    (x, y, w, h)
+                                });
+                                state.core.draw_list.stop_recording();
+                                if let Some((x, y, w, h)) = crop_params {
+                                    if w > 0 && h > 0 {
+                                        if let Err(e) = crop_and_write_png(&frame, x, y, w, h, path)
+                                        {
+                                            eprintln!("Failed to crop PNG: {e}");
                                             std::process::exit(1);
                                         }
+                                        eprintln!("Cropped screenshot saved to {path}");
+                                        cropped = true;
                                     }
                                 }
-                                Err(e) => {
-                                    eprintln!("Failed to create file '{path}': {e}");
-                                    std::process::exit(1);
+                            }
+                            if !cropped {
+                                match std::fs::File::create(path) {
+                                    Ok(file) => {
+                                        let mut png_encoder =
+                                            png::Encoder::new(file, frame.width, frame.height);
+                                        png_encoder.set_color(png::ColorType::Rgba);
+                                        png_encoder.set_depth(png::BitDepth::Eight);
+                                        match png_encoder.write_header() {
+                                            Ok(mut writer) => {
+                                                if let Err(e) = writer.write_image_data(&frame.rgba)
+                                                {
+                                                    eprintln!("Failed to write PNG data: {e}");
+                                                    std::process::exit(1);
+                                                }
+                                                eprintln!("Screenshot saved to {path}");
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Failed to write PNG header: {e}");
+                                                std::process::exit(1);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to create file '{path}': {e}");
+                                        std::process::exit(1);
+                                    }
                                 }
                             }
                         }

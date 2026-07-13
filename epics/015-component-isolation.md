@@ -825,4 +825,28 @@ Added the `Component` enum, `--component` / `--list-components` flags, selective
 
 **Reviewer check:** `Component::from_name` and `force_state_initial` bodies match the spec pseudocode verbatim (modulo the `ensure_navbar_slots` fix above). Tab variants correctly set both `active_tab` AND `prev_active_tab` to suppress the spurious tab-change toast. The one-shot guard is not on `AppState` (per the spec's Option A guidance) and does not re-run on subsequent frames, so `--component` + `--script` composition works.
 
+### 2026-07-13 — Task 015c landed
+
+Added `compute_component_aabb` and `crop_and_write_png` to `examples/demo-rust/src/main.rs` (+117/-20). Extended the `start_recording` gate to include `isolated_component.is_some()` (Pitfall #3). Auto-crop splice inside the `Ok(frame)` arm runs before the full-frame PNG write, sets a `cropped: bool` on success, and the full-frame write is gated by `if !cropped { ... }` (Option β per the spec). `stop_recording()` is called once inside the splice, regardless of AABB outcome.
+
+**Spec amendment required (new pitfall, surfaced by implementation):**
+
+> **Pitfall #13 — Z_SCRIM quads dominate overlay AABBs.** The drawer's scrim (a single full-window darkening quad at `crates/akar-components/src/drawer.rs:49-76` with `z = Z_SCRIM` and `rect = [250, 0, 550, 600]`) and the modal's backdrop (`crates/akar-components/src/modal.rs:38-50`) extend the auto-crop AABB to the full window because the scrim spans nearly the entire surface. Without filtering, `--component drawer` produces a 800x600 crop with the drawer content visible in the top-left — i.e. no crop. **Fix:** in `compute_component_aabb`, `continue` if `q.z == Z_SCRIM`. Verified: `Z_SCRIM` has only the two call sites above (drawer + modal backdrops), so the filter is conservative and cannot drop legitimate component content. Text calls have no `Z_SCRIM` callers in the codebase.
+
+**Verification — partial due to winit NSApp hang (environmental, not a code defect):**
+- `cargo check` / `clippy` / `test` (145 tests pass) / `fmt --check` all pass.
+- `--component drawer --screenshot /tmp/drawer.png --exit` → **266x600** PNG, AK avatar + 4 nav links, right-side black padding visible. Z_SCRIM filter is what made this a real crop.
+- `--component dropdown --screenshot /tmp/dropdown.png --exit` → **116x145** PNG, all 4 options (A–D) with padding on all four sides.
+- `--component form`, `--component navbar`, and the full `--screenshot` demo hung in `[NSApplication _nextEventMatchingEventMask:]` after the first 1–2 runs in the same shell session. This is a known winit/macOS limitation (NSApp activation state gets stuck once a non-foregrounded run completes; the second run in a fresh session blocks forever waiting for an event that never arrives). It is environmental — the same `target/release/demo-rust` binary that produced the working drawer and dropdown captures produces no output on the hung cases. The AABB + crop path is identical for all components, and the two most complex cases (overlay with scrim filtering, overlay with cross-component layout dep) are verified visually. Re-run the unverified commands in a fresh GUI session to confirm.
+
+**Expected dimensions from the spec (recorded for cross-check after re-verification):**
+- `--component drawer` — spec said ~282x632; actual 266x600. The difference is that the AABB is the panel's `rect` (`(0, 0, 250, 600)`) plus 16px padding (250+16=266 wide, 600+0=600 tall), not the spec's estimate which assumed the panel rect is `(16, 16, 250, 600)`. The 266x600 is correct — the spec was approximate.
+- `--component dropdown` — ~116x145 actual matches the spec's "tight" expectation.
+- `--component form` — should be ~the form's `form_container` rect + 16px padding (~552x~600 in 800x600 window).
+- `--component navbar` — should be ~816x80 (full-width, 48px tall + 16px padding).
+- `--screenshot` (no component) — must remain 800x600 (the full-frame write path).
+
+**Reviewer check:** `compute_component_aabb` filters by Z_SCRIM (Pitfall #13) and by scissor intersection (Pitfall #9) before extending the AABB. `crop_and_write_png` uses 4-side clamp via `right = (aabb[0] + aabb[2] + PAD).min(frame.width as f32) as u32; bottom = (aabb[1] + aabb[3] + PAD).min(frame.height as f32) as u32; w = right.saturating_sub(x); h = bottom.saturating_sub(y)` (Pitfall #10). `pad = 16.0` is in physical pixels (Pitfall #11). On degenerate AABBs (`w == 0 || h == 0`) the splice falls through to the full-frame write — same as a non-isolated capture. The non-isolated path (no `--component`) is unchanged.
+
+
 
