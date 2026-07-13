@@ -1,6 +1,6 @@
 # Epic 014: Screenshot Utility Enhancements for Agent-Led Development
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Extend the screenshot utility (Epic 013) with features that enable fully autonomous coding-agent development cycles. The current implementation has three limitations that block agent-led UI work:
 
 1. Fixed 5-second delay before capture — not configurable.
