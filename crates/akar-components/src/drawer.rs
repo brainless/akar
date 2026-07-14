@@ -76,7 +76,7 @@ pub fn drawer_begin(
     });
 
     let corner_radii = match edge {
-        DrawerEdge::Left => [0.0, theme.radius_box, theme.radius_box, 0.0],
+        DrawerEdge::Left => [0.0; 4],
         DrawerEdge::Right => [theme.radius_box, 0.0, 0.0, theme.radius_box],
     };
 

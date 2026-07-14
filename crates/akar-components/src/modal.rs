@@ -6,10 +6,12 @@ use akar_layout::{
 use crate::color::color_to_f32;
 use crate::AkarTheme;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct ModalResponse {
     pub close_requested: bool,
     pub content_node: NodeId,
+    pub content_rect: [f32; 4],
+    pub panel_rect: [f32; 4],
 }
 
 pub fn modal_begin(
@@ -25,6 +27,8 @@ pub fn modal_begin(
         return ModalResponse {
             close_requested: false,
             content_node: NodeId::new(0),
+            content_rect: [0.0; 4],
+            panel_rect: [0.0; 4],
         };
     }
 
@@ -53,7 +57,7 @@ pub fn modal_begin(
         rect: panel_rect,
         fill: color_to_f32(theme.base_200),
         border_color: [0.0; 4],
-        corner_radii: [theme.radius_box; 4],
+        corner_radii: [theme.radius_box, 0.0, theme.radius_box, theme.radius_box],
         border_width: 0.0,
         z: Z_FLOAT,
         shadow_blur: 16.0,
@@ -77,7 +81,7 @@ pub fn modal_begin(
         flex_grow: 0.0,
         flex_shrink: 0.0,
         size: Size {
-            width: length(40.0),
+            width: length(32.0),
             height: Dimension::percent(1.0),
         },
         ..Default::default()
@@ -93,7 +97,7 @@ pub fn modal_begin(
         },
         ..Default::default()
     });
-    layout.set_padding(header, 0.0, theme.padding_x, 0.0, theme.padding_x);
+    layout.set_padding(header, 0.0, 8.0, 0.0, theme.padding_x);
     layout.set_children(header, &[title_node, close_node]);
 
     let content_node = layout.new_leaf(Style {
@@ -156,7 +160,7 @@ pub fn modal_begin(
         buffer_id: close_buffer_id,
         x: close_rect[0],
         y: close_rect[1],
-        clip: close_rect,
+        clip: [close_rect[0], close_rect[1], 200.0, close_rect[3]],
         color: color_to_f32(theme.base_content),
         z: Z_FLOAT,
     });
@@ -170,6 +174,8 @@ pub fn modal_begin(
     ModalResponse {
         close_requested,
         content_node,
+        content_rect,
+        panel_rect,
     }
 }
 

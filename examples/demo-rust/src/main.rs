@@ -880,7 +880,7 @@ fn render_modal(state: &mut AppState, viewport_rect: [f32; 4]) {
             &AKAR_THEME_DARK,
         );
 
-        let content_rect = state.layout.rect(modal_resp.content_node);
+        let content_rect = modal_resp.content_rect;
 
         let buffer_id = state.core.text_pipeline.set_text(
             Some(5000),
