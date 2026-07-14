@@ -2,7 +2,9 @@
 
 ## Project Status
 
-akar is in **pre-alpha / active development**. Epics 001 through 013 are complete, covering the core renderer, layout system, C API, text pipeline, container styling, scroll areas, static display components, navigation, tabs, drawer, overlay stack, form controls, and screenshot utility. No stable public API exists yet. Architecture decisions are recorded in `epics/` as they are made.
+akar is in **pre-alpha / active development**. No stable public API exists yet. Architecture decisions and completion status are recorded in `epics/` (one file per epic) — check `epics/` for what's done and what's next; do not rely on this file or any other doc for epic status.
+
+akar is primarily built by agents. The `demo-rust` binary ships with a complete visual debug toolchain (see "Screenshot Workflow" below) so a multi-modal agent can make a change, see its result, and iterate with no human in the loop. This is a first-class design goal, not a side benefit.
 
 ## Local Dependencies
 
@@ -49,28 +51,29 @@ cargo run --example demo-rust
 
 ## Screenshot Workflow
 
-akar supports a built-in screenshot mechanism for visual verification and coding-agent-led development. The `demo-rust` binary captures its own window and writes a PNG, enabling agents to "see" the UI they are modifying.
+The `demo-rust` binary is the primary visual feedback loop for UI work, and it is tuned for agent-led (and specifically multi-modal-LLM) development. It captures exactly what akar rendered — no OS chrome, no overlapping windows — using wgpu intermediate-texture readback, so it works identically on macOS, Windows, and Linux.
 
 ```bash
-# Capture the demo window after a 5-second delay
+# Basic: full-window screenshot after the default 5s delay, then exit
 cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+
+# Configurable delay (float seconds; 0 = first frame)
+cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
 ```
 
-This is the primary feedback loop for UI work:
+Beyond the basic capture, the binary exposes a full debug toolchain (see `AGENTS.md` → "Debug toolchain" for the recommended loop and full flag reference):
 
-1. Make a change to a component, theme token, or layout.
-2. Run the screenshot command.
-3. Read the resulting PNG to verify the visual result.
-4. Iterate.
+- `--script <FILE>` — line-based input injection (`hover`, `press`, `release`, `click`, `scroll`, `key`, `type`, `delay`, `screenshot`) with `@label` element addressing, for capturing non-idle/interactive states frame-precisely.
+- `--dump-layout` — prints `name x y w h` for every labeled layout node and exits (element discovery).
+- `--dump-frame <PATH>` — structured JSON dump for the captured frame: every draw call (including culled ones, with z-order and scissor), labeled layout rects, and an input snapshot.
+- `--component <name>` / `--list-components` — isolate a single component, force its interesting state once (open drawer/dropdown/modal), and **auto-crop** the PNG to its bounding box, removing unrelated UI as visual noise.
+- `akar-diff` — standalone binary, no GPU/akar deps. `--diff BASE CUR -o OUT.png` draws a visual diff (changed pixels red, unchanged dimmed); `--compare BASE CUR --threshold PCT` exits non-zero when the changed-pixel ratio exceeds a threshold (CI regression gate).
 
-The screenshot captures exactly what akar rendered — no OS chrome, no overlapping windows. It uses wgpu intermediate-texture readback (see `epics/013-screenshot-utility.md`), so it works identically on macOS, Windows, and Linux.
+Design rationale and history for the toolchain live in `epics/013-screenshot-utility.md`, `epics/014-screenshot-enhancements.md`, and `epics/015-component-isolation.md`.
 
-**Current limitations** (planned for a follow-up epic):
-- Fixed 5-second delay before capture — not configurable yet.
-- No programmatic input injection — cannot trigger hover/press states for screenshots.
-- No structured logging of draw calls — debugging relies on visual inspection.
-
-These limitations will be addressed in the next epic to enable fully autonomous coding-agent development cycles.
+**Remaining limitations** (deferred, not blocking agent workflows):
+- No perceptual diff — `akar-diff` is pixel-exact for v1.
+- No headless/offscreen rendering — `AkarCore::mock` and the intermediate-texture capture path make it architecturally feasible, but adapter availability on CI runners (no software Metal on macOS; `lavapipe` Linux-only; WARP Windows-only) is the real blocker. Punt documented in `epics/014` (Task 014e); a future epic will address it when CI visual regression is prioritized.
 
 ## Project Structure
 
@@ -90,8 +93,9 @@ akar/
 │   ├── akar-c-api/               # extern "C" bindings; produces libakar + akar.h
 │   └── akar-winit/               # optional: winit event → akar input bridge
 └── examples/
-    ├── demo-rust/                # comprehensive demo of all components
-    └── canvas-basic-rust/        # canvas component example
+    ├── demo-rust/                # comprehensive demo of all components; CLI debug toolchain
+    ├── canvas-basic-rust/        # canvas component example
+    └── akar-diff/                # standalone PNG diff/compare binary (no GPU/akar deps)
 ```
 
 ## Architecture Notes

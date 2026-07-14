@@ -16,6 +16,7 @@ The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-
 - **Batteries-included components.** Buttons, badges, labels, cards, inputs, checkboxes, toggles, selects, sliders, modals, drawers, tables, progress bars, toasts — pre-styled, themeable via a flat token struct.
 - **Layout via Flexbox.** Built on [taffy](https://github.com/DioxusLabs/taffy): the same CSS Flexbox model you already know, resolved to pixel coordinates before draw calls.
 - **Virtualization first.** Infinite scroll and large data grids are first-class via a list-clipper API. The library never renders what is off-screen.
+- **Built by agents, debuggable by agents.** akar is primarily written by coding agents, and is designed to be used by other projects that need a cross-platform UI framework which works and debugs well for agents — especially multi-modal LLMs. The `demo-rust` binary ships with a complete visual debug toolchain (screenshot capture, scripted input injection, layout/frame inspection, component isolation, and a diff tool) so an agent can see, isolate, and iterate on its UI with no human in the loop.
 
 ## For whom
 
@@ -35,19 +36,29 @@ The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-
 
 ## Status
 
-**Pre-alpha.** Epics 001–013 are complete with 30+ components implemented and a working screenshot utility. The API is functional but may change as development continues.
-
-See `epics/` for the current design roadmap and completion status.
+**Pre-alpha.** The API is functional but may change as development continues. See `epics/` for the design roadmap and completion status.
 
 ## Screenshot workflow
 
-akar includes a built-in screenshot tool for visual verification. Coding agents use it to see the UI they are modifying:
+akar's `demo-rust` binary ships with a visual debug toolchain purpose-built for agent-led development (especially multi-modal LLMs). It captures exactly what akar rendered — no OS chrome — via wgpu intermediate-texture readback, identically on macOS, Windows, and Linux.
 
 ```bash
+# Basic capture after default 5s delay, then exit
 cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+
+# Configurable delay (float seconds; 0 = first frame)
+cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
 ```
 
-This captures akar's rendered output (no OS chrome) to a PNG file. It is the primary feedback loop for UI development: change code, capture screenshot, inspect, iterate.
+Beyond the basic capture, the toolchain includes:
+
+- `--script <FILE>` — line-based input injection (`hover`, `press`, `release`, `click`, `scroll`, `key`, `type`, `delay`, `screenshot`) with `@label` element addressing, for capturing non-idle and interactive states frame-precisely.
+- `--dump-layout` — prints `name x y w h` for every labeled layout node and exits (element discovery for `@label` addressing and coordinate fallback).
+- `--dump-frame <PATH>` — structured JSON dump for the captured frame: every draw call (including culled ones, with z-order and scissor), labeled layout rects, and an input snapshot.
+- `--component <name>` / `--list-components` — isolate a single component, force its interesting state once (open drawer/dropdown/modal), and **auto-crop** the PNG to its bounding box, removing unrelated UI as visual noise.
+- `akar-diff` — standalone binary (no GPU/akar deps). `--diff BASE CUR -o OUT.png` draws a visual diff (changed pixels red); `--compare BASE CUR --threshold PCT` exits non-zero when the changed-pixel ratio exceeds a threshold for CI regression gates.
+
+See `AGENTS.md` → "Debug toolchain" for the recommended iteration loop and full flag reference. Design and history: `epics/013-screenshot-utility.md`, `epics/014-screenshot-enhancements.md`, `epics/015-component-isolation.md`.
 
 ## License
 
