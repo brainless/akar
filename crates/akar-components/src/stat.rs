@@ -28,7 +28,7 @@ pub fn stat(
         return;
     }
 
-    let key: u64 = node_id.into();
+    let key = u64::from(node_id).wrapping_mul(3).wrapping_add(2_000_000);
     let lh_sm = theme.font_size_sm * 1.2;
     let lh_lg = theme.font_size_lg * 1.2;
 

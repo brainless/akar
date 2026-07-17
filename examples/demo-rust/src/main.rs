@@ -252,7 +252,17 @@ fn ease_out_cubic(t: f32) -> f32 {
     1.0 - (1.0 - t).powf(3.0)
 }
 
-fn prepare_layout(state: &mut AppState, size: PhysicalSize<u32>, scale: f32) {
+fn prepare_layout(
+    state: &mut AppState,
+    size: PhysicalSize<u32>,
+    scale: f32,
+    isolated_component: Option<&Component>,
+) {
+    if let Some(component) = isolated_component {
+        component.prepare_isolated_layout(state, size, scale);
+        return;
+    }
+
     if state.alert_dismissed {
         state.layout.set_style(
             state.alert_node,
@@ -308,6 +318,13 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
             .add_child(slots.end, state.navbar_dropdown_btn_node);
         state.navbar_slots = Some(slots);
     }
+
+    akar_container(
+        &mut state.core,
+        &state.layout,
+        navbar_id,
+        &BoxStyle::panel(&AKAR_THEME_DARK),
+    );
 
     akar_label(
         &mut state.core,
@@ -983,6 +1000,21 @@ fn render_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
 
 fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
     render_containers(state);
+fn render_isolated_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
+    let trigger = akar_button(
+        &mut state.core,
+        &state.layout,
+        state.navbar_dropdown_btn_node,
+        "Dropdown",
+        ButtonVariant::Ghost,
+        &AKAR_THEME_DARK,
+    );
+    if trigger.clicked {
+        state.dropdown_open = !state.dropdown_open;
+    }
+    render_dropdown(state, viewport_rect);
+}
+
     render_navbar(state, viewport_rect);
     render_alert(state);
     render_tab_bar(state);
@@ -1100,6 +1132,138 @@ fn crop_and_write_png(
 impl Component {
     fn from_name(name: &str) -> Option<Self> {
         match name {
+    fn prepare_isolated_layout(&self, state: &mut AppState, size: PhysicalSize<u32>, scale: f32) {
+        let (root, style) = match self {
+            Self::Navbar => {
+                ensure_navbar_slots(state);
+                (
+                    state.page.header.unwrap(),
+                    Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: Some(AlignItems::CENTER),
+                        size: Size {
+                            width: length(600.0),
+                            height: length(48.0),
+                        },
+                        ..Default::default()
+                    },
+                )
+            }
+            Self::Alert => (
+                state.alert_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(520.0),
+                        height: length(48.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::TabBar => (
+                state.tab_bar_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(520.0),
+                        height: length(40.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::ListTab => (
+                state.scroll_container,
+                Style {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    overflow: taffy::geometry::Point {
+                        x: taffy::style::Overflow::Clip,
+                        y: taffy::style::Overflow::Clip,
+                    },
+                    size: Size {
+                        width: length(600.0),
+                        height: length(480.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::CanvasTab => (
+                state.canvas_wrapper,
+                Style {
+                    display: Display::Flex,
+                    align_items: Some(AlignItems::CENTER),
+                    justify_content: Some(JustifyContent::CENTER),
+                    size: Size {
+                        width: length(600.0),
+                        height: length(360.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::StatsTab => (
+                state.stats_wrapper,
+                Style {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    gap: taffy::geometry::Size {
+                        width: length(0.0),
+                        height: length(8.0),
+                    },
+                    size: Size {
+                        width: length(600.0),
+                        height: length(228.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::FormTab => (
+                state.form_container,
+                Style {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    size: Size {
+                        width: length(450.0),
+                        height: length(500.0),
+                    },
+                    padding: taffy::geometry::Rect {
+                        left: length(16.0),
+                        right: length(16.0),
+                        top: length(16.0),
+                        bottom: length(16.0),
+                    },
+                    gap: taffy::geometry::Size {
+                        width: length(0.0),
+                        height: length(12.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Dropdown => (
+                state.navbar_dropdown_btn_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(160.0),
+                        height: length(32.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Drawer | Self::Modal | Self::Toasts => return,
+        };
+
+        state.layout.set_style(root, style);
+        state.layout.compute(
+            root,
+            (
+                Some(size.width as f32 / scale),
+                Some(size.height as f32 / scale),
+            ),
+            |_, _, _, _, _| Size::ZERO,
+        );
+    }
+
             "navbar" => Some(Self::Navbar),
             "alert" => Some(Self::Alert),
             "tab_bar" => Some(Self::TabBar),
@@ -1134,7 +1298,7 @@ impl Component {
             Self::Drawer => render_drawer(state, viewport_rect),
             Self::Modal => render_modal(state, viewport_rect),
             Self::Toasts => render_toasts(state, viewport_rect),
-            Self::Dropdown => render_dropdown(state, viewport_rect),
+            Self::Dropdown => render_isolated_dropdown(state, viewport_rect),
         }
     }
 
@@ -1726,12 +1890,12 @@ impl ApplicationHandler for App {
                         component.force_state_initial(state);
                         self.forced_initial_state = true;
                     }
-                    if matches!(component, Component::Dropdown) {
+                    if matches!(component, Component::Navbar) {
                         ensure_navbar_slots(state);
                     }
                 }
 
-                prepare_layout(state, size, scale);
+                prepare_layout(state, size, scale, self.isolated_component.as_ref());
 
                 if self.dump_layout {
                     for (name, rect) in state.layout.labeled_rects() {
