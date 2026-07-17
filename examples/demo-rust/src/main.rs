@@ -656,17 +656,18 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         z: 0.0,
     });
 
+    let name_rect = state.layout.rect(state.form_name_node);
     let name_label_buf = state.core.text_pipeline.set_text(
         Some(3001),
         "Name",
         glyphon::Metrics::new(14.0, 14.0 * 1.2),
-        Some(form_rect[2] - 32.0),
+        Some(name_rect[2]),
         None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
         buffer_id: name_label_buf,
-        x: form_rect[0],
-        y: form_rect[1] + 24.0,
+        x: name_rect[0] + AKAR_THEME_DARK.padding_x,
+        y: name_rect[1] - 20.0,
         clip: form_rect,
         color: [0.7, 0.7, 0.75, 1.0],
         z: 0.0,
@@ -683,17 +684,18 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         &AKAR_THEME_DARK,
     );
 
+    let notes_rect = state.layout.rect(state.form_notes_node);
     let notes_label_buf = state.core.text_pipeline.set_text(
         Some(3002),
         "Notes",
         glyphon::Metrics::new(14.0, 14.0 * 1.2),
-        Some(form_rect[2] - 32.0),
+        Some(notes_rect[2]),
         None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
         buffer_id: notes_label_buf,
-        x: form_rect[0],
-        y: form_rect[1] + 80.0,
+        x: notes_rect[0] + AKAR_THEME_DARK.padding_x,
+        y: notes_rect[1] - 20.0,
         clip: form_rect,
         color: [0.7, 0.7, 0.75, 1.0],
         z: 0.0,
@@ -998,8 +1000,6 @@ fn render_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
     }
 }
 
-fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
-    render_containers(state);
 fn render_isolated_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
     let trigger = akar_button(
         &mut state.core,
@@ -1015,6 +1015,8 @@ fn render_isolated_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
     render_dropdown(state, viewport_rect);
 }
 
+fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
+    render_containers(state);
     render_navbar(state, viewport_rect);
     render_alert(state);
     render_tab_bar(state);
@@ -1130,8 +1132,6 @@ fn crop_and_write_png(
 }
 
 impl Component {
-    fn from_name(name: &str) -> Option<Self> {
-        match name {
     fn prepare_isolated_layout(&self, state: &mut AppState, size: PhysicalSize<u32>, scale: f32) {
         let (root, style) = match self {
             Self::Navbar => {
@@ -1264,6 +1264,8 @@ impl Component {
         );
     }
 
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
             "navbar" => Some(Self::Navbar),
             "alert" => Some(Self::Alert),
             "tab_bar" => Some(Self::TabBar),
@@ -1654,6 +1656,12 @@ impl ApplicationHandler for App {
                 width: Dimension::percent(1.0),
                 height: length(40.0),
             },
+            margin: taffy::geometry::Rect {
+                top: length(20.0),
+                right: length(0.0),
+                bottom: length(0.0),
+                left: length(0.0),
+            },
             ..Default::default()
         });
 
@@ -1662,6 +1670,12 @@ impl ApplicationHandler for App {
             size: Size {
                 width: Dimension::percent(1.0),
                 height: length(100.0),
+            },
+            margin: taffy::geometry::Rect {
+                top: length(20.0),
+                right: length(0.0),
+                bottom: length(0.0),
+                left: length(0.0),
             },
             ..Default::default()
         });

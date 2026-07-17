@@ -83,7 +83,7 @@ pub fn select(
     });
 
     let chevron_buffer = core.text_pipeline.set_text(
-        Some(u64::from(node_id) + 1),
+        Some(u64::from(node_id).wrapping_add(1_000_000)),
         "\u{25BC}",
         glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
         None,
@@ -139,7 +139,7 @@ pub fn select(
                 }
 
                 let option_buffer = core.text_pipeline.set_text(
-                    Some(u64::from(node_id) + 2 + i as u64),
+                    Some(u64::from(node_id).wrapping_add(1_000_001 + i as u64)),
                     option,
                     glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
                     Some(state.content_rect[2]),
