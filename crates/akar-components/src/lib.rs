@@ -92,7 +92,10 @@ pub mod textarea;
 pub use textarea::{textarea as akar_textarea, TextAreaResponse};
 
 pub mod data_item;
-pub use data_item::{data_item as akar_data_item, DataItemResponse, DataItemStyle};
+pub use data_item::{
+    canvas_data_item, data_item as akar_data_item, CanvasDataItemDescriptor,
+    CanvasDataItemResponse, DataItemResponse, DataItemStyle,
+};
 
 pub mod data_list;
 pub use data_list::{data_list_begin, data_list_end, DataListResponse, DataListState};

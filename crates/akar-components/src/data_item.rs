@@ -1,6 +1,8 @@
 use akar_core::{AkarCore, QuadCall};
-use akar_layout::{Layout, NodeId};
+use akar_layout::{Layout, NodeId, WorldRect};
 
+use crate::canvas::{CanvasAlign, CanvasInput, CanvasOverflow, CanvasPainter, CanvasTextStyle};
+use crate::color::f32_to_color;
 use crate::AkarTheme;
 
 #[derive(Clone, Copy)]
@@ -99,6 +101,111 @@ pub fn data_item(
     }
 
     DataItemResponse {
+        hovered,
+        pressed,
+        clicked,
+    }
+}
+
+pub struct CanvasDataItemDescriptor<'a> {
+    pub title: Option<&'a str>,
+    pub supporting_text: Option<&'a str>,
+    pub metadata: Option<&'a str>,
+    pub style: &'a DataItemStyle,
+}
+
+pub struct CanvasDataItemResponse {
+    pub hovered: bool,
+    pub pressed: bool,
+    pub clicked: bool,
+}
+
+pub fn canvas_data_item(
+    painter: &mut CanvasPainter,
+    input: &CanvasInput,
+    world_rect: WorldRect,
+    descriptor: &CanvasDataItemDescriptor,
+) -> CanvasDataItemResponse {
+    let hovered = input.is_hovering(world_rect);
+    let pressed = input.is_pressed(world_rect);
+    let clicked = input.is_clicked(world_rect);
+
+    let style = descriptor.style;
+    let fill = style.fill_for_state(hovered, pressed);
+    let fill_u32 = f32_to_color(fill);
+
+    painter.push_quad(
+        world_rect,
+        fill_u32,
+        f32_to_color(style.border_color),
+        style.border_width,
+        [style.corner_radius; 4],
+        0.0,
+    );
+
+    let content_x = world_rect.min.x + style.padding_x;
+    let content_w = (world_rect.max.x - world_rect.min.x - style.padding_x * 2.0).max(0.0);
+    let mut cursor_y = world_rect.min.y + style.padding_y;
+    let title_font = 14.0;
+    let supporting_font = 12.0;
+    let metadata_font = 10.0;
+    let line_height_factor = 1.3;
+    let field_spacing = style.spacing;
+
+    if let Some(title) = descriptor.title {
+        let h = title_font * line_height_factor;
+        let text_rect = WorldRect::from_xywh(content_x, cursor_y, content_w, h);
+        painter.push_text(
+            text_rect,
+            title,
+            &CanvasTextStyle {
+                font_size: title_font,
+                color: 0xFFFFFFFF,
+                background: None,
+                padding: [0.0; 4],
+                align_x: CanvasAlign::Left,
+                overflow: CanvasOverflow::Truncate,
+            },
+        );
+        cursor_y += h + field_spacing;
+    }
+
+    if let Some(text) = descriptor.supporting_text {
+        let h = supporting_font * line_height_factor;
+        let text_rect = WorldRect::from_xywh(content_x, cursor_y, content_w, h);
+        painter.push_text(
+            text_rect,
+            text,
+            &CanvasTextStyle {
+                font_size: supporting_font,
+                color: 0xBBBBBBFF,
+                background: None,
+                padding: [0.0; 4],
+                align_x: CanvasAlign::Left,
+                overflow: CanvasOverflow::Truncate,
+            },
+        );
+        cursor_y += h + field_spacing;
+    }
+
+    if let Some(text) = descriptor.metadata {
+        let h = metadata_font * line_height_factor;
+        let text_rect = WorldRect::from_xywh(content_x, cursor_y, content_w, h);
+        painter.push_text(
+            text_rect,
+            text,
+            &CanvasTextStyle {
+                font_size: metadata_font,
+                color: 0x999999FF,
+                background: None,
+                padding: [0.0; 4],
+                align_x: CanvasAlign::Left,
+                overflow: CanvasOverflow::Truncate,
+            },
+        );
+    }
+
+    CanvasDataItemResponse {
         hovered,
         pressed,
         clicked,
@@ -300,5 +407,202 @@ mod tests {
         data_item(&mut core, &layout, node_id, 0, &style);
 
         assert_eq!(core.draw_list.sorted_quads().len(), 1);
+    }
+
+    fn make_canvas_painter() -> CanvasPainter {
+        let w2s =
+            akar_layout::make_world_to_screen(glam::Vec2::ZERO, 1.0, [0.0, 0.0, 800.0, 600.0]);
+        CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: [0.0, 0.0, 800.0, 600.0],
+            text_buffer_scope: 1,
+        }
+    }
+
+    fn make_canvas_input(screen_x: f32, screen_y: f32) -> CanvasInput {
+        let s2w =
+            akar_layout::make_screen_to_world(glam::Vec2::ZERO, 1.0, [0.0, 0.0, 800.0, 600.0]);
+        let mut input = akar_core::InputState::new();
+        input.set_mouse_pos(screen_x, screen_y);
+        CanvasInput::new(&input, &s2w)
+    }
+
+    fn make_canvas_input_with_click(screen_x: f32, screen_y: f32) -> CanvasInput {
+        let s2w =
+            akar_layout::make_screen_to_world(glam::Vec2::ZERO, 1.0, [0.0, 0.0, 800.0, 600.0]);
+        let mut input = akar_core::InputState::new();
+        input.set_mouse_pos(screen_x, screen_y);
+        input.push_mouse_button(0, true);
+        input.begin_frame();
+        input.set_mouse_pos(screen_x, screen_y);
+        input.push_mouse_button(0, false);
+        CanvasInput::new(&input, &s2w)
+    }
+
+    #[test]
+    fn canvas_data_item_hover_inside() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input(400.0, 300.0);
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Test"),
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+
+        let result = canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert!(result.hovered);
+        assert!(!result.pressed);
+        assert!(!result.clicked);
+    }
+
+    #[test]
+    fn canvas_data_item_no_hover_outside() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input(100.0, 100.0);
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 20.0, 20.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Test"),
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+
+        let result = canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert!(!result.hovered);
+        assert!(!result.pressed);
+        assert!(!result.clicked);
+    }
+
+    #[test]
+    fn canvas_data_item_click() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input_with_click(400.0, 300.0);
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Test"),
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+
+        let result = canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert!(result.hovered);
+        assert!(result.clicked);
+    }
+
+    #[test]
+    fn canvas_data_item_submits_quad_and_text() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input(400.0, 300.0);
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Title"),
+            supporting_text: Some("Supporting"),
+            metadata: Some("Meta"),
+            style: &style,
+        };
+
+        canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert_eq!(
+            painter.quad_buffer.len(),
+            1,
+            "should submit one background quad"
+        );
+        assert_eq!(
+            painter.text_buffer.len(),
+            3,
+            "should submit three text entries"
+        );
+    }
+
+    #[test]
+    fn canvas_data_item_partial_text_fields() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input(400.0, 300.0);
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Only title"),
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+
+        canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert_eq!(painter.quad_buffer.len(), 1);
+        assert_eq!(painter.text_buffer.len(), 1);
+    }
+
+    #[test]
+    fn canvas_data_item_far_outside_still_works() {
+        let mut painter = make_canvas_painter();
+        let input = make_canvas_input(400.0, 300.0);
+        let rect = WorldRect::from_xywh(5000.0, 5000.0, 100.0, 100.0);
+        let style = DataItemStyle::default();
+        let desc = CanvasDataItemDescriptor {
+            title: Some("Far away"),
+            supporting_text: Some("Still rendered"),
+            metadata: None,
+            style: &style,
+        };
+
+        let result = canvas_data_item(&mut painter, &input, rect, &desc);
+
+        assert!(!result.hovered);
+        assert!(!result.pressed);
+        assert!(!result.clicked);
+        assert_eq!(
+            painter.quad_buffer.len(),
+            1,
+            "quad submitted regardless of visibility"
+        );
+        assert_eq!(
+            painter.text_buffer.len(),
+            2,
+            "text submitted regardless of visibility"
+        );
+    }
+
+    #[test]
+    fn canvas_data_item_hover_changes_fill() {
+        let style = DataItemStyle::default();
+        let rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+
+        let mut painter_normal = make_canvas_painter();
+        let input_normal = make_canvas_input(100.0, 100.0);
+        let desc = CanvasDataItemDescriptor {
+            title: None,
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+        canvas_data_item(&mut painter_normal, &input_normal, rect, &desc);
+        let fill_normal = painter_normal.quad_buffer[0].fill;
+
+        let mut painter_hover = make_canvas_painter();
+        let input_hover = make_canvas_input(400.0, 300.0);
+        let desc = CanvasDataItemDescriptor {
+            title: None,
+            supporting_text: None,
+            metadata: None,
+            style: &style,
+        };
+        canvas_data_item(&mut painter_hover, &input_hover, rect, &desc);
+        let fill_hover = painter_hover.quad_buffer[0].fill;
+
+        assert_ne!(fill_normal, fill_hover, "hover should change fill color");
     }
 }

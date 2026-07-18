@@ -194,12 +194,13 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [x] Unit tests cover range boundaries, scroll input, and nested scissors.
 - [x] A unit test scrolls the visible range by one item, renders a focused/edited item at the boundary row, and confirms focus/text-buffer state does not transfer to the newly visible record at that position.
 
-### Task 4: Canvas Data-Item Summary Helper
+### Task 4: Canvas Data-Item Summary Helper ✅
 
 **Files:**
 
 - `crates/akar-components/src/canvas.rs`
-- `crates/akar-components/src/data_item.rs`
+- `crates/akar-components/src/data_item.rs` — added `CanvasDataItemDescriptor`, `canvas_data_item()`
+- `crates/akar-components/src/color.rs` — added `f32_to_color`
 - `crates/akar-components/src/lib.rs`
 
 **Work:**
@@ -211,9 +212,9 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- Summary items create no layout nodes, focusable widgets, text-buffer IDs, or child hit targets.
-- Invisible items are culled before text shaping.
-- Canvas item geometry and text scale correctly with zoom.
+- [x] Summary items create no layout nodes, focusable widgets, text-buffer IDs, or child hit targets.
+- [x] Invisible items are culled before text shaping.
+- [x] Canvas item geometry and text scale correctly with zoom.
 
 ### Task 5: Portal Composition Example and Visual Verification
 
