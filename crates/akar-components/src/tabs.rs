@@ -138,7 +138,7 @@ pub fn tab_bar(
         }
 
         let buffer_id = core.text_pipeline.set_text(
-            Some(u64::from(node_id) + i as u64),
+            Some(layout.widget_id(node_id) + i as u64),
             label,
             glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
             Some(tab_width),

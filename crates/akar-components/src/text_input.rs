@@ -53,7 +53,7 @@ pub fn text_input(
         };
     }
 
-    let id_u64 = u64::from(node_id);
+    let id_u64 = layout.widget_id(node_id);
 
     if core.input.is_clicked(rect) {
         core.input.focused_id = Some(id_u64);
@@ -162,7 +162,7 @@ pub fn text_input(
     };
 
     let buffer_id = core.text_pipeline.set_text(
-        Some(node_id.into()),
+        Some(layout.widget_id(node_id)),
         display_text,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(max_text_width.max(0.0)),

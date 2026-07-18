@@ -50,7 +50,7 @@ pub fn textarea(
         return TextAreaResponse { changed: false };
     }
 
-    let id_u64 = u64::from(node_id);
+    let id_u64 = layout.widget_id(node_id);
     let line_height = theme.font_size_base * 1.2;
 
     if core.input.is_clicked(rect) {
@@ -208,7 +208,7 @@ pub fn textarea(
     };
 
     let buffer_id = core.text_pipeline.set_text(
-        Some(node_id.into()),
+        Some(layout.widget_id(node_id)),
         display_text,
         glyphon::Metrics::new(theme.font_size_base, line_height),
         Some(max_text_width.max(0.0)),

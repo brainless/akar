@@ -92,7 +92,7 @@ pub fn button(
     });
 
     let buffer_id = core.text_pipeline.set_text(
-        Some(node_id.into()),
+        Some(layout.widget_id(node_id)),
         label,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2]),

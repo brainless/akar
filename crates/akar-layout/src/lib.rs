@@ -23,6 +23,8 @@ pub struct Layout {
     tree: TaffyTree<AkarNodeContext>,
     parents: HashMap<NodeId, NodeId>,
     labels: HashMap<String, NodeId>,
+    screen_origin: [f32; 2],
+    namespace_id: u64,
 }
 
 impl Layout {
@@ -31,7 +33,26 @@ impl Layout {
             tree: TaffyTree::new(),
             parents: HashMap::new(),
             labels: HashMap::new(),
+            screen_origin: [0.0; 2],
+            namespace_id: 0,
         }
+    }
+
+    pub fn set_screen_origin(&mut self, origin: [f32; 2]) {
+        self.screen_origin = origin;
+    }
+
+    pub fn set_namespace_id(&mut self, id: u64) {
+        self.namespace_id = id;
+    }
+
+    pub fn namespace_id(&self) -> u64 {
+        self.namespace_id
+    }
+
+    pub fn widget_id(&self, node: NodeId) -> u64 {
+        let local: u64 = node.into();
+        self.namespace_id.wrapping_add(local)
     }
 
     pub fn register_label(&mut self, name: &str, node: NodeId) {
@@ -153,7 +174,12 @@ impl Layout {
             y += pl.location.y;
             current = parent;
         }
-        [x, y, l.size.width, l.size.height]
+        [
+            self.screen_origin[0] + x,
+            self.screen_origin[1] + y,
+            l.size.width,
+            l.size.height,
+        ]
     }
 }
 
@@ -722,5 +748,122 @@ mod tests {
         assert_eq!(name, "child");
         assert!((rect[2] - 60.0).abs() < 1.0);
         assert!((rect[3] - 60.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn portal_child_rects_offset_by_origin() {
+        let mut layout = Layout::new();
+        layout.set_screen_origin([100.0, 50.0]);
+
+        let child = layout.new_leaf(Style {
+            size: Size {
+                width: length(40.0),
+                height: length(20.0),
+            },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect(child);
+        assert_eq!(r[0], 100.0, "child.x should include screen_origin.x");
+        assert_eq!(r[1], 50.0, "child.y should include screen_origin.y");
+        assert_eq!(r[2], 40.0);
+        assert_eq!(r[3], 20.0);
+    }
+
+    #[test]
+    fn default_layout_origin_zero() {
+        let mut layout = Layout::new();
+
+        let child = layout.new_leaf(Style {
+            size: Size {
+                width: length(40.0),
+                height: length(20.0),
+            },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect(child);
+        assert_eq!(r[0], 0.0);
+        assert_eq!(r[1], 0.0);
+        assert_eq!(r[2], 40.0);
+        assert_eq!(r[3], 20.0);
+    }
+
+    #[test]
+    fn portal_same_local_nodes_distinct_widget_ids() {
+        let mut layout_a = Layout::new();
+        layout_a.set_namespace_id(1000);
+        let node_a = layout_a.new_leaf(Style::default());
+
+        let mut layout_b = Layout::new();
+        layout_b.set_namespace_id(2000);
+        let node_b = layout_b.new_leaf(Style::default());
+
+        let id_a = layout_a.widget_id(node_a);
+        let id_b = layout_b.widget_id(node_b);
+
+        assert_ne!(id_a, id_b, "different namespaces must produce distinct widget IDs");
+    }
+
+    #[test]
+    fn layout_drop_recreate_same_namespace_same_widget_id() {
+        let local_node_idx: u64;
+
+        {
+            let mut layout = Layout::new();
+            layout.set_namespace_id(42);
+            let node = layout.new_leaf(Style::default());
+            local_node_idx = u64::from(node);
+            let _ = layout.widget_id(node);
+        }
+
+        {
+            let mut layout = Layout::new();
+            layout.set_namespace_id(42);
+            let node: NodeId = local_node_idx.into();
+            let id = layout.widget_id(node);
+            assert_eq!(id, 42u64.wrapping_add(local_node_idx));
+        }
+    }
+
+    #[test]
+    fn zero_area_portal_root() {
+        let mut layout = Layout::new();
+        layout.set_screen_origin([200.0, 100.0]);
+
+        let root = layout.new_leaf(Style::default());
+        layout.compute(root, (Some(0.0), Some(0.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect(root);
+        assert_eq!(r[0], 200.0);
+        assert_eq!(r[1], 100.0);
+        assert_eq!(r[2], 0.0);
+        assert_eq!(r[3], 0.0);
+    }
+
+    #[test]
+    fn rect_offset_composes_with_screen_origin() {
+        let mut layout = Layout::new();
+        layout.set_screen_origin([100.0, 50.0]);
+
+        let child = layout.new_leaf(Style {
+            size: Size {
+                width: length(40.0),
+                height: length(20.0),
+            },
+            ..Default::default()
+        });
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
+
+        let r = layout.rect_offset(child, [10.0, 20.0]);
+        assert_eq!(r[0], 110.0, "rect_offset adds its origin on top of screen_origin");
+        assert_eq!(r[1], 70.0);
+        assert_eq!(r[2], 40.0);
+        assert_eq!(r[3], 20.0);
     }
 }

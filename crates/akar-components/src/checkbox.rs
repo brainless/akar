@@ -49,7 +49,7 @@ pub fn checkbox(
 
     if *checked {
         let check_buffer = core.text_pipeline.set_text(
-            Some(u64::from(node_id)),
+            Some(layout.widget_id(node_id)),
             "\u{2713}",
             glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
             Some(box_size),
@@ -66,7 +66,7 @@ pub fn checkbox(
     }
 
     let label_buffer = core.text_pipeline.set_text(
-        Some(u64::from(node_id) + 1),
+        Some(layout.widget_id(node_id) + 1),
         label,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2] - 24.0),

@@ -106,7 +106,7 @@ pub fn alert(
             dismissed = true;
         }
 
-        let key: u64 = node_id.into();
+        let key: u64 = layout.widget_id(node_id);
         let close_buffer_id = core.text_pipeline.set_text(
             Some(key.wrapping_add(1)),
             "×",
@@ -137,7 +137,7 @@ pub fn alert(
 
     if text_max_w > 0.0 {
         let msg_buffer_id = core.text_pipeline.set_text(
-            Some(node_id.into()),
+            Some(layout.widget_id(node_id)),
             text,
             glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
             Some(text_max_w),

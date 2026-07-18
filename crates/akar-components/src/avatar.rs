@@ -70,7 +70,7 @@ pub fn avatar(
     let line_height = font_size * 1.2;
 
     let buf_id = core.text_pipeline.set_text(
-        Some(node_id.into()),
+        Some(layout.widget_id(node_id)),
         &display,
         glyphon::Metrics::new(font_size, line_height),
         Some(diameter),

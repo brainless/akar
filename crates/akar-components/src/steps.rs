@@ -109,7 +109,7 @@ pub fn steps(
         };
 
         let buffer_id = core.text_pipeline.set_text(
-            Some(u64::from(node_id) + i as u64),
+            Some(layout.widget_id(node_id) + i as u64),
             label,
             glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
             Some(step_spacing),
