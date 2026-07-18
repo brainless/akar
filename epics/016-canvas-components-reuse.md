@@ -247,6 +247,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 ### Task 5: Tests and Visual Regression Assets
 
+**Status:** Done
+
 **Files:**
 
 - `crates/akar-components/src/canvas.rs`
@@ -338,5 +340,5 @@ For smooth transitions, applications can use projected dimensions directly to ca
 - [x] At interactive detail, a caller can render an ordinary local layout subtree with existing components, including button and text input, inside a clipped portal.
 - [x] Existing screen-space component APIs remain backward compatible.
 - [x] The canvas-basic example demonstrates all levels and captures overview plus interactive verification states.
-- [ ] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
+- [x] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
 - [ ] `DEVELOP.md`, `README.md`, and `AGENTS.md` are updated when the implementation lands.
