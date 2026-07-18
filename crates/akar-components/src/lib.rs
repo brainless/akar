@@ -47,9 +47,9 @@ pub use steps::steps as akar_steps;
 
 pub mod canvas;
 pub use canvas::{
-    canvas_begin, canvas_end, is_visible_world, CanvasAlign, CanvasConfig, CanvasInput,
-    CanvasOverflow, CanvasPainter, CanvasProjectedRect, CanvasResponse, CanvasState,
-    CanvasTextStyle, PanButton,
+    canvas_begin, canvas_end, canvas_portal_begin, canvas_portal_end, is_visible_world,
+    CanvasAlign, CanvasConfig, CanvasInput, CanvasOverflow, CanvasPainter, CanvasPortalGuard,
+    CanvasProjectedRect, CanvasResponse, CanvasState, CanvasTextStyle, PanButton,
 };
 
 pub mod tabs;

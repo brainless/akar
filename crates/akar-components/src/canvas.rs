@@ -394,6 +394,29 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
     core.draw_list.pop_scissor();
 }
 
+pub struct CanvasPortalGuard {
+    pub screen_rect: [f32; 4],
+}
+
+/// Push a scissor rect for a portal's projected screen bounds.
+///
+/// Ordering: render buffered canvas content (`canvas_end`) before calling
+/// this. Render the portal subtree between begin and end. The portal's
+/// scissor composes with any existing canvas scissor via intersection.
+pub fn canvas_portal_begin(
+    core: &mut AkarCore,
+    portal_layout: &Layout,
+    root_node: NodeId,
+) -> CanvasPortalGuard {
+    let screen_rect = portal_layout.rect(root_node);
+    core.draw_list.push_scissor(screen_rect);
+    CanvasPortalGuard { screen_rect }
+}
+
+pub fn canvas_portal_end(core: &mut AkarCore, _guard: CanvasPortalGuard) {
+    core.draw_list.pop_scissor();
+}
+
 pub fn is_visible_world(viewport: WorldRect, target: WorldRect) -> bool {
     viewport.intersects(target)
 }
@@ -680,5 +703,126 @@ mod tests {
             core.input.focused_id.is_none(),
             "canvas text must not set focused_id"
         );
+    }
+
+    fn make_portal_layout(rect: [f32; 4]) -> (Layout, NodeId) {
+        let mut layout = Layout::new();
+        layout.set_screen_origin([rect[0], rect[1]]);
+        let root = layout.new_leaf(akar_layout::Style {
+            size: akar_layout::Size {
+                width: akar_layout::length(rect[2]),
+                height: akar_layout::length(rect[3]),
+            },
+            ..Default::default()
+        });
+        layout.compute(root, (Some(rect[2]), Some(rect[3])), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        (layout, root)
+    }
+
+    #[test]
+    fn portal_pushes_scissor() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+
+        let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
+        let guard = canvas_portal_begin(&mut core, &layout, root);
+
+        let scissor = core.draw_list.active_scissor().unwrap();
+        assert!(
+            (scissor[0] - 100.0).abs() < 0.001,
+            "scissor.x={}",
+            scissor[0]
+        );
+        assert!(
+            (scissor[1] - 50.0).abs() < 0.001,
+            "scissor.y={}",
+            scissor[1]
+        );
+        assert!(
+            (scissor[2] - 300.0).abs() < 0.001,
+            "scissor.w={}",
+            scissor[2]
+        );
+        assert!(
+            (scissor[3] - 200.0).abs() < 0.001,
+            "scissor.h={}",
+            scissor[3]
+        );
+        assert_eq!(guard.screen_rect, [100.0, 50.0, 300.0, 200.0]);
+
+        canvas_portal_end(&mut core, guard);
+    }
+
+    #[test]
+    fn portal_end_pops_scissor() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+
+        let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
+        let guard = canvas_portal_begin(&mut core, &layout, root);
+        assert!(core.draw_list.active_scissor().is_some());
+
+        canvas_portal_end(&mut core, guard);
+        assert!(
+            core.draw_list.active_scissor().is_none(),
+            "scissor should be popped after portal_end"
+        );
+    }
+
+    #[test]
+    fn portal_nests_with_canvas_scissor() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+
+        core.draw_list.push_scissor([0.0, 0.0, 800.0, 600.0]);
+
+        let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
+        let guard = canvas_portal_begin(&mut core, &layout, root);
+
+        let scissor = core.draw_list.active_scissor().unwrap();
+        assert!(
+            (scissor[0] - 100.0).abs() < 0.001,
+            "intersection x={}",
+            scissor[0]
+        );
+        assert!(
+            (scissor[1] - 50.0).abs() < 0.001,
+            "intersection y={}",
+            scissor[1]
+        );
+        assert!(
+            (scissor[2] - 300.0).abs() < 0.001,
+            "intersection w={}",
+            scissor[2]
+        );
+        assert!(
+            (scissor[3] - 200.0).abs() < 0.001,
+            "intersection h={}",
+            scissor[3]
+        );
+
+        canvas_portal_end(&mut core, guard);
+
+        let restored = core.draw_list.active_scissor().unwrap();
+        assert_eq!(restored, [0.0, 0.0, 800.0, 600.0]);
+
+        core.draw_list.pop_scissor();
+    }
+
+    #[test]
+    fn portal_zero_area() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+
+        let (layout, root) = make_portal_layout([200.0, 100.0, 0.0, 0.0]);
+        let guard = canvas_portal_begin(&mut core, &layout, root);
+
+        let scissor = core.draw_list.active_scissor().unwrap();
+        assert_eq!(scissor[2], 0.0, "zero-width scissor");
+        assert_eq!(scissor[3], 0.0, "zero-height scissor");
+
+        canvas_portal_end(&mut core, guard);
     }
 }
