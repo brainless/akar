@@ -224,6 +224,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 ### Task 4: Interactive Portal Demonstration
 
+**Status:** Done
+
 **Files:**
 
 - `examples/canvas-basic-rust/src/main.rs`
@@ -335,6 +337,6 @@ For smooth transitions, applications can use projected dimensions directly to ca
 - [x] Low-detail canvas objects can render caller-styled, display-only text that is projected, clipped, and culled by akar without creating widget or input state.
 - [x] At interactive detail, a caller can render an ordinary local layout subtree with existing components, including button and text input, inside a clipped portal.
 - [x] Existing screen-space component APIs remain backward compatible.
-- [ ] The canvas-basic example demonstrates all levels and captures overview plus interactive verification states.
+- [x] The canvas-basic example demonstrates all levels and captures overview plus interactive verification states.
 - [ ] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
 - [ ] `DEVELOP.md`, `README.md`, and `AGENTS.md` are updated when the implementation lands.
