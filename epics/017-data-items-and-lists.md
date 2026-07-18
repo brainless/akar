@@ -1,6 +1,6 @@
 # Epic 017: Reusable Data Items and Lists
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Provide application-agnostic data-item and list primitives that work in ordinary akar layouts and have a deliberate canvas LOD path, without importing application data models or creating a second transformed-component renderer.
 
 **Prerequisite:** Epic 016 (Canvas Level of Detail and Component Portals) is `Status: Done`.
