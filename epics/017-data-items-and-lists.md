@@ -220,7 +220,8 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Files:**
 
-- `examples/canvas-basic-rust/src/main.rs` — updated to use data_item + canvas_data_item
+- `examples/canvas-basic-rust/src/main.rs` — updated to use data_item + canvas_data_item; added `--screenshot/--delay/--exit/--portal` capture flags (mirrors demo-rust's screenshot pipeline) to force and capture the interactive-portal state
+- `examples/canvas-basic-rust/Cargo.toml` — added `png` dependency for screenshot PNG encoding
 - relevant component tests and scripted capture assets
 
 **Work:**
@@ -232,7 +233,7 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 **Acceptance criteria:**
 
 - [x] The example makes the transition boundary clear without implying world-space child interaction.
-- [ ] Overview and interactive screenshots are visually verified.
+- [x] Overview and interactive screenshots are visually verified.
 
 ### Task 6: C ABI and Documentation ✅
 
@@ -285,4 +286,4 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [x] Full interactive items in a canvas use a clipped portal with ordinary components.
 - [x] Item and child-widget identity remains stable and collision-free across virtualized rows and portal layouts, keyed by caller-provided record identity rather than screen position (ADR-016a) — verified by a scroll-and-refocus test, not just a same-frame collision test.
 - [x] The C ABI follows the generated-header contract.
-- [ ] Formatting, clippy, tests, and representative visual captures pass.
+- [x] Formatting, clippy, tests, and representative visual captures pass.

@@ -12,3 +12,4 @@ glam = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }
 pollster = "0.4"
+png = "0.17"

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 use akar_components::{
     akar_button, akar_container, akar_data_item, akar_label, akar_text_input,
@@ -60,12 +61,60 @@ struct AppState {
 }
 
 fn main() {
+    let mut screenshot_path = None;
+    let mut exit_after = false;
+    let mut delay_secs = 1.0;
+    let mut force_portal = false;
+
+    let mut args = std::env::args().peekable();
+    args.next();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--screenshot" => {
+                screenshot_path = args.next();
+            }
+            "--exit" => {
+                exit_after = true;
+            }
+            "--delay" => {
+                if let Some(v) = args.next() {
+                    if let Ok(parsed) = v.parse::<f64>() {
+                        delay_secs = parsed;
+                    }
+                }
+            }
+            "--portal" => {
+                force_portal = true;
+            }
+            other => {
+                eprintln!("Unknown argument: {other}");
+                std::process::exit(1);
+            }
+        }
+    }
+
     let event_loop = EventLoop::new().unwrap();
-    event_loop.run_app(&mut App { state: None }).unwrap();
+    event_loop
+        .run_app(&mut App {
+            state: None,
+            screenshot_path,
+            exit_after,
+            delay_secs,
+            force_portal,
+            start_time: None,
+            screenshot_taken: false,
+        })
+        .unwrap();
 }
 
 struct App {
     state: Option<AppState>,
+    screenshot_path: Option<String>,
+    exit_after: bool,
+    delay_secs: f64,
+    force_portal: bool,
+    start_time: Option<Instant>,
+    screenshot_taken: bool,
 }
 
 impl ApplicationHandler for App {
@@ -111,7 +160,17 @@ impl ApplicationHandler for App {
             sidebar_right_width: None,
         });
 
-        let canvas_state = CanvasState::new();
+        let mut canvas_state = CanvasState::new();
+        if self.force_portal {
+            // Server Alpha's bounds are centered at (-120, -50); zoom past the
+            // interactive LOD threshold (220px) so its portal renders open.
+            canvas_state.zoom = 4.0;
+            canvas_state.pan = Vec2::new(-120.0, -50.0);
+        }
+
+        if self.screenshot_path.is_some() {
+            self.start_time = Some(Instant::now());
+        }
 
         let object_states = (0..5)
             .map(|_| ObjectState {
@@ -482,21 +541,38 @@ impl ApplicationHandler for App {
                     canvas_portal_end(core, guard);
                 }
 
+                let is_capture_frame = !self.screenshot_taken
+                    && self.screenshot_path.is_some()
+                    && self.start_time.is_some_and(|t| {
+                        t.elapsed() >= std::time::Duration::from_secs_f64(self.delay_secs)
+                    });
+                if is_capture_frame {
+                    state.core.request_screenshot();
+                }
+
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
                     _ => return,
                 };
-                let view = output
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
                 let mut encoder = state
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
                 {
+                    let surface_view = output
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default());
+                    let render_view = if is_capture_frame {
+                        state
+                            .core
+                            .capture_target_view(&state.device, size.width, size.height)
+                            .unwrap()
+                    } else {
+                        surface_view
+                    };
                     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("main pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
+                            view: &render_view,
                             depth_slice: None,
                             resolve_target: None,
                             ops: wgpu::Operations {
@@ -511,7 +587,50 @@ impl ApplicationHandler for App {
                     });
                     let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
                 }
-                state.queue.submit(std::iter::once(encoder.finish()));
+
+                if is_capture_frame {
+                    let path = self.screenshot_path.clone().unwrap();
+                    match state
+                        .core
+                        .take_screenshot(&state.device, &state.queue, encoder, &output)
+                    {
+                        Ok(frame) => match std::fs::File::create(&path) {
+                            Ok(file) => {
+                                let mut png_encoder =
+                                    png::Encoder::new(file, frame.width, frame.height);
+                                png_encoder.set_color(png::ColorType::Rgba);
+                                png_encoder.set_depth(png::BitDepth::Eight);
+                                match png_encoder.write_header() {
+                                    Ok(mut writer) => {
+                                        if let Err(e) = writer.write_image_data(&frame.rgba) {
+                                            eprintln!("Failed to write PNG data: {e}");
+                                            std::process::exit(1);
+                                        }
+                                        eprintln!("Screenshot saved to {path}");
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to write PNG header: {e}");
+                                        std::process::exit(1);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to create file '{path}': {e}");
+                                std::process::exit(1);
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("Screenshot failed: {e}");
+                            std::process::exit(1);
+                        }
+                    }
+                    self.screenshot_taken = true;
+                    if self.exit_after {
+                        event_loop.exit();
+                    }
+                } else {
+                    state.queue.submit(std::iter::once(encoder.finish()));
+                }
                 output.present();
             }
             _ => {}
