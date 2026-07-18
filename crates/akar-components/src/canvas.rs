@@ -340,16 +340,19 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
             continue;
         }
 
-        core.text_pipeline
-            .set_text(Some(buffer_id), &entry.text, metrics, Some(text_area_w), None);
+        core.text_pipeline.set_text(
+            Some(buffer_id),
+            &entry.text,
+            metrics,
+            Some(text_area_w),
+            None,
+        );
 
         let text_size = core.text_pipeline.measure(buffer_id, Some(text_area_w));
 
         let text_x = match entry.style.align_x {
             CanvasAlign::Left => screen_rect[0] + pad_left,
-            CanvasAlign::Center => {
-                screen_rect[0] + pad_left + (text_area_w - text_size.x) * 0.5
-            }
+            CanvasAlign::Center => screen_rect[0] + pad_left + (text_area_w - text_size.x) * 0.5,
             CanvasAlign::Right => screen_rect[0] + screen_rect[2] - pad_right - text_size.x,
         };
         let text_y = screen_rect[1] + pad_top;
@@ -377,7 +380,12 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
             CanvasOverflow::Clip => screen_rect,
             CanvasOverflow::Truncate => {
                 let max_h = text_size.y.min(text_area_h);
-                [screen_rect[0], screen_rect[1], screen_rect[2], pad_top + max_h]
+                [
+                    screen_rect[0],
+                    screen_rect[1],
+                    screen_rect[2],
+                    pad_top + max_h,
+                ]
             }
         };
 
@@ -625,7 +633,14 @@ mod tests {
             canvas_rect: CANVAS,
         };
         let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
-        painter.push_quad(world_rect, 0xFF0000FF, 0x00000000, 2.0, [1.0, 2.0, 3.0, 4.0], 0.0);
+        painter.push_quad(
+            world_rect,
+            0xFF0000FF,
+            0x00000000,
+            2.0,
+            [1.0, 2.0, 3.0, 4.0],
+            0.0,
+        );
         let q = &painter.quad_buffer[0];
         assert!((q.corner_radii[0] - 2.0).abs() < 0.001);
         assert!((q.corner_radii[1] - 4.0).abs() < 0.001);
@@ -824,5 +839,321 @@ mod tests {
         assert_eq!(scissor[3], 0.0, "zero-height scissor");
 
         canvas_portal_end(&mut core, guard);
+    }
+
+    #[test]
+    fn lod_index_single_threshold_below() {
+        let resp = make_response(Vec2::ZERO, 1.0);
+        let world_rect = WorldRect::from_xywh(-1.0, -1.0, 2.0, 2.0);
+        assert_eq!(resp.lod_index(world_rect, &[100.0]), 0);
+    }
+
+    #[test]
+    fn lod_index_single_threshold_above() {
+        let resp = make_response(Vec2::ZERO, 2.0);
+        let world_rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        assert_eq!(resp.lod_index(world_rect, &[100.0]), 1);
+    }
+
+    #[test]
+    fn lod_index_exact_threshold_boundary() {
+        let resp = make_response(Vec2::ZERO, 1.0);
+        let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
+        let min_dim = 10.0_f32;
+        let thresholds = [min_dim];
+        assert_eq!(resp.lod_index(world_rect, &thresholds), 1);
+    }
+
+    #[test]
+    fn canvas_input_world_mouse_at_zoom() {
+        let zoom = 2.0;
+        let s2w = make_screen_to_world(Vec2::ZERO, zoom, CANVAS);
+        let mut input = InputState::new();
+        input.set_mouse_pos(500.0, 350.0);
+        let ci = CanvasInput::new(&input, &s2w);
+        let expected = s2w.apply(Vec2::new(500.0, 350.0));
+        assert!(
+            (ci.world_mouse_pos - expected).length() < 0.001,
+            "world_mouse_pos should match screen_to_world transform"
+        );
+    }
+
+    #[test]
+    fn canvas_input_hover_at_zoom() {
+        let zoom = 2.0;
+        let s2w = make_screen_to_world(Vec2::ZERO, zoom, CANVAS);
+        let mut input = InputState::new();
+        input.set_mouse_pos(400.0, 300.0);
+        let ci = CanvasInput::new(&input, &s2w);
+        let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
+        assert!(
+            ci.is_hovering(world_rect),
+            "mouse at canvas center should hover world origin rect at zoom 2"
+        );
+    }
+
+    #[test]
+    fn canvas_text_with_background() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: Some(0xFF0000FF),
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Clip,
+        };
+
+        let world_rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        painter.push_text(world_rect, "bg test", &style);
+
+        canvas_end(&mut core, painter);
+
+        let quads: Vec<_> = core.draw_list.sorted_quads().into_iter().collect();
+        assert!(!quads.is_empty(), "text with background should emit a quad");
+    }
+
+    #[test]
+    fn canvas_text_truncate_overflow() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Truncate,
+        };
+
+        let world_rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        painter.push_text(world_rect, "truncated", &style);
+
+        canvas_end(&mut core, painter);
+
+        let text_calls: Vec<_> = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            text_calls.len(),
+            1,
+            "truncate should still produce a text call"
+        );
+    }
+
+    #[test]
+    fn canvas_text_center_alignment() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let left_style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Clip,
+        };
+        let center_style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Center,
+            overflow: CanvasOverflow::Clip,
+        };
+
+        let world_rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        painter.push_text(world_rect, "X", &left_style);
+        painter.push_text(world_rect, "X", &center_style);
+
+        canvas_end(&mut core, painter);
+
+        let text_calls: Vec<_> = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(text_calls.len(), 2);
+        assert!(
+            text_calls[1].x > text_calls[0].x,
+            "center-aligned text should be to the right of left-aligned"
+        );
+    }
+
+    #[test]
+    fn canvas_text_right_alignment() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let left_style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Clip,
+        };
+        let right_style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Right,
+            overflow: CanvasOverflow::Clip,
+        };
+
+        let world_rect = WorldRect::from_xywh(-50.0, -50.0, 100.0, 100.0);
+        painter.push_text(world_rect, "X", &left_style);
+        painter.push_text(world_rect, "X", &right_style);
+
+        canvas_end(&mut core, painter);
+
+        let text_calls: Vec<_> = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(text_calls.len(), 2);
+        assert!(
+            text_calls[1].x > text_calls[0].x,
+            "right-aligned text should be to the right of left-aligned"
+        );
+    }
+
+    #[test]
+    fn canvas_text_zero_area_padding() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [50.0, 50.0, 50.0, 50.0],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Clip,
+        };
+
+        let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
+        painter.push_text(world_rect, "tiny", &style);
+
+        canvas_end(&mut core, painter);
+
+        let text_calls: Vec<_> = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            text_calls.is_empty(),
+            "text with padding exceeding rect should be culled"
+        );
+    }
+
+    #[test]
+    fn canvas_text_multiple_buffer_ids() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+        let w2s = make_world_to_screen(Vec2::ZERO, 1.0, CANVAS);
+
+        let mut painter = CanvasPainter {
+            quad_buffer: Vec::new(),
+            text_buffer: Vec::new(),
+            world_to_screen: w2s,
+            canvas_rect: CANVAS,
+        };
+
+        let style = CanvasTextStyle {
+            font_size: 12.0,
+            color: 0xFFFFFFFF,
+            background: None,
+            padding: [0.0; 4],
+            align_x: CanvasAlign::Left,
+            overflow: CanvasOverflow::Clip,
+        };
+
+        let r1 = WorldRect::from_xywh(-100.0, -50.0, 80.0, 20.0);
+        let r2 = WorldRect::from_xywh(10.0, -50.0, 80.0, 20.0);
+        painter.push_text(r1, "first", &style);
+        painter.push_text(r2, "second", &style);
+
+        canvas_end(&mut core, painter);
+
+        let text_calls: Vec<_> = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(text_calls.len(), 2);
+        assert_ne!(
+            text_calls[0].buffer_id, text_calls[1].buffer_id,
+            "multiple text calls must have distinct buffer IDs"
+        );
     }
 }

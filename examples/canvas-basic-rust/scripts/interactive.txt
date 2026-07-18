@@ -1,0 +1,27 @@
+# Interactive state: zoomed in, portal active for at least one object
+#
+# Expected visual output:
+#   - Dark background with a header bar at top
+#   - One or more objects rendered as full interactive portals:
+#     * A container with dark panel background
+#     * A label showing the object name (e.g. "Server Alpha")
+#     * A "Click me" button (solid variant)
+#     * A text input with placeholder "Type here..."
+#   - Portal content is clipped to the object's projected screen rect
+#   - Other objects may still be at LOD 1-2 (outline/filled rectangles)
+#   - Button is clickable; clicking toggles to "Clicked!"
+#   - Text input accepts keyboard input
+#
+# Zoom/pan settings:
+#   zoom: 3.0
+#   pan: (-180, -80) to center on "Server Alpha" object
+#
+# At zoom 3.0, the 120x60 object projects to 360x180 screen pixels,
+# well above the 220px LOD threshold (index 3 = interactive portal).
+# The portal layout has 8px padding, so usable area is 344x164.
+#
+# To test interaction:
+#   hover @button   -- should show hover state
+#   click @button   -- should toggle text to "Clicked!"
+#   click @input    -- should focus the text input
+#   type "hello"    -- should appear in the input field

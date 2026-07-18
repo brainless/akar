@@ -806,7 +806,10 @@ mod tests {
         let id_a = layout_a.widget_id(node_a);
         let id_b = layout_b.widget_id(node_b);
 
-        assert_ne!(id_a, id_b, "different namespaces must produce distinct widget IDs");
+        assert_ne!(
+            id_a, id_b,
+            "different namespaces must produce distinct widget IDs"
+        );
     }
 
     #[test]
@@ -861,9 +864,72 @@ mod tests {
         layout.compute(root, (Some(200.0), Some(200.0)), |_, _, _, _, _| Size::ZERO);
 
         let r = layout.rect_offset(child, [10.0, 20.0]);
-        assert_eq!(r[0], 110.0, "rect_offset adds its origin on top of screen_origin");
+        assert_eq!(
+            r[0], 110.0,
+            "rect_offset adds its origin on top of screen_origin"
+        );
         assert_eq!(r[1], 70.0);
         assert_eq!(r[2], 40.0);
         assert_eq!(r[3], 20.0);
+    }
+
+    #[test]
+    fn portal_nested_children_offset_by_origin() {
+        let mut layout = Layout::new();
+        layout.set_screen_origin([200.0, 100.0]);
+
+        let grandchild = layout.new_leaf(Style {
+            size: Size {
+                width: length(20.0),
+                height: length(10.0),
+            },
+            ..Default::default()
+        });
+        let child = layout.new_with_children(
+            Style {
+                display: Display::Flex,
+                size: Size {
+                    width: length(100.0),
+                    height: length(50.0),
+                },
+                padding: taffy::geometry::Rect {
+                    top: length(5.0),
+                    right: length(5.0),
+                    bottom: length(5.0),
+                    left: length(5.0),
+                },
+                ..Default::default()
+            },
+            &[grandchild],
+        );
+        let root = layout.new_with_children(Style::default(), &[child]);
+        layout.compute(root, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let cr = layout.rect(child);
+        assert_eq!(cr[0], 200.0, "child.x includes screen_origin");
+        assert_eq!(cr[1], 100.0, "child.y includes screen_origin");
+
+        let gr = layout.rect(grandchild);
+        assert_eq!(gr[0], 205.0, "grandchild.x includes origin + padding");
+        assert_eq!(gr[1], 105.0, "grandchild.y includes origin + padding");
+    }
+
+    #[test]
+    fn portal_widget_id_deterministic_for_same_namespace() {
+        let mut layout_a = Layout::new();
+        layout_a.set_namespace_id(42);
+        let node_a = layout_a.new_leaf(Style::default());
+        let id_first = layout_a.widget_id(node_a);
+
+        let mut layout_b = Layout::new();
+        layout_b.set_namespace_id(42);
+        let local_idx: u64 = node_a.into();
+        let node_b: NodeId = local_idx.into();
+        let id_second = layout_b.widget_id(node_b);
+
+        assert_eq!(
+            id_first, id_second,
+            "same namespace + same local node = same widget ID"
+        );
     }
 }

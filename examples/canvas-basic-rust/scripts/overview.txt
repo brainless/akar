@@ -1,0 +1,20 @@
+# Overview state: zoomed out, all objects at LOD 0 (silhouette dots)
+#
+# Expected visual output:
+#   - Dark background with a header bar at top
+#   - Five small dots visible on the canvas, each colored per object:
+#     * Server Alpha (blue #3B82F6) at roughly center-left
+#     * Database Beta (green #10B981) at center-right
+#     * Cache Gamma (amber #F59E0B) at center
+#     * Gateway Delta (red #EF4444) at lower-left
+#     * Worker Epsilon (purple #8B5CF6) at lower-right
+#   - No text labels visible (LOD 0 = dot only)
+#   - No outlines or filled rectangles
+#   - Dots turn white on hover
+#
+# Zoom/pan settings:
+#   zoom: 0.3 (well below LOD threshold 0 = 48px)
+#   pan: (0, 0)
+#
+# All five objects project below 48px minimum dimension at this zoom,
+# so they render as 4px dots at their world-space centers.

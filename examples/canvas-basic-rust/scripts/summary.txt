@@ -1,0 +1,20 @@
+# Summary state: medium zoom, objects at LOD 1-2 (outline + label, or filled + label)
+#
+# Expected visual output:
+#   - Dark background with a header bar at top
+#   - Objects rendered as outlined or filled rectangles with text labels:
+#     * LOD 1 (48-120px projected): border outline + centered truncated name
+#       e.g. "Server Alpha" with a blue border, no fill
+#     * LOD 2 (120-220px projected): solid fill + name label in top region
+#       e.g. "Cache Gamma" as a filled amber rectangle with white label
+#   - Hover brightens LOD 2 objects; LOD 1 objects get white border on hover
+#   - No interactive components (buttons, inputs) visible
+#
+# Zoom/pan settings:
+#   zoom: 0.8
+#   pan: (0, 0)
+#
+# At zoom 0.8, the 120px-wide objects project to ~96px (LOD 1),
+# while the 80-100px objects project to ~64-80px (LOD 1).
+# The 120px objects with larger projected size may reach LOD 2.
+# Exact LOD depends on the object's world-space minimum dimension.
