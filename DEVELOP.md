@@ -130,6 +130,22 @@ Every language binding is a thin wrapper over `akar.h`. The bindings live in `bi
 
 A flat `AkarTheme` struct of color tokens and size tokens. No cascade, no inheritance. Two presets ship: `AKAR_THEME_DARK` and `AKAR_THEME_LIGHT`. The developer can swap presets or mutate individual tokens.
 
+### Canvas LOD and portals
+
+Canvas provides continuous level of detail via projected screen dimensions. `CanvasResponse::project()` returns a `CanvasProjectedRect` with the object's screen rect, pixels-per-world-unit, and visibility. `lod_index()` classifies an object against caller-supplied pixel thresholds using the projected minimum dimension.
+
+Applications define arbitrary LOD thresholds — the library does not prescribe a fixed set of levels. Common patterns: dot (smallest), outline + summary label, preview, and interactive portal.
+
+Low-detail levels use `CanvasPainter` primitives: transformed quads (with zoom-scaled border width, corner radii, and shadow fields) and display text (`push_text` with `CanvasTextStyle`). Group-level world-space hover/press/click detection is available through `CanvasInput`.
+
+At the interactive threshold, applications render a normal screen-space layout subtree through `canvas_portal_begin/end`. Portal layouts have their own `screen_origin` and `namespace_id` to avoid widget ID collisions. Applications own portal layout lifecycle — create on threshold entry, drop on exit. No akar-owned registry or eviction policy.
+
+Canvas text is display-only: no focus, no widget identity, no input. It does not create layout nodes or text-buffer IDs. Use portal mode when interactive text or child components are needed.
+
+The `examples/canvas-basic-rust/` example demonstrates the full LOD + portal pattern with dot, outline+summary, preview, and interactive portal levels.
+
+Renderer limitation: glyphon text renders after quads globally (not per-draw-call ordered). Strict quad/text interleaving within a frame requires a separate renderer architecture change.
+
 ### What akar does NOT own
 
 - The window and swap chain — developer provides these.

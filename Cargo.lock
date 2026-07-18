@@ -345,6 +345,7 @@ dependencies = [
  "akar-core",
  "akar-layout",
  "akar-winit",
+ "glam",
  "pollster",
  "wgpu",
  "winit",

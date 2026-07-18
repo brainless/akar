@@ -28,7 +28,10 @@ pub fn stat(
         return;
     }
 
-    let key = layout.widget_id(node_id).wrapping_mul(3).wrapping_add(2_000_000);
+    let key = layout
+        .widget_id(node_id)
+        .wrapping_mul(3)
+        .wrapping_add(2_000_000);
     let lh_sm = theme.font_size_sm * 1.2;
     let lh_lg = theme.font_size_lg * 1.2;
 

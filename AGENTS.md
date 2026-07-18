@@ -173,6 +173,22 @@ For scroll containers and list components:
 - Expose `list_clip(total, item_height, scroll_y)` so developers can avoid submitting off-screen items entirely.
 - Do not call `glyphon::Buffer::shape_until_scroll` for items outside the scissor rect.
 
+## Canvas and portal guidance
+
+When working with canvas changes, verify at one overview level and one interactive-portal level using screenshots. Use `--component` or `--screenshot` with `examples/canvas-basic-rust/`.
+
+Low-detail canvas interaction is group-level only — hover/press/click on the whole object, not child widgets. `CanvasInput` operates on `WorldRect` bounds.
+
+Canvas text is display-only. It never creates focus, widget state, or text-buffer IDs. Use portal mode for interactive text inputs, selects, buttons, or any component requiring child interaction.
+
+`canvas_portal_begin/end` push/pop scissors. The portal subtree renders through normal component APIs — no canvas-specific component variants needed. Portal layouts must use unique `namespace_id` values to avoid widget ID collisions.
+
+The scissor stack intersects automatically. A portal inside a canvas is clipped to both the portal bounds and the canvas bounds.
+
+glyphon text renders after quads globally. Do not expect strict quad/text ordering within a frame — this is a known renderer limitation.
+
+Reference: `examples/canvas-basic-rust/` for the canonical LOD + portal pattern.
+
 ## Testing approach
 
 - No live GPU in CI — component logic and layout resolution must be testable without a real wgpu device.

@@ -17,6 +17,7 @@ The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-
 - **Layout via Flexbox.** Built on [taffy](https://github.com/DioxusLabs/taffy): the same CSS Flexbox model you already know, resolved to pixel coordinates before draw calls.
 - **Virtualization first.** Infinite scroll and large data grids are first-class via a list-clipper API. The library never renders what is off-screen.
 - **Built by agents, debuggable by agents.** akar is primarily written by coding agents, and is designed to be used by other projects that need a cross-platform UI framework which works and debugs well for agents — especially multi-modal LLMs. The `demo-rust` binary ships with a complete visual debug toolchain (screenshot capture, scripted input injection, layout/frame inspection, component isolation, and a diff tool) so an agent can see, isolate, and iterate on its UI with no human in the loop.
+- **Canvas LOD with component portals.** The canvas supports overview-to-detail rendering: objects show progressively richer representations (dot, outline, summary, preview) as their projected screen size increases. At sufficient detail, an object promotes to a normal screen-space portal where standard akar components (buttons, inputs, selects) work unchanged. See `DEVELOP.md` and `examples/canvas-basic-rust/` for details.
 
 ## For whom
 
