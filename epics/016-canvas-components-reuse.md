@@ -1,6 +1,6 @@
 # Epic 016: Canvas Level of Detail and Component Portals
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Make canvas useful for large, zoomable collections of UI-like objects without turning it into a second general-purpose UI layout system. Canvas objects render application-defined low-detail representations, including styled display text, while zoomed out; when an object has enough projected screen space, the application may render its normal akar layout and components through a canvas-attached screen-space portal.
 
 **Prerequisite:** Epic 004 (Canvas) is `Status: Done`.
@@ -270,6 +270,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 ### Task 6: Update `DEVELOP.md`
 
+**Status:** Done
+
 **File:** `DEVELOP.md`
 
 **Work:**
@@ -283,6 +285,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 ### Task 7: Update `README.md`
 
+**Status:** Done
+
 **File:** `README.md`
 
 **Work:**
@@ -294,6 +298,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 **Acceptance criteria:** README accurately communicates the feature without implying a retained scene graph or a mandatory zoom policy.
 
 ### Task 8: Update `AGENTS.md`
+
+**Status:** Done
 
 **File:** `AGENTS.md`
 
@@ -341,4 +347,4 @@ For smooth transitions, applications can use projected dimensions directly to ca
 - [x] Existing screen-space component APIs remain backward compatible.
 - [x] The canvas-basic example demonstrates all levels and captures overview plus interactive verification states.
 - [x] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
-- [ ] `DEVELOP.md`, `README.md`, and `AGENTS.md` are updated when the implementation lands.
+- [x] `DEVELOP.md`, `README.md`, and `AGENTS.md` are updated when the implementation lands.
