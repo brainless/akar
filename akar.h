@@ -111,6 +111,37 @@ typedef struct AkarTextInputResponse {
     uint32_t new_cursor_pos;
 } AkarTextInputResponse;
 
+typedef struct AkarDataItemStyle {
+    float surface[4];
+    float padding_x;
+    float padding_y;
+    float spacing;
+    float color_normal[4];
+    float color_hover[4];
+    float color_pressed[4];
+    float color_selected[4];
+    float corner_radius;
+    float border_width;
+    float border_color[4];
+} AkarDataItemStyle;
+
+typedef struct AkarDataItemResponse {
+    bool hovered;
+    bool pressed;
+    bool clicked;
+} AkarDataItemResponse;
+
+typedef struct AkarDataListResponse {
+    float viewport_rect[4];
+    float content_origin[2];
+    uint32_t visible_range_start;
+    uint32_t visible_range_end;
+} AkarDataListResponse;
+
+typedef struct AkarDataListState {
+    float scroll_y;
+} AkarDataListState;
+
 typedef struct AkarTextAreaResponse {
     bool changed;
     uint32_t new_cursor_pos;
@@ -316,6 +347,23 @@ struct AkarTextInputResponse akar_text_input(struct AkarCtx *ctx,
                                              uint32_t *cursor_pos,
                                              const char *placeholder,
                                              bool cursor_visible);
+
+void akar_data_item_style_default(struct AkarCtx *ctx, struct AkarDataItemStyle *style_out);
+
+struct AkarDataItemResponse akar_data_item(struct AkarCtx *ctx,
+                                           uint64_t node_id,
+                                           uint64_t key,
+                                           const struct AkarDataItemStyle *style);
+
+struct AkarDataListResponse akar_data_list_begin(struct AkarCtx *ctx,
+                                                 uint64_t node_id,
+                                                 struct AkarDataListState *state,
+                                                 uint32_t item_count,
+                                                 float item_height,
+                                                 const uint64_t *keys,
+                                                 uint32_t key_count);
+
+void akar_data_list_end(struct AkarCtx *ctx);
 
 struct AkarTextAreaResponse akar_textarea(struct AkarCtx *ctx,
                                           uint64_t node_id,

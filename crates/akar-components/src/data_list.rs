@@ -228,8 +228,10 @@ mod tests {
         let list_rect = layout.rect(node);
         let expected_x = outer_rect[0].max(list_rect[0]);
         let expected_y = outer_rect[1].max(list_rect[1]);
-        let expected_w = (outer_rect[0] + outer_rect[2]).min(list_rect[0] + list_rect[2]) - expected_x;
-        let expected_h = (outer_rect[1] + outer_rect[3]).min(list_rect[1] + list_rect[3]) - expected_y;
+        let expected_w =
+            (outer_rect[0] + outer_rect[2]).min(list_rect[0] + list_rect[2]) - expected_x;
+        let expected_h =
+            (outer_rect[1] + outer_rect[3]).min(list_rect[1] + list_rect[3]) - expected_y;
         assert_eq!(inner, [expected_x, expected_y, expected_w, expected_h]);
 
         data_list_end(&mut core);
