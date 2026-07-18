@@ -1,12 +1,15 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use akar_components::{
-    akar_container, canvas_begin, canvas_end, is_visible_world, BoxStyle, CanvasConfig,
-    CanvasState, AKAR_THEME_DARK,
+    akar_button, akar_container, akar_label, akar_text_input, button::ButtonVariant, canvas_begin,
+    canvas_end, canvas_portal_begin, canvas_portal_end, is_visible_world, BoxStyle, CanvasAlign,
+    CanvasConfig, CanvasInput, CanvasOverflow, CanvasState, CanvasTextStyle, AKAR_THEME_DARK,
 };
 use akar_core::AkarCore;
-use akar_layout::{Layout, PageConfig, Size, WorldRect};
+use akar_layout::{length, Layout, NodeId, PageConfig, Size, Style, WorldRect};
 use akar_winit::process_window_event;
+use glam::Vec2;
 use wgpu::{
     CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
 };
@@ -18,9 +21,26 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+const LOD_THRESHOLDS: [f32; 3] = [48.0, 120.0, 220.0];
+
 struct DemoObject {
     bounds: WorldRect,
     fill: u32,
+    name: &'static str,
+}
+
+struct ObjectState {
+    button_clicked: bool,
+    text_value: String,
+    text_cursor: usize,
+}
+
+struct PortalLayout {
+    layout: Layout,
+    root: NodeId,
+    label_node: NodeId,
+    button_node: NodeId,
+    input_node: NodeId,
 }
 
 struct AppState {
@@ -33,6 +53,8 @@ struct AppState {
     layout: Layout,
     page: akar_layout::PageLayout,
     canvas_state: CanvasState,
+    portal_layouts: HashMap<usize, PortalLayout>,
+    object_states: Vec<ObjectState>,
 }
 
 fn main() {
@@ -51,7 +73,7 @@ impl ApplicationHandler for App {
         }
 
         let window_attrs = WindowAttributes::default()
-            .with_title("akar canvas demo")
+            .with_title("akar canvas portal demo")
             .with_inner_size(LogicalSize::new(800.0, 600.0));
         let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
 
@@ -89,6 +111,14 @@ impl ApplicationHandler for App {
 
         let canvas_state = CanvasState::new();
 
+        let object_states = (0..5)
+            .map(|_| ObjectState {
+                button_clicked: false,
+                text_value: String::new(),
+                text_cursor: 0,
+            })
+            .collect();
+
         self.state = Some(AppState {
             window,
             device,
@@ -99,6 +129,8 @@ impl ApplicationHandler for App {
             layout,
             page,
             canvas_state,
+            portal_layouts: HashMap::new(),
+            object_states,
         });
     }
 
@@ -149,22 +181,27 @@ impl ApplicationHandler for App {
                     DemoObject {
                         bounds: WorldRect::from_xywh(-180.0, -80.0, 120.0, 60.0),
                         fill: 0x3B82F6FF,
+                        name: "Server Alpha",
                     },
                     DemoObject {
                         bounds: WorldRect::from_xywh(80.0, -80.0, 120.0, 60.0),
                         fill: 0x10B981FF,
+                        name: "Database Beta",
                     },
                     DemoObject {
                         bounds: WorldRect::from_xywh(-60.0, 40.0, 120.0, 60.0),
                         fill: 0xF59E0BFF,
+                        name: "Cache Gamma",
                     },
                     DemoObject {
                         bounds: WorldRect::from_xywh(-280.0, 60.0, 80.0, 80.0),
                         fill: 0xEF4444FF,
+                        name: "Gateway Delta",
                     },
                     DemoObject {
                         bounds: WorldRect::from_xywh(200.0, 20.0, 100.0, 100.0),
                         fill: 0x8B5CF6FF,
+                        name: "Worker Epsilon",
                     },
                 ];
 
@@ -177,13 +214,261 @@ impl ApplicationHandler for App {
                     &config,
                 );
 
+                let canvas_input = CanvasInput::new(&state.core.input, &response.screen_to_world);
+
+                let summary_style = CanvasTextStyle {
+                    font_size: 10.0,
+                    color: 0xFFFFFFFF,
+                    background: Some(0x00000080),
+                    padding: [2.0, 4.0, 2.0, 4.0],
+                    align_x: CanvasAlign::Center,
+                    overflow: CanvasOverflow::Truncate,
+                };
+
+                let preview_style = CanvasTextStyle {
+                    font_size: 12.0,
+                    color: 0xFFFFFFFF,
+                    background: None,
+                    padding: [4.0, 6.0, 4.0, 6.0],
+                    align_x: CanvasAlign::Center,
+                    overflow: CanvasOverflow::Clip,
+                };
+
+                let theme = &AKAR_THEME_DARK;
+
                 for obj in &objects {
-                    if is_visible_world(response.visible_world_rect, obj.bounds) {
-                        painter.push_quad(obj.bounds, obj.fill, 0x00000000, 0.0, [8.0; 4], 0.0);
+                    if !is_visible_world(response.visible_world_rect, obj.bounds) {
+                        continue;
+                    }
+
+                    let lod = response.lod_index(obj.bounds, &LOD_THRESHOLDS);
+                    let hovered = canvas_input.is_hovering(obj.bounds);
+
+                    match lod {
+                        0 => {
+                            let center = Vec2::new(
+                                (obj.bounds.min.x + obj.bounds.max.x) * 0.5,
+                                (obj.bounds.min.y + obj.bounds.max.y) * 0.5,
+                            );
+                            let dot_size = 4.0;
+                            let dot = WorldRect::from_xywh(
+                                center.x - dot_size * 0.5,
+                                center.y - dot_size * 0.5,
+                                dot_size,
+                                dot_size,
+                            );
+                            let fill = if hovered { 0xFFFFFFFF } else { obj.fill };
+                            painter.push_quad(dot, fill, 0x00000000, 0.0, [2.0; 4], 0.0);
+                        }
+                        1 => {
+                            let border = if hovered { 0xFFFFFFFF } else { obj.fill };
+                            painter.push_quad(obj.bounds, 0x00000000, border, 2.0, [4.0; 4], 0.0);
+                            painter.push_text(obj.bounds, obj.name, &summary_style);
+                        }
+                        2 => {
+                            let fill = if hovered {
+                                let r = ((obj.fill >> 24) & 0xFF) as f32;
+                                let g = ((obj.fill >> 16) & 0xFF) as f32;
+                                let b = ((obj.fill >> 8) & 0xFF) as f32;
+                                let a = obj.fill & 0xFF;
+                                let brighten = 1.2;
+                                let nr = (r * brighten).min(255.0) as u32;
+                                let ng = (g * brighten).min(255.0) as u32;
+                                let nb = (b * brighten).min(255.0) as u32;
+                                (nr << 24) | (ng << 16) | (nb << 8) | a
+                            } else {
+                                obj.fill
+                            };
+                            painter.push_quad(obj.bounds, fill, 0x00000000, 0.0, [8.0; 4], 0.0);
+                            let label_bounds = WorldRect::from_xywh(
+                                obj.bounds.min.x,
+                                obj.bounds.min.y,
+                                obj.bounds.max.x - obj.bounds.min.x,
+                                20.0,
+                            );
+                            painter.push_text(label_bounds, obj.name, &preview_style);
+                        }
+                        _ => {
+                            painter.push_quad(obj.bounds, obj.fill, 0x00000000, 0.0, [8.0; 4], 0.0);
+                        }
                     }
                 }
 
                 canvas_end(&mut state.core, painter);
+
+                let objects_for_portal = [
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-180.0, -80.0, 120.0, 60.0),
+                        fill: 0x3B82F6FF,
+                        name: "Server Alpha",
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(80.0, -80.0, 120.0, 60.0),
+                        fill: 0x10B981FF,
+                        name: "Database Beta",
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-60.0, 40.0, 120.0, 60.0),
+                        fill: 0xF59E0BFF,
+                        name: "Cache Gamma",
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(-280.0, 60.0, 80.0, 80.0),
+                        fill: 0xEF4444FF,
+                        name: "Gateway Delta",
+                    },
+                    DemoObject {
+                        bounds: WorldRect::from_xywh(200.0, 20.0, 100.0, 100.0),
+                        fill: 0x8B5CF6FF,
+                        name: "Worker Epsilon",
+                    },
+                ];
+
+                let (core, portal_layouts, object_states) = (
+                    &mut state.core,
+                    &mut state.portal_layouts,
+                    &mut state.object_states,
+                );
+
+                for (i, obj) in objects_for_portal.iter().enumerate() {
+                    if !is_visible_world(response.visible_world_rect, obj.bounds) {
+                        continue;
+                    }
+
+                    let lod = response.lod_index(obj.bounds, &LOD_THRESHOLDS);
+                    if lod < 3 {
+                        continue;
+                    }
+
+                    let projected = response.project(obj.bounds);
+                    if !projected.visible {
+                        continue;
+                    }
+
+                    let sr = projected.screen_rect;
+                    let portal_w = sr[2];
+                    let portal_h = sr[3];
+                    if portal_w < 1.0 || portal_h < 1.0 {
+                        continue;
+                    }
+
+                    let portal = portal_layouts.entry(i).or_insert_with(|| {
+                        let mut pl = Layout::new();
+                        pl.set_namespace_id(i as u64 + 1);
+
+                        let root = pl.new_with_children(
+                            Style {
+                                display: akar_layout::Display::Flex,
+                                flex_direction: akar_layout::FlexDirection::Column,
+                                ..Default::default()
+                            },
+                            &[],
+                        );
+
+                        let label_node = pl.new_leaf(Style {
+                            size: Size {
+                                width: akar_layout::Dimension::percent(1.0),
+                                height: length(24.0),
+                            },
+                            ..Default::default()
+                        });
+
+                        let button_node = pl.new_leaf(Style {
+                            size: Size {
+                                width: akar_layout::Dimension::percent(1.0),
+                                height: length(32.0),
+                            },
+                            ..Default::default()
+                        });
+
+                        let input_node = pl.new_leaf(Style {
+                            size: Size {
+                                width: akar_layout::Dimension::percent(1.0),
+                                height: length(32.0),
+                            },
+                            ..Default::default()
+                        });
+
+                        pl.set_children(root, &[label_node, button_node, input_node]);
+
+                        PortalLayout {
+                            layout: pl,
+                            root,
+                            label_node,
+                            button_node,
+                            input_node,
+                        }
+                    });
+
+                    portal.layout.set_screen_origin([sr[0], sr[1]]);
+                    portal.layout.set_style(
+                        portal.root,
+                        Style {
+                            display: akar_layout::Display::Flex,
+                            flex_direction: akar_layout::FlexDirection::Column,
+                            size: Size {
+                                width: length(portal_w),
+                                height: length(portal_h),
+                            },
+                            padding: akar_layout::Rect {
+                                top: length(8.0),
+                                right: length(8.0),
+                                bottom: length(8.0),
+                                left: length(8.0),
+                            },
+                            ..Default::default()
+                        },
+                    );
+
+                    portal.layout.compute(
+                        portal.root,
+                        (Some(portal_w), Some(portal_h)),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+
+                    let guard = canvas_portal_begin(core, &portal.layout, portal.root);
+
+                    akar_container(core, &portal.layout, portal.root, &BoxStyle::panel(theme));
+
+                    akar_label(
+                        core,
+                        &portal.layout,
+                        portal.label_node,
+                        obj.name,
+                        theme.base_content,
+                        theme,
+                    );
+
+                    let btn = akar_button(
+                        core,
+                        &portal.layout,
+                        portal.button_node,
+                        if object_states[i].button_clicked {
+                            "Clicked!"
+                        } else {
+                            "Click me"
+                        },
+                        ButtonVariant::Solid,
+                        theme,
+                    );
+                    if btn.clicked {
+                        object_states[i].button_clicked = !object_states[i].button_clicked;
+                    }
+
+                    let obj_state = &mut object_states[i];
+                    let _ = akar_text_input(
+                        core,
+                        &portal.layout,
+                        portal.input_node,
+                        &mut obj_state.text_value,
+                        &mut obj_state.text_cursor,
+                        "Type here...",
+                        true,
+                        theme,
+                    );
+
+                    canvas_portal_end(core, guard);
+                }
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,

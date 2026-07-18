@@ -8,6 +8,7 @@ akar-core = { path = "../../crates/akar-core" }
 akar-layout = { path = "../../crates/akar-layout" }
 akar-components = { path = "../../crates/akar-components" }
 akar-winit = { path = "../../crates/akar-winit" }
+glam = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }
 pollster = "0.4"
