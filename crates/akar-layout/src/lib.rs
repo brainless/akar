@@ -58,6 +58,11 @@ impl Layout {
         mix_widget_id(self.namespace_id ^ local.rotate_left(29)) & !(1 << 63)
     }
 
+    pub fn widget_id_keyed(&self, node: NodeId, key: u64) -> u64 {
+        let local: u64 = node.into();
+        mix_widget_id(self.namespace_id ^ key ^ local.rotate_left(29)) & !(1 << 63)
+    }
+
     pub fn register_label(&mut self, name: &str, node: NodeId) {
         self.labels.insert(name.to_string(), node);
     }
@@ -960,5 +965,81 @@ mod tests {
             id_first, id_second,
             "same namespace + same local node = same widget ID"
         );
+    }
+
+    #[test]
+    fn widget_id_keyed_different_keys_produce_different_ids() {
+        let mut layout = Layout::new();
+        layout.set_namespace_id(0);
+        let node = layout.new_leaf(Style::default());
+
+        let id_a = layout.widget_id_keyed(node, 1000);
+        let id_b = layout.widget_id_keyed(node, 2000);
+
+        assert_ne!(
+            id_a, id_b,
+            "different keys must produce different widget IDs"
+        );
+    }
+
+    #[test]
+    fn widget_id_keyed_same_key_produces_same_id() {
+        let mut layout_a = Layout::new();
+        layout_a.set_namespace_id(0);
+        let node_a = layout_a.new_leaf(Style::default());
+        let id_first = layout_a.widget_id_keyed(node_a, 42);
+
+        let mut layout_b = Layout::new();
+        layout_b.set_namespace_id(0);
+        let local_idx: u64 = node_a.into();
+        let node_b: NodeId = local_idx.into();
+        let id_second = layout_b.widget_id_keyed(node_b, 42);
+
+        assert_eq!(
+            id_first, id_second,
+            "same key + same local node = same widget ID"
+        );
+    }
+
+    #[test]
+    fn widget_id_keyed_composes_with_namespace() {
+        let mut layout_a = Layout::new();
+        layout_a.set_namespace_id(100);
+        let node_a = layout_a.new_leaf(Style::default());
+        let id_a = layout_a.widget_id_keyed(node_a, 42);
+
+        let mut layout_b = Layout::new();
+        layout_b.set_namespace_id(200);
+        let local_idx: u64 = node_a.into();
+        let node_b: NodeId = local_idx.into();
+        let id_b = layout_b.widget_id_keyed(node_b, 42);
+
+        assert_ne!(
+            id_a, id_b,
+            "different namespaces must produce different keyed IDs"
+        );
+    }
+
+    #[test]
+    fn widget_id_keyed_differs_from_plain_widget_id() {
+        let mut layout = Layout::new();
+        layout.set_namespace_id(0);
+        let node = layout.new_leaf(Style::default());
+
+        let plain = layout.widget_id(node);
+        let keyed = layout.widget_id_keyed(node, 12345);
+
+        assert_ne!(plain, keyed, "keyed ID should differ from plain widget ID");
+    }
+
+    #[test]
+    fn widget_id_keyed_high_bit_cleared() {
+        let mut layout = Layout::new();
+        layout.set_namespace_id(u64::MAX);
+        let node = layout.new_leaf(Style::default());
+
+        let id = layout.widget_id_keyed(node, u64::MAX);
+
+        assert_eq!(id >> 63, 0, "high bit must be cleared");
     }
 }

@@ -1,6 +1,6 @@
 # Epic 017: Reusable Data Items and Lists
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Provide application-agnostic data-item and list primitives that work in ordinary akar layouts and have a deliberate canvas LOD path, without importing application data models or creating a second transformed-component renderer.
 
 **Prerequisite:** Epic 016 (Canvas Level of Detail and Component Portals) is `Status: Done`.
@@ -34,6 +34,19 @@ The solution must preserve two existing architecture boundaries:
 - Applications create the child layout and render ordinary components for title, supporting text, badges, avatars, buttons, and custom content.
 - The item response does not mutate selection. Single-select, multi-select, range-select, and navigation remain application policy.
 - Every item needs a stable caller-provided key wherever state or identity is required.
+
+### ADR-016a: Virtualized Item Identity Is Keyed, Not Positional
+
+**Decision:** Widget identity inside a virtualized list is composed from three parts: `namespace_id` (portal instance), a caller-provided stable item key (record identity), and the local structural node id (which child within the item). The existing `Layout::widget_id(node)` composes only the first and third and is not sufficient for virtualized items.
+
+**Rationale:** Immediate-mode rebuilding means a given screen row (structural position) can hold a different record after every scroll or data mutation. If identity is derived from structural position alone, stateful child widgets — focus, text-input buffers, cursor position — silently attach to a screen position instead of the record occupying it. This is a correctness bug specific to virtualization (a static, non-scrolling layout does not have this problem, which is why it was not caught by the existing portal namespace mechanism), not a hypothetical edge case, and downstream applications depend on virtualized lists being correct under scrolling with focused/edited rows.
+
+**Consequences:**
+
+- `data_item` and any focusable child rendered inside it must be identified through a keyed path (e.g. `Layout::widget_id_keyed(node, key)`), not the plain `widget_id(node)` used elsewhere.
+- `data_list` requires a caller-provided key per visible item (e.g. via `key_for(index)` or keys passed alongside the visible range) — `item_count` alone is not sufficient.
+- Scrolling a list such that a screen row now renders a different record must not carry over focus or text-buffer state from the previous occupant of that row.
+- This changes the public API surface in `data_item`/`data_list` from the earlier sketch: a key parameter is required, not optional polish.
 
 ### ADR-017: Lists Are Layout Scopes With Caller-Driven Rendering
 
@@ -85,6 +98,7 @@ pub fn data_item(
     core: &mut AkarCore,
     layout: &Layout,
     node: NodeId,
+    key: u64,
     style: &DataItemStyle,
 ) -> DataItemResponse;
 
@@ -104,7 +118,7 @@ pub fn data_list_begin(
 pub fn data_list_end(core: &mut AkarCore);
 ```
 
-The caller creates the list root and each visible item subtree, then invokes ordinary components inside each item. The final design must establish where item keys participate in widget identity and must not accidentally reuse text-input/focus IDs between virtualized rows.
+`key` is the caller's stable record identity (e.g. a hash of a database id or content key), not the row's screen position. The caller creates the list root and each visible item subtree, then invokes ordinary components inside each item, passing the same `key` (or a value derived from it) to any focusable child so it can be identified via `Layout::widget_id_keyed` rather than plain `widget_id`. See ADR-016a: this key is required, not optional — without it, focus and text-buffer state attach to the row's structural position instead of its record and corrupt on scroll.
 
 For canvas summary levels, an item descriptor should carry only display-oriented fields, for example title, supporting text, metadata, and a style. It is not a generic nested component tree. At interactive detail, callers create or retrieve a portal-local `Layout`, set its screen origin and stable namespace, and use the normal item/list APIs inside the portal.
 
@@ -112,14 +126,14 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 ## Implementation Tasks
 
-### Task 1: API Design and Identity Contract
+### Task 1: API Design and Identity Contract ✅
 
 **Files:**
 
 - `crates/akar-components/src/data_item.rs` (new)
 - `crates/akar-components/src/data_list.rs` (new)
 - `crates/akar-components/src/lib.rs`
-- `crates/akar-layout/src/lib.rs` if identity support is needed
+- `crates/akar-layout/src/lib.rs` — added `widget_id_keyed`
 
 **Work:**
 
@@ -130,9 +144,10 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- The API can express a commit, message, tweet, and search-result item without an akar-owned record enum.
-- Two visible items with identical local layout node IDs cannot collide in focus or text-buffer identity.
-- The API does not require a Rust closure to render list items.
+- [x] The API can express a commit, message, tweet, and search-result item without an akar-owned record enum.
+- [x] Two visible items with identical local layout node IDs cannot collide in focus or text-buffer identity.
+- [ ] Scrolling a virtualized list such that a screen row now renders a different record does not carry over focus or text-buffer state from the previous record at that position (see ADR-016a). This must be covered by a test that scrolls a list with a focused/edited row and asserts the new occupant is not focused/pre-filled.
+- [x] The API does not require a Rust closure to render list items.
 
 ### Task 2: Layout Data Item
 
@@ -169,6 +184,7 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 2. Expose a padded visible range and content origin suitable for callers to construct only visible item layouts.
 3. Confirm nesting with scroll areas, portals, and canvas scissors.
 4. Document the fixed-height constraint and the supported fallback for variable-height data.
+5. Require and thread a per-item key (see ADR-016a) alongside the visible range — the caller supplies `key_for(index)` or an equivalent keyed source, and `data_list` must make it straightforward to pass that key into each visible item's `data_item` call. `item_count` alone must not be treated as sufficient identity.
 
 **Acceptance criteria:**
 
@@ -176,6 +192,7 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - Scroll offsets clamp correctly for empty, short, and long lists.
 - The list scissor is restored after end, including when nested in a portal.
 - Unit tests cover range boundaries, scroll input, and nested scissors.
+- A unit test scrolls the visible range by one item, renders a focused/edited item at the boundary row, and confirms focus/text-buffer state does not transfer to the newly visible record at that position.
 
 ### Task 4: Canvas Data-Item Summary Helper
 
@@ -266,6 +283,6 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [ ] Fixed-height lists clip and virtualize correctly in a normal layout and in a portal.
 - [ ] Canvas summaries use display-only text and group interaction only.
 - [ ] Full interactive items in a canvas use a clipped portal with ordinary components.
-- [ ] Item and child-widget identity remains stable and collision-free across virtualized rows and portal layouts.
+- [ ] Item and child-widget identity remains stable and collision-free across virtualized rows and portal layouts, keyed by caller-provided record identity rather than screen position (ADR-016a) — verified by a scroll-and-refocus test, not just a same-frame collision test.
 - [ ] The C ABI follows the generated-header contract.
 - [ ] Formatting, clippy, tests, and representative visual captures pass.
