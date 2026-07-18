@@ -1,4 +1,4 @@
-use akar_core::AkarCore;
+use akar_core::{AkarCore, QuadCall};
 use akar_layout::{Layout, NodeId};
 
 use crate::AkarTheme;
@@ -36,6 +36,16 @@ impl DataItemStyle {
             border_color: color_to_f32(theme.base_300),
         }
     }
+
+    fn fill_for_state(&self, hovered: bool, pressed: bool) -> [f32; 4] {
+        if pressed {
+            self.color_pressed
+        } else if hovered {
+            self.color_hover
+        } else {
+            self.color_normal
+        }
+    }
 }
 
 impl Default for DataItemStyle {
@@ -55,7 +65,7 @@ pub fn data_item(
     layout: &Layout,
     node: NodeId,
     _key: u64,
-    _style: &DataItemStyle,
+    style: &DataItemStyle,
 ) -> DataItemResponse {
     let rect = layout.rect(node);
 
@@ -70,6 +80,23 @@ pub fn data_item(
     let hovered = core.input.is_hovering(rect);
     let pressed = core.input.is_pressed(rect);
     let clicked = core.input.is_clicked(rect);
+
+    let fill = style.fill_for_state(hovered, pressed);
+    if fill[3] > 0.0 || (style.border_width > 0.0 && style.border_color[3] > 0.0) {
+        core.draw_list.push_quad(QuadCall {
+            rect,
+            fill,
+            border_color: style.border_color,
+            corner_radii: [style.corner_radius; 4],
+            border_width: style.border_width,
+            z: 0.0,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        });
+    }
 
     DataItemResponse {
         hovered,
@@ -169,5 +196,109 @@ mod tests {
         assert!(!result.hovered);
         assert!(!result.pressed);
         assert!(!result.clicked);
+    }
+
+    #[test]
+    fn nonzero_rect_submits_one_quad() {
+        let (layout, node_id) = sized_leaf(100.0, 50.0);
+        let mut core = AkarCore::mock();
+
+        data_item(&mut core, &layout, node_id, 0, &DataItemStyle::default());
+
+        assert_eq!(core.draw_list.sorted_quads().len(), 1);
+    }
+
+    #[test]
+    fn zero_area_submits_no_quads() {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style::default());
+        let mut core = AkarCore::mock();
+
+        data_item(&mut core, &layout, node_id, 0, &DataItemStyle::default());
+
+        assert!(core.draw_list.sorted_quads().is_empty());
+    }
+
+    #[test]
+    fn hover_changes_fill_color() {
+        let (layout, node_id) = sized_leaf(100.0, 50.0);
+        let style = DataItemStyle::default();
+
+        let mut core_normal = AkarCore::mock();
+        core_normal.input.set_mouse_pos(200.0, 200.0);
+        data_item(&mut core_normal, &layout, node_id, 0, &style);
+        let normal_fill = core_normal.draw_list.sorted_quads()[0].fill;
+
+        let mut core_hover = AkarCore::mock();
+        core_hover.input.set_mouse_pos(50.0, 25.0);
+        data_item(&mut core_hover, &layout, node_id, 0, &style);
+        let hover_fill = core_hover.draw_list.sorted_quads()[0].fill;
+
+        assert_ne!(normal_fill, hover_fill);
+    }
+
+    #[test]
+    fn pressed_changes_fill_color_vs_hover() {
+        let (layout, node_id) = sized_leaf(100.0, 50.0);
+        let style = DataItemStyle::default();
+
+        let mut core_hover = AkarCore::mock();
+        core_hover.input.set_mouse_pos(50.0, 25.0);
+        data_item(&mut core_hover, &layout, node_id, 0, &style);
+        let hover_fill = core_hover.draw_list.sorted_quads()[0].fill;
+
+        let mut core_pressed = AkarCore::mock();
+        core_pressed.input.set_mouse_pos(50.0, 25.0);
+        core_pressed.input.push_mouse_button(0, true);
+        data_item(&mut core_pressed, &layout, node_id, 0, &style);
+        let pressed_fill = core_pressed.draw_list.sorted_quads()[0].fill;
+
+        assert_ne!(hover_fill, pressed_fill);
+    }
+
+    #[test]
+    fn transparent_style_submits_no_quad() {
+        let (layout, node_id) = sized_leaf(100.0, 50.0);
+        let mut core = AkarCore::mock();
+        let style = DataItemStyle {
+            surface: [0.0; 4],
+            padding_x: 0.0,
+            padding_y: 0.0,
+            spacing: 0.0,
+            color_normal: [0.0; 4],
+            color_hover: [0.0; 4],
+            color_pressed: [0.0; 4],
+            color_selected: [0.0; 4],
+            corner_radius: 0.0,
+            border_width: 0.0,
+            border_color: [0.0; 4],
+        };
+
+        data_item(&mut core, &layout, node_id, 0, &style);
+
+        assert!(core.draw_list.sorted_quads().is_empty());
+    }
+
+    #[test]
+    fn border_only_style_submits_quad() {
+        let (layout, node_id) = sized_leaf(100.0, 50.0);
+        let mut core = AkarCore::mock();
+        let style = DataItemStyle {
+            surface: [0.0; 4],
+            padding_x: 0.0,
+            padding_y: 0.0,
+            spacing: 0.0,
+            color_normal: [0.0; 4],
+            color_hover: [0.0; 4],
+            color_pressed: [0.0; 4],
+            color_selected: [0.0; 4],
+            corner_radius: 0.0,
+            border_width: 1.0,
+            border_color: [1.0, 1.0, 1.0, 1.0],
+        };
+
+        data_item(&mut core, &layout, node_id, 0, &style);
+
+        assert_eq!(core.draw_list.sorted_quads().len(), 1);
     }
 }

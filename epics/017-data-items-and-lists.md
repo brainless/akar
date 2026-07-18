@@ -149,11 +149,11 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [ ] Scrolling a virtualized list such that a screen row now renders a different record does not carry over focus or text-buffer state from the previous record at that position (see ADR-016a). This must be covered by a test that scrolls a list with a focused/edited row and asserts the new occupant is not focused/pre-filled.
 - [x] The API does not require a Rust closure to render list items.
 
-### Task 2: Layout Data Item
+### Task 2: Layout Data Item ✅
 
 **Files:**
 
-- `crates/akar-components/src/data_item.rs` (new)
+- `crates/akar-components/src/data_item.rs` — fully rendered item shell
 - `crates/akar-components/src/theme.rs`
 - `crates/akar-components/src/lib.rs`
 
@@ -166,9 +166,9 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- The shell composes with labels, badges, avatars, buttons, and text inputs supplied by the caller.
-- Hover, press, and click behavior is unit-tested with `AkarCore::mock`.
-- Existing components and theme behavior remain backward compatible.
+- [x] The shell composes with labels, badges, avatars, buttons, and text inputs supplied by the caller.
+- [x] Hover, press, and click behavior is unit-tested with `AkarCore::mock`.
+- [x] Existing components and theme behavior remain backward compatible.
 
 ### Task 3: Fixed-Height Layout Data List
 
