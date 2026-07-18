@@ -150,6 +150,8 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 ### Task 1: Canvas Geometry, Projection, and Low-Detail Primitives
 
+**Status:** Done
+
 **Files:**
 
 - `crates/akar-components/src/canvas.rs`
