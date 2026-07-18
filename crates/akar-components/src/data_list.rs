@@ -12,6 +12,17 @@ pub struct DataListResponse {
     pub visible_keys: Vec<u64>,
 }
 
+/// Begins a fixed-height virtualized list scope.
+///
+/// All items must share the same `item_height`. Variable-height virtualization
+/// is out of scope; applications may use an unvirtualized layout list or an
+/// application-managed measurement/index until a dedicated follow-up is designed.
+///
+/// The caller must supply a stable per-item `keys` slice (record identity) so
+/// that `widget_id_keyed(node, key)` can be used for focusable children inside
+/// each visible item. Using plain `widget_id(node)` would tie widget identity
+/// to the screen row position and corrupt focus/text-buffer state on scroll
+/// (see ADR-016a).
 pub fn data_list_begin(
     core: &mut AkarCore,
     layout: &Layout,
@@ -197,5 +208,89 @@ mod tests {
             let idx = keys.iter().position(|&x| x == k).unwrap();
             assert!(resp.visible_range.contains(&idx));
         }
+    }
+
+    #[test]
+    fn nested_scissor_intersection_and_restore() {
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+
+        let outer_rect = [10.0, 10.0, 300.0, 300.0];
+        core.draw_list.push_scissor(outer_rect);
+
+        let (layout, node) = make_list_layout(200.0);
+        let keys = make_keys(10);
+        let mut state = DataListState { scroll_y: 0.0 };
+
+        data_list_begin(&mut core, &layout, node, &mut state, 10, 50.0, &keys);
+
+        let inner = core.draw_list.active_scissor().unwrap();
+        let list_rect = layout.rect(node);
+        let expected_x = outer_rect[0].max(list_rect[0]);
+        let expected_y = outer_rect[1].max(list_rect[1]);
+        let expected_w = (outer_rect[0] + outer_rect[2]).min(list_rect[0] + list_rect[2]) - expected_x;
+        let expected_h = (outer_rect[1] + outer_rect[3]).min(list_rect[1] + list_rect[3]) - expected_y;
+        assert_eq!(inner, [expected_x, expected_y, expected_w, expected_h]);
+
+        data_list_end(&mut core);
+
+        let restored = core.draw_list.active_scissor().unwrap();
+        assert_eq!(restored, [10.0, 10.0, 300.0, 300.0]);
+
+        core.draw_list.pop_scissor();
+        assert!(core.draw_list.active_scissor().is_none());
+    }
+
+    #[test]
+    fn adr016a_scroll_does_not_transfer_focus() {
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+
+        let (layout, node) = make_list_layout(200.0);
+        let keys = make_keys(20);
+        let mut state = DataListState { scroll_y: 0.0 };
+
+        let item_height = 50.0;
+        data_list_begin(&mut core, &layout, node, &mut state, 20, item_height, &keys);
+        let first_visible_idx = (state.scroll_y / item_height) as usize;
+        let first_key = keys[first_visible_idx];
+        let first_item_id = layout.widget_id_keyed(node, first_key);
+        core.input.focused_id = Some(first_item_id);
+        data_list_end(&mut core);
+
+        state.scroll_y = item_height;
+        core.draw_list.begin_frame(1.0);
+        data_list_begin(&mut core, &layout, node, &mut state, 20, item_height, &keys);
+        let new_first_visible_idx = (state.scroll_y / item_height) as usize;
+        let new_first_key = keys[new_first_visible_idx];
+        let new_first_item_id = layout.widget_id_keyed(node, new_first_key);
+        data_list_end(&mut core);
+
+        assert_ne!(first_key, new_first_key);
+        assert_ne!(core.input.focused_id, Some(new_first_item_id));
+    }
+
+    #[test]
+    fn scroll_consumed_only_when_hovering_inside() {
+        let mut core = AkarCore::mock();
+        let (layout, node) = make_list_layout(200.0);
+        let keys = make_keys(10);
+        let mut state = DataListState { scroll_y: 0.0 };
+        let rect = layout.rect(node);
+
+        core.draw_list.begin_frame(1.0);
+        core.input.set_mouse_pos(rect[0] - 10.0, rect[1] + 10.0);
+        core.input.push_scroll(0.0, -50.0);
+        data_list_begin(&mut core, &layout, node, &mut state, 10, 50.0, &keys);
+        data_list_end(&mut core);
+        assert_eq!(state.scroll_y, 0.0);
+
+        core.input.begin_frame();
+        core.draw_list.begin_frame(1.0);
+        core.input.set_mouse_pos(rect[0] + 10.0, rect[1] + 10.0);
+        core.input.push_scroll(0.0, -50.0);
+        data_list_begin(&mut core, &layout, node, &mut state, 10, 50.0, &keys);
+        data_list_end(&mut core);
+        assert_eq!(state.scroll_y, 50.0);
     }
 }

@@ -146,7 +146,7 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 - [x] The API can express a commit, message, tweet, and search-result item without an akar-owned record enum.
 - [x] Two visible items with identical local layout node IDs cannot collide in focus or text-buffer identity.
-- [ ] Scrolling a virtualized list such that a screen row now renders a different record does not carry over focus or text-buffer state from the previous record at that position (see ADR-016a). This must be covered by a test that scrolls a list with a focused/edited row and asserts the new occupant is not focused/pre-filled.
+- [x] Scrolling a virtualized list such that a screen row now renders a different record does not carry over focus or text-buffer state from the previous record at that position (see ADR-016a). This must be covered by a test that scrolls a list with a focused/edited row and asserts the new occupant is not focused/pre-filled.
 - [x] The API does not require a Rust closure to render list items.
 
 ### Task 2: Layout Data Item ✅
@@ -170,13 +170,13 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [x] Hover, press, and click behavior is unit-tested with `AkarCore::mock`.
 - [x] Existing components and theme behavior remain backward compatible.
 
-### Task 3: Fixed-Height Layout Data List
+### Task 3: Fixed-Height Layout Data List ✅
 
 **Files:**
 
-- `crates/akar-components/src/data_list.rs` (new)
+- `crates/akar-components/src/data_list.rs` — scissor, scroll, clamp, nested scissor, ADR-016a test
 - `crates/akar-components/src/lib.rs`
-- `crates/akar-core/src/lib.rs` only if `list_clip` must be generalized without breaking its public API
+- `crates/akar-core/src/lib.rs` — `list_clip` unchanged
 
 **Work:**
 
@@ -188,11 +188,11 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- No off-screen item is required to submit quads or shape text.
-- Scroll offsets clamp correctly for empty, short, and long lists.
-- The list scissor is restored after end, including when nested in a portal.
-- Unit tests cover range boundaries, scroll input, and nested scissors.
-- A unit test scrolls the visible range by one item, renders a focused/edited item at the boundary row, and confirms focus/text-buffer state does not transfer to the newly visible record at that position.
+- [x] No off-screen item is required to submit quads or shape text.
+- [x] Scroll offsets clamp correctly for empty, short, and long lists.
+- [x] The list scissor is restored after end, including when nested in a portal.
+- [x] Unit tests cover range boundaries, scroll input, and nested scissors.
+- [x] A unit test scrolls the visible range by one item, renders a focused/edited item at the boundary row, and confirms focus/text-buffer state does not transfer to the newly visible record at that position.
 
 ### Task 4: Canvas Data-Item Summary Helper
 
