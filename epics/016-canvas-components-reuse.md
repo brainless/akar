@@ -1,6 +1,6 @@
 # Epic 016: Canvas Level of Detail and Component Portals
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Make canvas useful for large, zoomable collections of UI-like objects without turning it into a second general-purpose UI layout system. Canvas objects render application-defined low-detail representations, including styled display text, while zoomed out; when an object has enough projected screen space, the application may render its normal akar layout and components through a canvas-attached screen-space portal.
 
 **Prerequisite:** Epic 004 (Canvas) is `Status: Done`.
@@ -57,6 +57,7 @@ Canvas-in-Canvas remains disallowed (ADR-008 from Epic 003).
 - Existing component functions require no behavior changes; they receive portal-resolved screen rects and use normal screen-space input.
 - Widget and text-buffer IDs must be namespaced by a `Layout`-owned ID namespace so separate local layouts cannot collide. A portal layout is initialized with a stable caller-provided canvas item ID.
 - Menus, tooltips, drawers, and modals remain screen-space overlay behavior. Their treatment outside the portal clip is an explicit application choice and is not required by this epic.
+- akar owns no registry, pool, or eviction policy for per-object portal `Layout` instances. The application owns the lifecycle: it creates a `Layout` when an object first crosses into the interactive threshold (e.g. keyed in its own `HashMap<ItemId, Layout>`), and drops it whenever it chooses (object leaves the threshold, scrolls out of view, is deleted). Because widget/text-buffer identity is derived solely from the caller-provided namespace ID and not from any akar-internal counter, an application may freely recreate a `Layout` for the same item ID across frames — including after a drop-and-recreate cycle — without losing focus or buffer stability for that item.
 
 ### ADR-014: Low-Detail Canvas Rendering Is Deliberately Limited
 
@@ -190,6 +191,7 @@ For smooth transitions, applications can use projected dimensions directly to ca
 
 - Portal child rects equal local Taffy results translated by the portal origin, while a default layout produces its existing rects unchanged.
 - Portal layouts with identical local node IDs produce distinct widget IDs.
+- A `Layout` dropped and later recreated with the same namespace ID produces the same `widget_id` for the same local node ID, confirming the application can freely manage portal `Layout` lifecycle (create on demand, drop on eviction) without an akar-owned registry.
 - Existing layout tests and APIs remain backward compatible.
 - `cargo test -p akar-layout` passes.
 
