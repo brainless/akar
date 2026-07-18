@@ -52,7 +52,10 @@ impl Layout {
 
     pub fn widget_id(&self, node: NodeId) -> u64 {
         let local: u64 = node.into();
-        self.namespace_id.wrapping_add(local)
+        if self.namespace_id == 0 {
+            return local;
+        }
+        mix_widget_id(self.namespace_id ^ local.rotate_left(29)) & !(1 << 63)
     }
 
     pub fn register_label(&mut self, name: &str, node: NodeId) {
@@ -181,6 +184,14 @@ impl Layout {
             l.size.height,
         ]
     }
+}
+
+fn mix_widget_id(mut value: u64) -> u64 {
+    value ^= value >> 30;
+    value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value ^= value >> 27;
+    value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
 }
 
 pub struct TwoColumnLayout {
@@ -813,6 +824,21 @@ mod tests {
     }
 
     #[test]
+    fn portal_widget_ids_do_not_overlap_when_local_nodes_differ() {
+        let mut layout_a = Layout::new();
+        layout_a.set_namespace_id(1);
+        let _root_a = layout_a.new_leaf(Style::default());
+        let input_a = layout_a.new_leaf(Style::default());
+
+        let mut layout_b = Layout::new();
+        layout_b.set_namespace_id(2);
+        let _root_b = layout_b.new_leaf(Style::default());
+        let button_b = layout_b.new_leaf(Style::default());
+
+        assert_ne!(layout_a.widget_id(input_a), layout_b.widget_id(button_b));
+    }
+
+    #[test]
     fn layout_drop_recreate_same_namespace_same_widget_id() {
         let local_node_idx: u64;
 
@@ -829,7 +855,10 @@ mod tests {
             layout.set_namespace_id(42);
             let node: NodeId = local_node_idx.into();
             let id = layout.widget_id(node);
-            assert_eq!(id, 42u64.wrapping_add(local_node_idx));
+            assert_eq!(
+                id,
+                mix_widget_id(42 ^ local_node_idx.rotate_left(29)) & !(1 << 63)
+            );
         }
     }
 

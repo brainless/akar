@@ -5,6 +5,10 @@ use akar_layout::{
     Layout, NodeId, WorldRect,
 };
 use glam::Vec2;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+const CANVAS_TEXT_NAMESPACE_BIT: u64 = 1 << 63;
+static NEXT_CANVAS_TEXT_SCOPE: AtomicU32 = AtomicU32::new(1);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PanButton {
@@ -35,6 +39,7 @@ pub struct CanvasState {
     pub pan: Vec2,
     pub zoom: f32,
     pub is_panning: bool,
+    text_buffer_scope: u32,
 }
 
 impl CanvasState {
@@ -43,6 +48,7 @@ impl CanvasState {
             pan: Vec2::ZERO,
             zoom: 1.0,
             is_panning: false,
+            text_buffer_scope: NEXT_CANVAS_TEXT_SCOPE.fetch_add(1, Ordering::Relaxed),
         }
     }
 
@@ -188,6 +194,7 @@ pub struct CanvasPainter {
     pub(crate) text_buffer: Vec<TextCallBuffer>,
     pub(crate) world_to_screen: CanvasTransform,
     pub(crate) canvas_rect: [f32; 4],
+    pub(crate) text_buffer_scope: u32,
 }
 
 impl CanvasPainter {
@@ -299,6 +306,7 @@ pub fn canvas_begin(
         text_buffer: Vec::new(),
         world_to_screen,
         canvas_rect: rect,
+        text_buffer_scope: state.text_buffer_scope,
     };
 
     (response, painter)
@@ -327,7 +335,8 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
         let line_height = font_size_px * 1.2;
         let metrics = glyphon::Metrics::new(font_size_px, line_height);
 
-        let buffer_id = u64::MAX - i as u64;
+        let buffer_id =
+            CANVAS_TEXT_NAMESPACE_BIT | ((painter.text_buffer_scope as u64) << 32) | i as u64;
         let padding = entry.style.padding;
         let pad_left = padding[3] * zoom;
         let pad_top = padding[0] * zoom;
@@ -404,25 +413,33 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
 
 pub struct CanvasPortalGuard {
     pub screen_rect: [f32; 4],
+    scissor_count: u8,
 }
 
 /// Push a scissor rect for a portal's projected screen bounds.
 ///
 /// Ordering: render buffered canvas content (`canvas_end`) before calling
-/// this. Render the portal subtree between begin and end. The portal's
-/// scissor composes with any existing canvas scissor via intersection.
+/// this. Render the portal subtree between begin and end. The portal is
+/// clipped to both its projected bounds and the canvas bounds.
 pub fn canvas_portal_begin(
     core: &mut AkarCore,
+    canvas: &CanvasResponse,
     portal_layout: &Layout,
     root_node: NodeId,
 ) -> CanvasPortalGuard {
     let screen_rect = portal_layout.rect(root_node);
+    core.draw_list.push_scissor(canvas.canvas_rect);
     core.draw_list.push_scissor(screen_rect);
-    CanvasPortalGuard { screen_rect }
+    CanvasPortalGuard {
+        screen_rect,
+        scissor_count: 2,
+    }
 }
 
-pub fn canvas_portal_end(core: &mut AkarCore, _guard: CanvasPortalGuard) {
-    core.draw_list.pop_scissor();
+pub fn canvas_portal_end(core: &mut AkarCore, guard: CanvasPortalGuard) {
+    for _ in 0..guard.scissor_count {
+        core.draw_list.pop_scissor();
+    }
 }
 
 pub fn is_visible_world(viewport: WorldRect, target: WorldRect) -> bool {
@@ -471,6 +488,7 @@ mod tests {
             pan: Vec2::ZERO,
             zoom: 0.15,
             is_panning: false,
+            text_buffer_scope: 1,
         };
         state.zoom_at_point(Vec2::new(400.0, 300.0), CANVAS, 0.1, 0.1, 5.0);
         assert!(state.zoom >= 0.1);
@@ -482,6 +500,7 @@ mod tests {
             pan: Vec2::ZERO,
             zoom: 4.9,
             is_panning: false,
+            text_buffer_scope: 1,
         };
         state.zoom_at_point(Vec2::new(400.0, 300.0), CANVAS, 10.0, 0.1, 5.0);
         assert!(state.zoom <= 5.0);
@@ -523,6 +542,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
         let world_rect = WorldRect {
             min: Vec2::new(-5.0, -5.0),
@@ -617,6 +637,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
         let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
         painter.push_quad(world_rect, 0xFF0000FF, 0x00000000, 2.0, [0.0; 4], 0.0);
@@ -631,6 +652,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
         let world_rect = WorldRect::from_xywh(-5.0, -5.0, 10.0, 10.0);
         painter.push_quad(
@@ -659,6 +681,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {
@@ -698,6 +721,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {
@@ -742,7 +766,8 @@ mod tests {
         core.begin_frame(800, 600, 1.0);
 
         let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
-        let guard = canvas_portal_begin(&mut core, &layout, root);
+        let canvas = make_response(Vec2::ZERO, 1.0);
+        let guard = canvas_portal_begin(&mut core, &canvas, &layout, root);
 
         let scissor = core.draw_list.active_scissor().unwrap();
         assert!(
@@ -776,7 +801,8 @@ mod tests {
         core.begin_frame(800, 600, 1.0);
 
         let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
-        let guard = canvas_portal_begin(&mut core, &layout, root);
+        let canvas = make_response(Vec2::ZERO, 1.0);
+        let guard = canvas_portal_begin(&mut core, &canvas, &layout, root);
         assert!(core.draw_list.active_scissor().is_some());
 
         canvas_portal_end(&mut core, guard);
@@ -794,7 +820,8 @@ mod tests {
         core.draw_list.push_scissor([0.0, 0.0, 800.0, 600.0]);
 
         let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
-        let guard = canvas_portal_begin(&mut core, &layout, root);
+        let canvas = make_response(Vec2::ZERO, 1.0);
+        let guard = canvas_portal_begin(&mut core, &canvas, &layout, root);
 
         let scissor = core.draw_list.active_scissor().unwrap();
         assert!(
@@ -827,12 +854,39 @@ mod tests {
     }
 
     #[test]
+    fn portal_is_clipped_to_canvas_after_canvas_end() {
+        let mut core = AkarCore::mock();
+        core.begin_frame(800, 600, 1.0);
+
+        let (layout, root) = make_portal_layout([100.0, 50.0, 300.0, 200.0]);
+        let mut canvas = make_response(Vec2::ZERO, 1.0);
+        canvas.canvas_rect = [0.0, 0.0, 200.0, 150.0];
+        let guard = canvas_portal_begin(&mut core, &canvas, &layout, root);
+
+        assert_eq!(
+            core.draw_list.active_scissor(),
+            Some([100.0, 50.0, 100.0, 100.0])
+        );
+
+        canvas_portal_end(&mut core, guard);
+        assert!(core.draw_list.active_scissor().is_none());
+    }
+
+    #[test]
+    fn canvas_states_use_distinct_text_buffer_scopes() {
+        let first = CanvasState::new();
+        let second = CanvasState::new();
+        assert_ne!(first.text_buffer_scope, second.text_buffer_scope);
+    }
+
+    #[test]
     fn portal_zero_area() {
         let mut core = AkarCore::mock();
         core.begin_frame(800, 600, 1.0);
 
         let (layout, root) = make_portal_layout([200.0, 100.0, 0.0, 0.0]);
-        let guard = canvas_portal_begin(&mut core, &layout, root);
+        let canvas = make_response(Vec2::ZERO, 1.0);
+        let guard = canvas_portal_begin(&mut core, &canvas, &layout, root);
 
         let scissor = core.draw_list.active_scissor().unwrap();
         assert_eq!(scissor[2], 0.0, "zero-width scissor");
@@ -903,6 +957,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {
@@ -934,6 +989,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {
@@ -977,6 +1033,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let left_style = CanvasTextStyle {
@@ -1029,6 +1086,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let left_style = CanvasTextStyle {
@@ -1081,6 +1139,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {
@@ -1123,6 +1182,7 @@ mod tests {
             text_buffer: Vec::new(),
             world_to_screen: w2s,
             canvas_rect: CANVAS,
+            text_buffer_scope: 1,
         };
 
         let style = CanvasTextStyle {

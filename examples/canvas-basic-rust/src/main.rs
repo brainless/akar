@@ -426,7 +426,7 @@ impl ApplicationHandler for App {
                         |_, _, _, _, _| Size::ZERO,
                     );
 
-                    let guard = canvas_portal_begin(core, &portal.layout, portal.root);
+                    let guard = canvas_portal_begin(core, &response, &portal.layout, portal.root);
 
                     akar_container(core, &portal.layout, portal.root, &BoxStyle::panel(theme));
 

@@ -348,3 +348,9 @@ For smooth transitions, applications can use projected dimensions directly to ca
 - [x] The canvas-basic example demonstrates all levels and captures overview plus interactive verification states.
 - [x] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
 - [x] `DEVELOP.md`, `README.md`, and `AGENTS.md` are updated when the implementation lands.
+
+## Post-completion Review
+
+**Status:** Done
+
+Follow-up review corrected portal widget-ID collisions, restored the canvas scissor around portal rendering after `canvas_end`, and assigned canvas display text a stable per-canvas buffer-ID scope. Regression coverage verifies each behavior.
