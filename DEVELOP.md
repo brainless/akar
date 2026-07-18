@@ -146,6 +146,16 @@ The `examples/canvas-basic-rust/` example demonstrates the full LOD + portal pat
 
 Renderer limitation: glyphon text renders after quads globally (not per-draw-call ordered). Strict quad/text interleaving within a frame requires a separate renderer architecture change.
 
+### Data items and lists
+
+Data items are presentation primitives, not records (ADR-016). akar does not define `Tweet`, `Message`, `Commit`, or any generic owned record type. A data item is a composable visual shell over caller-provided layout nodes and caller-owned content. The item response reports hover, press, and click state without retaining or mutating caller selection.
+
+Lists are fixed-height virtualized scopes with caller-owned scroll state (ADR-017). The caller supplies item count, row height, and stable per-item keys. `data_list_begin` returns the visible range and content origin; the caller renders only that range. Scroll position is caller-owned, allowing applications to persist, synchronize, or reset it deliberately. Variable-height virtualization is out of scope.
+
+Widget identity inside a virtualized list is keyed, not positional (ADR-016a). Identity is composed from `namespace_id`, a caller-provided stable item key (record identity), and the local structural node id. Using plain `widget_id(node)` ties identity to the screen row and corrupts focus/text-buffer state on scroll. Every focusable child rendered inside a data item must use `widget_id_keyed(node, key)`.
+
+Canvas summary items (`canvas_data_item`) are display-only. They render world-space backgrounds and textual fields through `CanvasPainter` with group-level hover/press/click via `CanvasInput`. They create no layout nodes, focusable widgets, text-buffer IDs, or child hit targets. Use portal mode (`canvas_portal_begin/end`) for interactive components inside a canvas.
+
 ### What akar does NOT own
 
 - The window and swap chain — developer provides these.

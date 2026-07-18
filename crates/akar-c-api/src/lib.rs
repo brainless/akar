@@ -1343,6 +1343,158 @@ pub struct AkarTextAreaResponse {
     pub new_cursor_pos: u32,
 }
 
+// ---- Data Item / Data List ----
+
+#[repr(C)]
+pub struct AkarDataItemStyle {
+    pub surface: [f32; 4],
+    pub padding_x: f32,
+    pub padding_y: f32,
+    pub spacing: f32,
+    pub color_normal: [f32; 4],
+    pub color_hover: [f32; 4],
+    pub color_pressed: [f32; 4],
+    pub color_selected: [f32; 4],
+    pub corner_radius: f32,
+    pub border_width: f32,
+    pub border_color: [f32; 4],
+}
+
+#[repr(C)]
+pub struct AkarDataItemResponse {
+    pub hovered: bool,
+    pub pressed: bool,
+    pub clicked: bool,
+}
+
+#[repr(C)]
+pub struct AkarDataListState {
+    pub scroll_y: f32,
+}
+
+#[repr(C)]
+pub struct AkarDataListResponse {
+    pub viewport_rect: [f32; 4],
+    pub content_origin: [f32; 2],
+    pub visible_range_start: u32,
+    pub visible_range_end: u32,
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_item_style_default(
+    ctx: *mut AkarCtx,
+    style_out: *mut AkarDataItemStyle,
+) {
+    let ctx = unsafe { &mut *ctx };
+    if style_out.is_null() {
+        return;
+    }
+    let s = akar_components::DataItemStyle::from_theme(&ctx.theme);
+    let out = unsafe { &mut *style_out };
+    out.surface = s.surface;
+    out.padding_x = s.padding_x;
+    out.padding_y = s.padding_y;
+    out.spacing = s.spacing;
+    out.color_normal = s.color_normal;
+    out.color_hover = s.color_hover;
+    out.color_pressed = s.color_pressed;
+    out.color_selected = s.color_selected;
+    out.corner_radius = s.corner_radius;
+    out.border_width = s.border_width;
+    out.border_color = s.border_color;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_item(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    key: u64,
+    style: *const AkarDataItemStyle,
+) -> AkarDataItemResponse {
+    let ctx = unsafe { &mut *ctx };
+    if style.is_null() {
+        return AkarDataItemResponse {
+            hovered: false,
+            pressed: false,
+            clicked: false,
+        };
+    }
+    let s = unsafe { &*style };
+    let rust_style = akar_components::DataItemStyle {
+        surface: s.surface,
+        padding_x: s.padding_x,
+        padding_y: s.padding_y,
+        spacing: s.spacing,
+        color_normal: s.color_normal,
+        color_hover: s.color_hover,
+        color_pressed: s.color_pressed,
+        color_selected: s.color_selected,
+        corner_radius: s.corner_radius,
+        border_width: s.border_width,
+        border_color: s.border_color,
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::akar_data_item(&mut ctx.core, &ctx.layout, nid, key, &rust_style);
+    AkarDataItemResponse {
+        hovered: result.hovered,
+        pressed: result.pressed,
+        clicked: result.clicked,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_list_begin(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    state: *mut AkarDataListState,
+    item_count: u32,
+    item_height: f32,
+    keys: *const u64,
+    key_count: u32,
+) -> AkarDataListResponse {
+    let ctx = unsafe { &mut *ctx };
+    if state.is_null() {
+        return AkarDataListResponse {
+            viewport_rect: [0.0; 4],
+            content_origin: [0.0; 2],
+            visible_range_start: 0,
+            visible_range_end: 0,
+        };
+    }
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_state = unsafe { &mut *state };
+    let mut data_state = akar_components::DataListState {
+        scroll_y: rust_state.scroll_y,
+    };
+    let keys_slice = if keys.is_null() || key_count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(keys, key_count as usize) }
+    };
+    let result = akar_components::data_list_begin(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &mut data_state,
+        item_count as usize,
+        item_height,
+        keys_slice,
+    );
+    rust_state.scroll_y = data_state.scroll_y;
+    AkarDataListResponse {
+        viewport_rect: result.viewport_rect,
+        content_origin: result.content_origin,
+        visible_range_start: result.visible_range.start as u32,
+        visible_range_end: result.visible_range.end as u32,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_list_end(ctx: *mut AkarCtx) {
+    let ctx = unsafe { &mut *ctx };
+    akar_components::data_list_end(&mut ctx.core);
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_textarea(
     ctx: *mut AkarCtx,

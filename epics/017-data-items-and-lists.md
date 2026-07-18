@@ -234,15 +234,14 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [x] The example makes the transition boundary clear without implying world-space child interaction.
 - [ ] Overview and interactive screenshots are visually verified.
 
-### Task 6: C ABI and Documentation
+### Task 6: C ABI and Documentation ✅
 
 **Files:**
 
-- `crates/akar-c-api/`
-- generated `akar.h` through the existing cbindgen workflow
-- `DEVELOP.md`
-- `README.md`
-- `AGENTS.md`
+- `crates/akar-c-api/src/lib.rs` — `akar_data_item`, `akar_data_list_begin/end`, `akar_data_item_style_default`
+- `crates/akar-c-api/tests/api.rs` — 3 new C integration tests
+- `crates/akar-c-api/cbindgen.toml` — added new struct names
+- `DEVELOP.md` — added "Data items and lists" section
 
 **Work:**
 
@@ -252,8 +251,8 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- A C caller can render a list through the generated header without application data ownership moving into akar.
-- `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
+- [x] A C caller can render a list through the generated header without application data ownership moving into akar.
+- [x] `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, and `cargo test --workspace` pass.
 
 ---
 
@@ -279,11 +278,11 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 ## Acceptance Criteria
 
-- [ ] An application can render its own messages, tweets, commits, and search results with the same item/list primitives.
-- [ ] Item interaction is reported without akar owning selection or record state.
-- [ ] Fixed-height lists clip and virtualize correctly in a normal layout and in a portal.
-- [ ] Canvas summaries use display-only text and group interaction only.
-- [ ] Full interactive items in a canvas use a clipped portal with ordinary components.
-- [ ] Item and child-widget identity remains stable and collision-free across virtualized rows and portal layouts, keyed by caller-provided record identity rather than screen position (ADR-016a) — verified by a scroll-and-refocus test, not just a same-frame collision test.
-- [ ] The C ABI follows the generated-header contract.
+- [x] An application can render its own messages, tweets, commits, and search results with the same item/list primitives.
+- [x] Item interaction is reported without akar owning selection or record state.
+- [x] Fixed-height lists clip and virtualize correctly in a normal layout and in a portal.
+- [x] Canvas summaries use display-only text and group interaction only.
+- [x] Full interactive items in a canvas use a clipped portal with ordinary components.
+- [x] Item and child-widget identity remains stable and collision-free across virtualized rows and portal layouts, keyed by caller-provided record identity rather than screen position (ADR-016a) — verified by a scroll-and-refocus test, not just a same-frame collision test.
+- [x] The C ABI follows the generated-header contract.
 - [ ] Formatting, clippy, tests, and representative visual captures pass.
