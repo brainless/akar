@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use akar_components::{
-    akar_button, akar_container, akar_label, akar_text_input, button::ButtonVariant, canvas_begin,
-    canvas_end, canvas_portal_begin, canvas_portal_end, is_visible_world, BoxStyle, CanvasAlign,
-    CanvasConfig, CanvasInput, CanvasOverflow, CanvasState, CanvasTextStyle, AKAR_THEME_DARK,
+    akar_button, akar_container, akar_data_item, akar_label, akar_text_input,
+    button::ButtonVariant, canvas_begin, canvas_data_item, canvas_end, canvas_portal_begin,
+    canvas_portal_end, is_visible_world, BoxStyle, CanvasConfig, CanvasDataItemDescriptor,
+    CanvasInput, CanvasState, DataItemStyle, AKAR_THEME_DARK,
 };
 use akar_core::AkarCore;
 use akar_layout::{length, Layout, NodeId, PageConfig, Size, Style, WorldRect};
@@ -38,6 +39,7 @@ struct ObjectState {
 struct PortalLayout {
     layout: Layout,
     root: NodeId,
+    item_node: NodeId,
     label_node: NodeId,
     button_node: NodeId,
     input_node: NodeId,
@@ -216,25 +218,8 @@ impl ApplicationHandler for App {
 
                 let canvas_input = CanvasInput::new(&state.core.input, &response.screen_to_world);
 
-                let summary_style = CanvasTextStyle {
-                    font_size: 10.0,
-                    color: 0xFFFFFFFF,
-                    background: Some(0x00000080),
-                    padding: [2.0, 4.0, 2.0, 4.0],
-                    align_x: CanvasAlign::Center,
-                    overflow: CanvasOverflow::Truncate,
-                };
-
-                let preview_style = CanvasTextStyle {
-                    font_size: 12.0,
-                    color: 0xFFFFFFFF,
-                    background: None,
-                    padding: [4.0, 6.0, 4.0, 6.0],
-                    align_x: CanvasAlign::Center,
-                    overflow: CanvasOverflow::Clip,
-                };
-
                 let theme = &AKAR_THEME_DARK;
+                let item_style = DataItemStyle::from_theme(theme);
 
                 for obj in &objects {
                     if !is_visible_world(response.visible_world_rect, obj.bounds) {
@@ -242,10 +227,10 @@ impl ApplicationHandler for App {
                     }
 
                     let lod = response.lod_index(obj.bounds, &LOD_THRESHOLDS);
-                    let hovered = canvas_input.is_hovering(obj.bounds);
 
                     match lod {
                         0 => {
+                            let hovered = canvas_input.is_hovering(obj.bounds);
                             let center = Vec2::new(
                                 (obj.bounds.min.x + obj.bounds.max.x) * 0.5,
                                 (obj.bounds.min.y + obj.bounds.max.y) * 0.5,
@@ -261,32 +246,30 @@ impl ApplicationHandler for App {
                             painter.push_quad(dot, fill, 0x00000000, 0.0, [2.0; 4], 0.0);
                         }
                         1 => {
-                            let border = if hovered { 0xFFFFFFFF } else { obj.fill };
-                            painter.push_quad(obj.bounds, 0x00000000, border, 2.0, [4.0; 4], 0.0);
-                            painter.push_text(obj.bounds, obj.name, &summary_style);
+                            canvas_data_item(
+                                &mut painter,
+                                &canvas_input,
+                                obj.bounds,
+                                &CanvasDataItemDescriptor {
+                                    title: Some(obj.name),
+                                    supporting_text: None,
+                                    metadata: None,
+                                    style: &item_style,
+                                },
+                            );
                         }
                         2 => {
-                            let fill = if hovered {
-                                let r = ((obj.fill >> 24) & 0xFF) as f32;
-                                let g = ((obj.fill >> 16) & 0xFF) as f32;
-                                let b = ((obj.fill >> 8) & 0xFF) as f32;
-                                let a = obj.fill & 0xFF;
-                                let brighten = 1.2;
-                                let nr = (r * brighten).min(255.0) as u32;
-                                let ng = (g * brighten).min(255.0) as u32;
-                                let nb = (b * brighten).min(255.0) as u32;
-                                (nr << 24) | (ng << 16) | (nb << 8) | a
-                            } else {
-                                obj.fill
-                            };
-                            painter.push_quad(obj.bounds, fill, 0x00000000, 0.0, [8.0; 4], 0.0);
-                            let label_bounds = WorldRect::from_xywh(
-                                obj.bounds.min.x,
-                                obj.bounds.min.y,
-                                obj.bounds.max.x - obj.bounds.min.x,
-                                20.0,
+                            canvas_data_item(
+                                &mut painter,
+                                &canvas_input,
+                                obj.bounds,
+                                &CanvasDataItemDescriptor {
+                                    title: Some(obj.name),
+                                    supporting_text: Some("Preview"),
+                                    metadata: None,
+                                    style: &item_style,
+                                },
                             );
-                            painter.push_text(label_bounds, obj.name, &preview_style);
                         }
                         _ => {
                             painter.push_quad(obj.bounds, obj.fill, 0x00000000, 0.0, [8.0; 4], 0.0);
@@ -365,6 +348,19 @@ impl ApplicationHandler for App {
                             &[],
                         );
 
+                        let item_node = pl.new_with_children(
+                            Style {
+                                display: akar_layout::Display::Flex,
+                                flex_direction: akar_layout::FlexDirection::Column,
+                                size: Size {
+                                    width: akar_layout::Dimension::percent(1.0),
+                                    height: akar_layout::Dimension::percent(1.0),
+                                },
+                                ..Default::default()
+                            },
+                            &[],
+                        );
+
                         let label_node = pl.new_leaf(Style {
                             size: Size {
                                 width: akar_layout::Dimension::percent(1.0),
@@ -389,11 +385,13 @@ impl ApplicationHandler for App {
                             ..Default::default()
                         });
 
-                        pl.set_children(root, &[label_node, button_node, input_node]);
+                        pl.set_children(item_node, &[label_node, button_node]);
+                        pl.set_children(root, &[item_node, input_node]);
 
                         PortalLayout {
                             layout: pl,
                             root,
+                            item_node,
                             label_node,
                             button_node,
                             input_node,
@@ -430,6 +428,17 @@ impl ApplicationHandler for App {
 
                     akar_container(core, &portal.layout, portal.root, &BoxStyle::panel(theme));
 
+                    let item_response = akar_data_item(
+                        core,
+                        &portal.layout,
+                        portal.item_node,
+                        i as u64,
+                        &DataItemStyle::from_theme(theme),
+                    );
+                    if item_response.clicked {
+                        object_states[i].button_clicked = !object_states[i].button_clicked;
+                    }
+
                     akar_label(
                         core,
                         &portal.layout,
@@ -439,6 +448,9 @@ impl ApplicationHandler for App {
                         theme,
                     );
 
+                    let _button_id = portal
+                        .layout
+                        .widget_id_keyed(portal.button_node, i as u64 + 1);
                     let btn = akar_button(
                         core,
                         &portal.layout,

@@ -216,11 +216,11 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 - [x] Invisible items are culled before text shaping.
 - [x] Canvas item geometry and text scale correctly with zoom.
 
-### Task 5: Portal Composition Example and Visual Verification
+### Task 5: Portal Composition Example and Visual Verification ✅
 
 **Files:**
 
-- `examples/canvas-basic-rust/src/main.rs` or a focused data-list example
+- `examples/canvas-basic-rust/src/main.rs` — updated to use data_item + canvas_data_item
 - relevant component tests and scripted capture assets
 
 **Work:**
@@ -231,8 +231,8 @@ For canvas summary levels, an item descriptor should carry only display-oriented
 
 **Acceptance criteria:**
 
-- The example makes the transition boundary clear without implying world-space child interaction.
-- Overview and interactive screenshots are visually verified.
+- [x] The example makes the transition boundary clear without implying world-space child interaction.
+- [ ] Overview and interactive screenshots are visually verified.
 
 ### Task 6: C ABI and Documentation
 
