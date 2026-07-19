@@ -125,6 +125,7 @@ struct AppState {
     form_font_size_node: akar_layout::NodeId,
     form_language_node: akar_layout::NodeId,
     form_submit_node: akar_layout::NodeId,
+    needs_repaint: bool,
 }
 
 fn main() {
@@ -352,6 +353,7 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
     );
     if menu_result.clicked {
         state.drawer_open = !state.drawer_open;
+        state.needs_repaint = true;
     }
 
     let new_item_result = akar_button(
@@ -364,6 +366,7 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
     );
     if new_item_result.clicked {
         state.modal_open = !state.modal_open;
+        state.needs_repaint = true;
     }
 
     let dropdown_btn_result = akar_button(
@@ -376,6 +379,7 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
     );
     if dropdown_btn_result.clicked {
         state.dropdown_open = !state.dropdown_open;
+        state.needs_repaint = true;
     }
 }
 
@@ -433,6 +437,7 @@ fn render_tab_bar(state: &mut AppState) {
     );
     if let Some(index) = tab_result.clicked {
         state.active_tab = index;
+        state.needs_repaint = true;
     }
 
     if state.active_tab != state.prev_active_tab {
@@ -632,6 +637,7 @@ fn render_stats_tab(state: &mut AppState) {
     );
     if toggle_result.clicked {
         state.show_skeleton = !state.show_skeleton;
+        state.needs_repaint = true;
     }
 }
 
@@ -769,6 +775,7 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         &AKAR_THEME_DARK,
     );
     if submit_result.clicked {
+        state.needs_repaint = true;
         if state.form_agreed {
             state.toasts_list.push(ToastItem {
                 variant: ToastVariant::Success,
@@ -792,6 +799,9 @@ fn render_drawer(state: &mut AppState, viewport_rect: [f32; 4]) {
         state.drawer_progress = (state.drawer_progress + speed).min(1.0);
     } else {
         state.drawer_progress = (state.drawer_progress - speed).max(0.0);
+    }
+    if state.drawer_progress > 0.0 && state.drawer_progress < 1.0 {
+        state.needs_repaint = true;
     }
     let panel_width = max_width * ease_out_cubic(state.drawer_progress);
 
@@ -883,6 +893,7 @@ fn render_drawer(state: &mut AppState, viewport_rect: [f32; 4]) {
 
         if drawer_resp.close_requested {
             state.drawer_open = false;
+            state.needs_repaint = true;
         }
     }
 }
@@ -921,6 +932,7 @@ fn render_modal(state: &mut AppState, viewport_rect: [f32; 4]) {
 
         if modal_resp.close_requested {
             state.modal_open = false;
+            state.needs_repaint = true;
         }
     }
 }
@@ -934,6 +946,7 @@ fn render_toasts(state: &mut AppState, viewport_rect: [f32; 4]) {
     );
     if let Some(index) = toast_resp.dismissed {
         state.toasts_list.remove(index);
+        state.needs_repaint = true;
     }
 }
 
@@ -993,6 +1006,7 @@ fn render_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
 
             if state.core.input.is_clicked(item_rect) {
                 state.dropdown_open = false;
+                state.needs_repaint = true;
             }
         }
 
@@ -1011,6 +1025,7 @@ fn render_isolated_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
     );
     if trigger.clicked {
         state.dropdown_open = !state.dropdown_open;
+        state.needs_repaint = true;
     }
     render_dropdown(state, viewport_rect);
 }
@@ -1024,7 +1039,10 @@ fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
         0 => render_list_tab(state, viewport_rect),
         1 => render_canvas_tab(state),
         2 => render_stats_tab(state),
-        3 => render_form_tab(state, viewport_rect),
+        3 => {
+            render_form_tab(state, viewport_rect);
+            state.needs_repaint = true;
+        }
         _ => {}
     }
     render_drawer(state, viewport_rect);
@@ -1858,6 +1876,7 @@ impl ApplicationHandler for App {
             form_font_size_node,
             form_language_node,
             form_submit_node,
+            needs_repaint: false,
         });
     }
 
@@ -2098,6 +2117,11 @@ impl ApplicationHandler for App {
                     state.queue.submit(std::iter::once(encoder.finish()));
                 }
                 output.present();
+
+                if state.needs_repaint {
+                    state.needs_repaint = false;
+                    state.window.request_redraw();
+                }
             }
             _ => {}
         }
