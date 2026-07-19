@@ -21,6 +21,10 @@ pub fn checkbox(
     let hovered = core.input.is_hovering(rect);
     let clicked = core.input.is_clicked(rect);
 
+    if clicked {
+        *checked = !*checked;
+    }
+
     let box_size = 18.0;
     let box_x = rect[0];
     let box_y = rect[1] + (rect[3] - box_size) * 0.5;
@@ -81,12 +85,7 @@ pub fn checkbox(
         z: 0.0,
     });
 
-    if clicked {
-        *checked = !*checked;
-        return true;
-    }
-
-    false
+    clicked
 }
 
 #[cfg(test)]

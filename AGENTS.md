@@ -161,10 +161,11 @@ The draw list is the internal rendering queue. Agents extending the renderer mus
 
 Each component function:
 1. Calls `akar-layout` to query resolved pixel bounds for its node ID.
-2. Submits background rect + border rect + text (if any) to the draw list via `akar-core` primitives.
-3. Checks hit-test from the input state to determine hover/active/focus.
-4. Returns a state enum (`Idle | Hovered | Pressed | Focused`) or a typed result (`Clicked: bool`, `value: f32`, etc.).
-5. Must work correctly with a zero-area rect (when the layout system gives it no space).
+2. Checks hit-test from the input state to determine hover/active/focus/click.
+3. If clicked, mutates any caller-owned state (`*checked`, `*selected`, etc.) immediately — before submitting draw calls. Drawing must always reflect the post-click value, never the pre-click one. A component that draws first and mutates after looks correct in isolation but silently lags one frame behind every click, and needs an unrelated event (e.g. a mouse move) to ever catch up. See checkbox/switch/radio/tab_bar history.
+4. Submits background rect + border rect + text (if any) to the draw list via `akar-core` primitives, using the already-updated state.
+5. Returns a state enum (`Idle | Hovered | Pressed | Focused`) or a typed result (`Clicked: bool`, `value: f32`, etc.).
+6. Must work correctly with a zero-area rect (when the layout system gives it no space).
 
 ## Virtualization contract
 

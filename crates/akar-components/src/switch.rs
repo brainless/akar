@@ -20,6 +20,10 @@ pub fn switch(
     let hovered = core.input.is_hovering(rect);
     let clicked = core.input.is_clicked(rect);
 
+    if clicked {
+        *on = !*on;
+    }
+
     let track_w = 36.0;
     let track_h = 20.0;
     let track_x = rect[0];
@@ -76,12 +80,7 @@ pub fn switch(
         _pad: [0.0; 2],
     });
 
-    if clicked {
-        *on = !*on;
-        return true;
-    }
-
-    false
+    clicked
 }
 
 #[cfg(test)]

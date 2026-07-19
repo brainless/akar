@@ -1963,7 +1963,19 @@ impl ApplicationHandler for App {
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
-                    _ => return,
+                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                        state
+                            .surface
+                            .configure(&state.device, &state.surface_config);
+                        state.window.request_redraw();
+                        return;
+                    }
+                    CurrentSurfaceTexture::Timeout
+                    | CurrentSurfaceTexture::Occluded
+                    | CurrentSurfaceTexture::Validation => {
+                        state.window.request_redraw();
+                        return;
+                    }
                 };
                 let mut encoder = state
                     .device

@@ -37,19 +37,22 @@ pub fn tab_bar(
     }
 
     let count = labels.len();
-    let active = active_index.min(count - 1);
     let tab_width = rect[2] / count as f32;
 
     let mut clicked = None;
+    for i in 0..count {
+        let tab_rect = [rect[0] + i as f32 * tab_width, rect[1], tab_width, rect[3]];
+        if core.input.is_clicked(tab_rect) {
+            clicked = Some(i);
+        }
+    }
+
+    let active = clicked.unwrap_or(active_index).min(count - 1);
 
     for (i, label) in labels.iter().enumerate() {
         let tab_rect = [rect[0] + i as f32 * tab_width, rect[1], tab_width, rect[3]];
 
         let is_active = i == active;
-
-        if core.input.is_clicked(tab_rect) {
-            clicked = Some(i);
-        }
 
         match variant {
             TabVariant::Boxed => {

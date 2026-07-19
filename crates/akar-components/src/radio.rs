@@ -14,6 +14,17 @@ pub fn radio_group(
 ) -> bool {
     let mut changed = false;
 
+    for (i, &node) in nodes.iter().enumerate() {
+        let rect = layout.rect(node);
+        if rect[2] == 0.0 || rect[3] == 0.0 {
+            continue;
+        }
+        if core.input.is_clicked(rect) {
+            *selected = i;
+            changed = true;
+        }
+    }
+
     for (i, (&node, &label)) in nodes.iter().zip(labels.iter()).enumerate() {
         let rect = layout.rect(node);
         if rect[2] == 0.0 || rect[3] == 0.0 {
@@ -21,7 +32,6 @@ pub fn radio_group(
         }
 
         let hovered = core.input.is_hovering(rect);
-        let clicked = core.input.is_clicked(rect);
 
         let circle_size = 16.0;
         let inner_size = 8.0;
@@ -83,11 +93,6 @@ pub fn radio_group(
             color: color_to_f32(theme.base_content),
             z: 0.0,
         });
-
-        if clicked {
-            *selected = i;
-            changed = true;
-        }
     }
 
     changed
