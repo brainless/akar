@@ -20,3 +20,12 @@ winit = "0.30"
 thiserror = "2"
 log = "0.4"
 bytemuck = { version = "1", features = ["derive"] }
+
+[profile.dev]
+debug = 0
+incremental = true
+codegen-units = 256
+
+[profile.dev.package."*"]
+debug = 0
+opt-level = 0
