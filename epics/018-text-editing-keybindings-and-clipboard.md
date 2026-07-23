@@ -1,6 +1,6 @@
 # Epic 018: Text Editing, Keybindings, and Clipboard Interop
 
-**Status:** Planned
+**Status:** In Progress
 **Goal:** Make `text_input` and `textarea` reliable, configurable text editors with selection, platform-standard select/copy/paste shortcuts, and a platform-neutral clipboard boundary.
 
 **Prerequisite:** Epic 017 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -137,6 +137,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 ## Tasks
 
 ### Task 1 — Fix Winit Text Filtering and Backspace Regression
+
+**Status:** Done
 
 - Filter control, private-use, newline, tab, and other non-committed special text before `InputState::push_char`.
 - Preserve printable Unicode text input and named editing key delivery.

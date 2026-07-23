@@ -1,0 +1,11 @@
+# Verify committed text and named Backspace delivery in both Form text widgets.
+click @form_name
+type "A"
+screenshot /tmp/form-name-before-backspace.png
+key Backspace
+screenshot /tmp/form-name-after-backspace.png
+click @form_notes
+type "B"
+screenshot /tmp/form-notes-before-backspace.png
+key Backspace
+screenshot /tmp/form-notes-after-backspace.png
