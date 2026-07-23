@@ -8,34 +8,38 @@ akar is primarily built by agents. The `demo-rust` binary ships with a complete 
 
 ## Local Dependencies
 
-All crate dependencies come from crates.io. The projects below are cloned locally under `~/Projects/` for design research and behavioral reference — coding agents and contributors should read these local sources directly rather than relying on crates.io docs or GitHub browsing, as they are the authoritative source for internals and undocumented behavior.
+All crate dependencies come from crates.io. The relevant dependency sources and design references below are cloned locally under `~/Projects/` for research and behavioral reference. Coding agents and contributors should read these local sources directly rather than relying on crates.io documentation or GitHub browsing: they are the local source of truth for internals and undocumented behavior. They are not Cargo path dependencies.
 
-### Reference-only local checkouts
-
-These are NOT path dependencies but are cloned locally for design research and behavioral reference.
+### Direct dependency sources
 
 | Project | Local path | What we learn from it |
 |---|---|---|
 | **glyphon** | `~/Projects/glyphon` | GPU text rendering via cosmic-text + wgpu. akar's text pipeline. Read `text_render.rs`, `text_atlas.rs` first. |
 | **glam** | `~/Projects/glam-rs` | Math types (Vec2, Vec4, Mat4). Reference for geometry and layout internals. |
 | **wgpu** | `~/Projects/wgpu` | GPU pipeline, render passes, buffer management. Source of truth for wgpu 29 internals. |
-| **sugacode** | `~/Projects/sugacode` | Author's own wgpu + glyphon app. The direct inspiration for akar; reference for renderer setup, TextAreaData pattern, UIManager pattern, scroll containers, and drawer. Read `src/renderer.rs` and `src/ui/` first. |
-| **xilem** | `~/Projects/xilem` | Linebender's Rust reactive UI (Masonry + vello). Reference for retained-mode architecture, widget lifecycle, and accessibility model — things akar deliberately defers. |
-| **daisyui** | `~/Projects/daisyui` | CSS component library. Reference for component catalog shape, naming, and the token-based theme model akar mirrors. |
-| **shadcn_ui** | `~/Projects/shadcn_ui` | React component library. Reference for component API ergonomics and composition patterns akar adapts to immediate mode. |
+| **taffy** | `~/Projects/taffy` | CSS Flexbox + Grid behavior and layout-engine internals. akar's layout engine. |
+| **winit** | `~/Projects/winit` | Window and event integration. Its use is restricted to `akar-winit` and examples. |
 
-### Projects to clone for Epic 001 exploration
+### Downstream application reference
 
-These are not yet present locally but are required reading for Epic 001. Clone them to `~/Projects/` before starting exploration tasks.
-
-| Project | Repo | What to study |
+| Project | Local path | What we learn from it |
 |---|---|---|
-| **gpui** (Zed) | `github.com/zed-industries/zed` (subtree: `crates/gpui`) | wgpu-based retained UI in production. Scene graph, element/layout protocol, platform abstraction. |
-| **egui** | `github.com/emilk/egui` | The dominant Rust immediate-mode UI. Painter API, Response type, Id/Memory system, layout cursor. |
-| **Dear ImGui** | `github.com/ocornut/imgui` | The canonical immediate-mode reference. DrawList, clipper, input model, docking. C API surface. |
-| **Nuklear** | `github.com/Immediate-Mode-UI/Nuklear` | Single-header C immediate-mode UI. Minimal, backend-agnostic. Best C ABI reference. |
-| **taffy** | `github.com/DioxusLabs/taffy` | CSS Flexbox + Grid layout in Rust. akar's layout engine candidate. |
-| **sokol** | `github.com/floooh/sokol` | C headers for GPU + app. Best example of a clean, language-neutral C API design (sokol_gfx.h pattern). |
+| **daftprompt** | `~/Projects/daftprompt` | The successor to sugacode and a real akar application. Reference for canvas, drawer, search, and application integration patterns. Read `src/ui/render.rs` and `src/ui/` first. |
+
+### UI, renderer, and API design references
+
+These are local reference-only checkouts; they are not dependencies.
+
+| Project | Local path | What to study |
+|---|---|---|
+| **egui** | `~/Projects/egui` | Immediate-mode Painter API, Response type, Id/Memory system, and layout cursor. |
+| **Dear ImGui** | `~/Projects/imgui` | DrawList, clipper, input model, docking, and C API surface. |
+| **Nuklear** | `~/Projects/Nuklear` | Single-header C immediate-mode UI and backend-agnostic C API. |
+| **sokol** | `~/Projects/sokol` | Language-neutral C API and header design, especially `sokol_gfx.h`. |
+| **Zed / GPUI** | `~/Projects/zed/crates/gpui` | Production wgpu UI: scene graph, element/layout protocol, and platform abstraction. |
+| **xilem** | `~/Projects/xilem` | Retained-mode architecture, widget lifecycle, and accessibility concepts that akar deliberately defers. |
+| **daisyUI** | `~/Projects/daisyui` | Component catalog shape, naming, and token-based themes. |
+| **shadcn/ui** | `~/Projects/shadcn_ui` | Component API ergonomics and composition patterns adapted to immediate mode. |
 
 ## Build & Run
 

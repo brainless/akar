@@ -16,17 +16,36 @@ akar is **primarily built by agents** and is designed to be used by other projec
 
 ## Local source access
 
-All reference projects are cloned locally. Prefer reading these over web searches — they are the authoritative source for internals and undocumented behavior.
+The relevant dependencies and design references are cloned locally under `~/Projects/`. Prefer reading these checkouts over web searches, crates.io documentation, or GitHub browsing: they are the local source of truth for internals and undocumented behavior. These are reference-only checkouts, not Cargo path dependencies.
 
-| Project | Local path | Read first |
+### Direct dependency sources
+
+| Project | Local path | Read first / use it for |
 |---|---|---|
-| **sugacode** | `~/Projects/sugacode/src/` | `renderer.rs`, `src/ui/` — predecessor app, rendering pattern reference |
 | **glyphon** | `~/Projects/glyphon/src/` | `text_render.rs`, `text_atlas.rs` — text renderer akar wraps |
 | **wgpu** | `~/Projects/wgpu/` | GPU pipeline, render passes, buffer management (wgpu 29 internals) |
-| **glam** | `~/Projects/glam-rs/src/` | Math types (Vec2, Vec4, Mat4) |
-| **xilem** | `~/Projects/xilem/` | Mature Rust retained-mode UI (reference only) |
-| **daisyui** | `~/Projects/daisyui/` | CSS component library (naming/token reference) |
-| **shadcn_ui** | `~/Projects/shadcn_ui/` | React component library (API ergonomics reference) |
+| **glam** | `~/Projects/glam-rs/` | Math types and geometry conventions (Vec2, Vec4, Mat4) |
+| **taffy** | `~/Projects/taffy/` | Flexbox/Grid layout behavior and the layout-engine internals akar wraps |
+| **winit** | `~/Projects/winit/` | Event and window integration; use only in `akar-winit` or examples |
+
+### Downstream application reference
+
+| Project | Local path | Read first / use it for |
+|---|---|---|
+| **daftprompt** | `~/Projects/daftprompt/` | The successor to sugacode and a real akar application. Read `src/ui/render.rs` and `src/ui/` for canvas, drawer, search, and integration patterns. |
+
+### UI, renderer, and API design references
+
+| Project | Local path | Read first / use it for |
+|---|---|---|
+| **egui** | `~/Projects/egui/` | Immediate-mode `Painter`, `Response`, `Id`/memory, and layout-cursor design |
+| **Dear ImGui** | `~/Projects/imgui/` | Draw-list, clipping, input, docking, and C API patterns |
+| **Nuklear** | `~/Projects/Nuklear/` | Minimal backend-agnostic immediate-mode C API design |
+| **sokol** | `~/Projects/sokol/` | Clean language-neutral C API and header design (`sokol_gfx.h`) |
+| **Zed / GPUI** | `~/Projects/zed/crates/gpui/` | Production wgpu UI: scene graph, element/layout protocol, platform abstraction |
+| **xilem** | `~/Projects/xilem/` | Retained-mode architecture, widget lifecycle, and accessibility concepts that akar deliberately defers |
+| **daisyUI** | `~/Projects/daisyui/` | Component catalog shape, naming, and token-based themes |
+| **shadcn/ui** | `~/Projects/shadcn_ui/` | Component API ergonomics and composition patterns |
 
 Do not fetch URLs for these projects. Read files locally.
 
