@@ -12,6 +12,49 @@ pub struct TextAreaResponse {
     pub changed: bool,
 }
 
+fn line_start(value: &str, position: usize) -> usize {
+    value[..position].rfind('\n').map_or(0, |index| index + 1)
+}
+
+fn line_end(value: &str, position: usize) -> usize {
+    value[position..]
+        .find('\n')
+        .map_or(value.len(), |index| position + index)
+}
+
+fn character_column(value: &str, position: usize) -> usize {
+    value[line_start(value, position)..position].chars().count()
+}
+
+fn position_at_character_column(value: &str, start: usize, end: usize, column: usize) -> usize {
+    value[start..end]
+        .char_indices()
+        .nth(column)
+        .map_or(end, |(index, _)| start + index)
+}
+
+fn move_vertical(value: &str, position: usize, direction: isize) -> usize {
+    let current_start = line_start(value, position);
+    let column = character_column(value, position);
+
+    if direction < 0 {
+        if current_start == 0 {
+            return 0;
+        }
+        let target_end = current_start - 1;
+        let target_start = line_start(value, target_end);
+        position_at_character_column(value, target_start, target_end, column)
+    } else {
+        let current_end = line_end(value, position);
+        if current_end == value.len() {
+            return value.len();
+        }
+        let target_start = current_end + 1;
+        let target_end = line_end(value, target_start);
+        position_at_character_column(value, target_start, target_end, column)
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn textarea(
     core: &mut AkarCore,
@@ -89,56 +132,16 @@ pub fn textarea(
                     Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
                     Key::Right => edit_state.cursor = next_boundary(value, edit_state.cursor),
                     Key::Up => {
-                        let line_start = value[..edit_state.cursor]
-                            .rfind('\n')
-                            .map(|i| i + 1)
-                            .unwrap_or(0);
-                        if line_start > 0 {
-                            let prev_line_end = value[..line_start.saturating_sub(1)]
-                                .rfind('\n')
-                                .map(|i| i + 1)
-                                .unwrap_or(0);
-                            let col = edit_state.cursor - line_start;
-                            edit_state.cursor = (prev_line_end + col).min(
-                                value[prev_line_end..]
-                                    .find('\n')
-                                    .map(|i| prev_line_end + i)
-                                    .unwrap_or(value.len()),
-                            );
-                        } else {
-                            edit_state.cursor = 0;
-                        }
+                        edit_state.cursor = move_vertical(value, edit_state.cursor, -1);
                     }
                     Key::Down => {
-                        let line_start = value[..edit_state.cursor]
-                            .rfind('\n')
-                            .map(|i| i + 1)
-                            .unwrap_or(0);
-                        let col = edit_state.cursor - line_start;
-                        if let Some(next_nl) = value[edit_state.cursor..].find('\n') {
-                            let next_line_start = edit_state.cursor + next_nl + 1;
-                            let next_line_end = value[next_line_start..]
-                                .find('\n')
-                                .map(|i| next_line_start + i)
-                                .unwrap_or(value.len());
-                            edit_state.cursor = (next_line_start + col).min(next_line_end);
-                        } else {
-                            edit_state.cursor = value.len();
-                        }
+                        edit_state.cursor = move_vertical(value, edit_state.cursor, 1);
                     }
                     Key::Home => {
-                        let line_start = value[..edit_state.cursor]
-                            .rfind('\n')
-                            .map(|i| i + 1)
-                            .unwrap_or(0);
-                        edit_state.cursor = line_start;
+                        edit_state.cursor = line_start(value, edit_state.cursor);
                     }
                     Key::End => {
-                        let line_end = value[edit_state.cursor..]
-                            .find('\n')
-                            .map(|i| edit_state.cursor + i)
-                            .unwrap_or(value.len());
-                        edit_state.cursor = line_end;
+                        edit_state.cursor = line_end(value, edit_state.cursor);
                     }
                     Key::Enter => {
                         changed |= replace_selection(value, edit_state, "\n");
@@ -271,5 +274,26 @@ mod tests {
         );
 
         assert!(!result.changed);
+    }
+
+    #[test]
+    fn vertical_navigation_uses_unicode_character_columns() {
+        let value = "aé🙂z\n12345\né🙂";
+
+        assert_eq!(move_vertical(value, 7, 1), 12);
+        assert_eq!(move_vertical(value, 12, 1), value.len());
+        assert_eq!(move_vertical(value, value.len(), -1), 11);
+        assert!(value.is_char_boundary(move_vertical(value, 7, 1)));
+        assert!(value.is_char_boundary(move_vertical(value, 12, -1)));
+    }
+
+    #[test]
+    fn vertical_navigation_clamps_at_document_and_short_line_edges() {
+        let value = "abc\né\nwxyz";
+
+        assert_eq!(move_vertical(value, 2, -1), 0);
+        assert_eq!(move_vertical(value, 2, 1), 6);
+        assert_eq!(move_vertical(value, 6, 1), 8);
+        assert_eq!(move_vertical(value, value.len(), 1), value.len());
     }
 }

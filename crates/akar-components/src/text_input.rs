@@ -80,9 +80,15 @@ pub fn text_input(
             } else {
                 match event.key {
                     Key::Left if edit_state.has_selection() => edit_state.collapse_to_start(),
-                    Key::Left => edit_state.cursor = previous_boundary(value, edit_state.cursor),
+                    Key::Left => {
+                        edit_state.cursor = previous_boundary(value, edit_state.cursor);
+                        edit_state.anchor = edit_state.cursor;
+                    }
                     Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
-                    Key::Right => edit_state.cursor = next_boundary(value, edit_state.cursor),
+                    Key::Right => {
+                        edit_state.cursor = next_boundary(value, edit_state.cursor);
+                        edit_state.anchor = edit_state.cursor;
+                    }
                     Key::Home => {
                         edit_state.cursor = 0;
                         edit_state.anchor = 0;
