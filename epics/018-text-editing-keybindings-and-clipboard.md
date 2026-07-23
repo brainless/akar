@@ -156,6 +156,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 3 — Context-Level Text Edit Keybindings
 
+**Status:** Done
+
 - Add `Shortcut`, `TextEditKeybindings`, `platform_default`, and matching helpers.
 - Store bindings on `AkarCore` with a clear configuration method.
 - Implement default Primary+A/C/V behavior and arbitrary downstream replacement bindings.

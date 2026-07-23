@@ -1,4 +1,5 @@
 use glam;
+use std::ops::{BitOr, BitOrAssign};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
@@ -29,6 +30,110 @@ pub struct KeyEvent {
     pub key: Key,
     pub modifiers: Modifiers,
     pub repeat: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ShortcutModifiers(u8);
+
+impl ShortcutModifiers {
+    pub const NONE: Self = Self(0);
+    pub const PRIMARY: Self = Self(1 << 0);
+    pub const CONTROL: Self = Self(1 << 1);
+    pub const SUPER: Self = Self(1 << 2);
+    pub const ALT: Self = Self(1 << 3);
+    pub const SHIFT: Self = Self(1 << 4);
+
+    fn matches(self, modifiers: Modifiers) -> bool {
+        let mut expected = self.0;
+        if expected & Self::PRIMARY.0 != 0 {
+            expected &= !Self::PRIMARY.0;
+            #[cfg(target_os = "macos")]
+            {
+                expected |= Self::SUPER.0;
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                expected |= Self::CONTROL.0;
+            }
+        }
+
+        let actual = (if modifiers.control {
+            Self::CONTROL.0
+        } else {
+            0
+        }) | (if modifiers.super_key {
+            Self::SUPER.0
+        } else {
+            0
+        }) | (if modifiers.alt { Self::ALT.0 } else { 0 })
+            | (if modifiers.shift { Self::SHIFT.0 } else { 0 });
+        actual == expected
+    }
+}
+
+impl BitOr for ShortcutModifiers {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        Self(self.0 | rhs.0)
+    }
+}
+
+impl BitOrAssign for ShortcutModifiers {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shortcut {
+    pub modifiers: ShortcutModifiers,
+    pub key: Key,
+}
+
+impl Shortcut {
+    pub const fn new(modifiers: ShortcutModifiers, key: Key) -> Self {
+        Self { modifiers, key }
+    }
+
+    pub fn matches(&self, event: &KeyEvent) -> bool {
+        self.key == event.key && self.modifiers.matches(event.modifiers)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TextEditKeybindings {
+    pub select_all: Shortcut,
+    pub copy: Shortcut,
+    pub paste: Shortcut,
+}
+
+impl TextEditKeybindings {
+    pub const fn platform_default() -> Self {
+        Self {
+            select_all: Shortcut::new(ShortcutModifiers::PRIMARY, Key::Character('a')),
+            copy: Shortcut::new(ShortcutModifiers::PRIMARY, Key::Character('c')),
+            paste: Shortcut::new(ShortcutModifiers::PRIMARY, Key::Character('v')),
+        }
+    }
+
+    pub fn matches_select_all(&self, event: &KeyEvent) -> bool {
+        self.select_all.matches(event)
+    }
+
+    pub fn matches_copy(&self, event: &KeyEvent) -> bool {
+        self.copy.matches(event)
+    }
+
+    pub fn matches_paste(&self, event: &KeyEvent) -> bool {
+        self.paste.matches(event)
+    }
+}
+
+impl Default for TextEditKeybindings {
+    fn default() -> Self {
+        Self::platform_default()
+    }
 }
 
 pub struct InputState {
@@ -198,5 +303,63 @@ mod tests {
         input.begin_frame();
         assert!(input.key_events.is_empty());
         assert!(input.keys_pressed.is_empty());
+    }
+
+    #[test]
+    fn platform_defaults_use_primary_modifier() {
+        let bindings = TextEditKeybindings::platform_default();
+        assert_eq!(bindings.select_all.key, Key::Character('a'));
+        assert_eq!(bindings.copy.key, Key::Character('c'));
+        assert_eq!(bindings.paste.key, Key::Character('v'));
+
+        #[cfg(target_os = "macos")]
+        assert!(bindings.matches_select_all(&KeyEvent {
+            key: Key::Character('a'),
+            modifiers: Modifiers {
+                super_key: true,
+                ..Modifiers::default()
+            },
+            repeat: false,
+        }));
+        #[cfg(not(target_os = "macos"))]
+        assert!(bindings.matches_select_all(&KeyEvent {
+            key: Key::Character('a'),
+            modifiers: Modifiers {
+                control: true,
+                ..Modifiers::default()
+            },
+            repeat: false,
+        }));
+    }
+
+    #[test]
+    fn matching_requires_exact_modifiers_and_supports_custom_bindings() {
+        let bindings = TextEditKeybindings {
+            select_all: Shortcut::new(
+                ShortcutModifiers::ALT | ShortcutModifiers::SHIFT,
+                Key::Character('x'),
+            ),
+            ..TextEditKeybindings::default()
+        };
+        let event = |modifiers| KeyEvent {
+            key: Key::Character('x'),
+            modifiers,
+            repeat: false,
+        };
+        assert!(bindings.matches_select_all(&event(Modifiers {
+            alt: true,
+            shift: true,
+            ..Modifiers::default()
+        })));
+        assert!(!bindings.matches_select_all(&event(Modifiers {
+            alt: true,
+            ..Modifiers::default()
+        })));
+        assert!(!bindings.matches_select_all(&event(Modifiers {
+            alt: true,
+            shift: true,
+            control: true,
+            ..Modifiers::default()
+        })));
     }
 }

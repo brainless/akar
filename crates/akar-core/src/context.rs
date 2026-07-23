@@ -1,10 +1,14 @@
 use crate::draw_list::DrawCall;
 use crate::screenshot::ScreenshotCapture;
-use crate::{CapturedFrame, DrawList, InputState, QuadPipeline, ScreenshotError, TextPipeline};
+use crate::{
+    CapturedFrame, DrawList, InputState, QuadPipeline, ScreenshotError, TextEditKeybindings,
+    TextPipeline,
+};
 
 pub struct AkarCore {
     pub draw_list: DrawList,
     pub input: InputState,
+    pub text_edit_keybindings: TextEditKeybindings,
     pub(crate) quad_pipeline: QuadPipeline,
     pub text_pipeline: TextPipeline,
     screenshot_capture: ScreenshotCapture,
@@ -24,6 +28,7 @@ impl AkarCore {
         Self {
             draw_list: DrawList::new(),
             input: InputState::new(),
+            text_edit_keybindings: TextEditKeybindings::default(),
             quad_pipeline: QuadPipeline::new(device, surface_format),
             text_pipeline: TextPipeline::new(device, queue, surface_format),
             screenshot_capture: ScreenshotCapture::new(device, surface_format),
@@ -32,6 +37,10 @@ impl AkarCore {
             viewport_height: 0,
             scale_factor: 1.0,
         }
+    }
+
+    pub fn set_text_edit_keybindings(&mut self, bindings: TextEditKeybindings) {
+        self.text_edit_keybindings = bindings;
     }
 
     pub fn mock() -> Self {
