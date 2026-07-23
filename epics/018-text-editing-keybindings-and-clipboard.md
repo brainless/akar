@@ -191,6 +191,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 7 — C ABI and Generated Header
 
+**Status:** Done
+
 - Add binding and selection structs, keybinding setter, and targeted paste input to `akar-c-api`.
 - Move C text buffers to explicit logical length and capacity semantics.
 - Regenerate `akar.h` with cbindgen; do not hand-edit it.

@@ -6,6 +6,18 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define AKAR_SHORTCUT_MODIFIER_PRIMARY (1 << 0)
+
+#define AKAR_SHORTCUT_MODIFIER_CONTROL (1 << 1)
+
+#define AKAR_SHORTCUT_MODIFIER_SUPER (1 << 2)
+
+#define AKAR_SHORTCUT_MODIFIER_ALT (1 << 3)
+
+#define AKAR_SHORTCUT_MODIFIER_SHIFT (1 << 4)
+
+#define AKAR_KEY_CHARACTER 11
+
 #define AKAR_KEY_BACKSPACE 0
 
 #define AKAR_KEY_DELETE 1
@@ -101,14 +113,35 @@ typedef struct AkarDropdownState {
     float content_rect[4];
 } AkarDropdownState;
 
+typedef struct AkarShortcut {
+    uint32_t modifiers;
+    uint32_t key;
+    uint32_t character;
+} AkarShortcut;
+
+typedef struct AkarTextEditKeybindings {
+    struct AkarShortcut select_all;
+    struct AkarShortcut copy;
+    struct AkarShortcut paste;
+} AkarTextEditKeybindings;
+
 typedef struct AkarSelectResponse {
     bool changed;
 } AkarSelectResponse;
 
+typedef struct AkarTextEditState {
+    uint32_t cursor;
+    uint32_t anchor;
+} AkarTextEditState;
+
 typedef struct AkarTextInputResponse {
     bool changed;
     bool submitted;
-    uint32_t new_cursor_pos;
+    uint64_t widget_id;
+    struct AkarTextEditState edit_state;
+    uint32_t copy_len;
+    uint32_t copy_required_len;
+    bool request_paste;
 } AkarTextInputResponse;
 
 typedef struct AkarDataItemStyle {
@@ -144,7 +177,11 @@ typedef struct AkarDataListState {
 
 typedef struct AkarTextAreaResponse {
     bool changed;
-    uint32_t new_cursor_pos;
+    uint64_t widget_id;
+    struct AkarTextEditState edit_state;
+    uint32_t copy_len;
+    uint32_t copy_required_len;
+    bool request_paste;
 } AkarTextAreaResponse;
 
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
@@ -312,7 +349,22 @@ struct AkarDropdownState akar_dropdown_begin(struct AkarCtx *ctx,
 
 void akar_dropdown_end(struct AkarCtx *ctx);
 
+struct AkarTextEditKeybindings akar_text_edit_keybindings_default(void);
+
+bool akar_set_text_edit_keybindings(struct AkarCtx *ctx, struct AkarTextEditKeybindings bindings);
+
 void akar_push_key(struct AkarCtx *ctx, uint32_t key);
+
+void akar_push_key_event(struct AkarCtx *ctx,
+                         uint32_t key,
+                         uint32_t character,
+                         uint32_t modifiers,
+                         bool repeat);
+
+bool akar_push_paste(struct AkarCtx *ctx,
+                     uint64_t widget_id,
+                     const uint8_t *utf8,
+                     uint32_t utf8_len);
 
 bool akar_checkbox(struct AkarCtx *ctx,
                    uint64_t node_id,
@@ -340,13 +392,26 @@ struct AkarSelectResponse akar_select(struct AkarCtx *ctx,
                                       bool *open,
                                       const float *viewport_rect);
 
+/**
+ * Edits a caller-owned UTF-8 buffer.
+ *
+ * `value_len` is the meaningful byte length on input and receives the new
+ * meaningful byte length. `value_capacity` is the allocation size in bytes.
+ * Output is truncated only at a UTF-8 boundary and is NUL-terminated when the
+ * resulting length is smaller than the capacity. Copy text is written to
+ * `copy_buf`; `copy_len` reports bytes written and `copy_required_len` reports
+ * the complete selected byte length.
+ */
 struct AkarTextInputResponse akar_text_input(struct AkarCtx *ctx,
                                              uint64_t node_id,
                                              uint8_t *value_buf,
-                                             uint32_t buf_len,
-                                             uint32_t *cursor_pos,
+                                             uint32_t *value_len,
+                                             uint32_t value_capacity,
+                                             struct AkarTextEditState *edit_state,
                                              const char *placeholder,
-                                             bool cursor_visible);
+                                             bool cursor_visible,
+                                             uint8_t *copy_buf,
+                                             uint32_t copy_capacity);
 
 void akar_data_item_style_default(struct AkarCtx *ctx, struct AkarDataItemStyle *style_out);
 
@@ -365,13 +430,21 @@ struct AkarDataListResponse akar_data_list_begin(struct AkarCtx *ctx,
 
 void akar_data_list_end(struct AkarCtx *ctx);
 
+/**
+ * Edits a caller-owned multiline UTF-8 buffer.
+ *
+ * Buffer and copy-output semantics match `akar_text_input`.
+ */
 struct AkarTextAreaResponse akar_textarea(struct AkarCtx *ctx,
                                           uint64_t node_id,
                                           uint8_t *value_buf,
-                                          uint32_t buf_len,
-                                          uint32_t *cursor_pos,
+                                          uint32_t *value_len,
+                                          uint32_t value_capacity,
+                                          struct AkarTextEditState *edit_state,
                                           float *scroll_y,
                                           const char *placeholder,
-                                          bool cursor_visible);
+                                          bool cursor_visible,
+                                          uint8_t *copy_buf,
+                                          uint32_t copy_capacity);
 
 #endif  /* AKAR_H */

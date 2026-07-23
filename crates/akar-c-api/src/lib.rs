@@ -4,7 +4,9 @@ use std::ffi::{c_char, c_void};
 use std::ptr;
 
 use akar_components::{AkarTheme, ButtonVariant, AKAR_THEME_DARK};
-use akar_core::{AkarCore, Key};
+use akar_core::{
+    AkarCore, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
+};
 use akar_layout::Layout;
 
 pub struct AkarCtx {
@@ -23,6 +25,37 @@ pub struct AkarButtonResult {
     pub clicked: bool,
     pub hovered: bool,
     pub pressed: bool,
+}
+
+pub const AKAR_SHORTCUT_MODIFIER_PRIMARY: u32 = 1 << 0;
+pub const AKAR_SHORTCUT_MODIFIER_CONTROL: u32 = 1 << 1;
+pub const AKAR_SHORTCUT_MODIFIER_SUPER: u32 = 1 << 2;
+pub const AKAR_SHORTCUT_MODIFIER_ALT: u32 = 1 << 3;
+pub const AKAR_SHORTCUT_MODIFIER_SHIFT: u32 = 1 << 4;
+
+pub const AKAR_KEY_CHARACTER: u32 = 11;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AkarShortcut {
+    pub modifiers: u32,
+    pub key: u32,
+    pub character: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AkarTextEditKeybindings {
+    pub select_all: AkarShortcut,
+    pub copy: AkarShortcut,
+    pub paste: AkarShortcut,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct AkarTextEditState {
+    pub cursor: u32,
+    pub anchor: u32,
 }
 
 fn texture_format_from_raw(raw: u32) -> Option<wgpu::TextureFormat> {
@@ -1069,24 +1102,169 @@ pub const AKAR_KEY_ENTER: u32 = 8;
 pub const AKAR_KEY_ESCAPE: u32 = 9;
 pub const AKAR_KEY_TAB: u32 = 10;
 
+fn key_from_raw(key: u32, character: u32) -> Option<Key> {
+    match key {
+        AKAR_KEY_BACKSPACE => Some(Key::Backspace),
+        AKAR_KEY_DELETE => Some(Key::Delete),
+        AKAR_KEY_LEFT => Some(Key::Left),
+        AKAR_KEY_RIGHT => Some(Key::Right),
+        AKAR_KEY_UP => Some(Key::Up),
+        AKAR_KEY_DOWN => Some(Key::Down),
+        AKAR_KEY_HOME => Some(Key::Home),
+        AKAR_KEY_END => Some(Key::End),
+        AKAR_KEY_ENTER => Some(Key::Enter),
+        AKAR_KEY_ESCAPE => Some(Key::Escape),
+        AKAR_KEY_TAB => Some(Key::Tab),
+        AKAR_KEY_CHARACTER => char::from_u32(character).map(Key::Character),
+        _ => None,
+    }
+}
+
+fn shortcut_modifiers_from_raw(raw: u32) -> ShortcutModifiers {
+    let mut modifiers = ShortcutModifiers::NONE;
+    if raw & AKAR_SHORTCUT_MODIFIER_PRIMARY != 0 {
+        modifiers |= ShortcutModifiers::PRIMARY;
+    }
+    if raw & AKAR_SHORTCUT_MODIFIER_CONTROL != 0 {
+        modifiers |= ShortcutModifiers::CONTROL;
+    }
+    if raw & AKAR_SHORTCUT_MODIFIER_SUPER != 0 {
+        modifiers |= ShortcutModifiers::SUPER;
+    }
+    if raw & AKAR_SHORTCUT_MODIFIER_ALT != 0 {
+        modifiers |= ShortcutModifiers::ALT;
+    }
+    if raw & AKAR_SHORTCUT_MODIFIER_SHIFT != 0 {
+        modifiers |= ShortcutModifiers::SHIFT;
+    }
+    modifiers
+}
+
+fn modifiers_from_raw(raw: u32) -> Modifiers {
+    let mut modifiers = Modifiers {
+        shift: raw & AKAR_SHORTCUT_MODIFIER_SHIFT != 0,
+        control: raw & AKAR_SHORTCUT_MODIFIER_CONTROL != 0,
+        alt: raw & AKAR_SHORTCUT_MODIFIER_ALT != 0,
+        super_key: raw & AKAR_SHORTCUT_MODIFIER_SUPER != 0,
+    };
+    if raw & AKAR_SHORTCUT_MODIFIER_PRIMARY != 0 {
+        #[cfg(target_os = "macos")]
+        {
+            modifiers.super_key = true;
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            modifiers.control = true;
+        }
+    }
+    modifiers
+}
+
+fn shortcut_from_ffi(shortcut: AkarShortcut) -> Option<Shortcut> {
+    Some(Shortcut::new(
+        shortcut_modifiers_from_raw(shortcut.modifiers),
+        key_from_raw(shortcut.key, shortcut.character)?,
+    ))
+}
+
+#[no_mangle]
+pub extern "C" fn akar_text_edit_keybindings_default() -> AkarTextEditKeybindings {
+    AkarTextEditKeybindings {
+        select_all: AkarShortcut {
+            modifiers: AKAR_SHORTCUT_MODIFIER_PRIMARY,
+            key: AKAR_KEY_CHARACTER,
+            character: 'a' as u32,
+        },
+        copy: AkarShortcut {
+            modifiers: AKAR_SHORTCUT_MODIFIER_PRIMARY,
+            key: AKAR_KEY_CHARACTER,
+            character: 'c' as u32,
+        },
+        paste: AkarShortcut {
+            modifiers: AKAR_SHORTCUT_MODIFIER_PRIMARY,
+            key: AKAR_KEY_CHARACTER,
+            character: 'v' as u32,
+        },
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_set_text_edit_keybindings(
+    ctx: *mut AkarCtx,
+    bindings: AkarTextEditKeybindings,
+) -> bool {
+    let Some(select_all) = shortcut_from_ffi(bindings.select_all) else {
+        return false;
+    };
+    let Some(copy) = shortcut_from_ffi(bindings.copy) else {
+        return false;
+    };
+    let Some(paste) = shortcut_from_ffi(bindings.paste) else {
+        return false;
+    };
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return false;
+    };
+    ctx.core.set_text_edit_keybindings(TextEditKeybindings {
+        select_all,
+        copy,
+        paste,
+    });
+    true
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_push_key(ctx: *mut AkarCtx, key: u32) {
     let ctx = unsafe { &mut *ctx };
-    let k = match key {
-        0 => Key::Backspace,
-        1 => Key::Delete,
-        2 => Key::Left,
-        3 => Key::Right,
-        4 => Key::Up,
-        5 => Key::Down,
-        6 => Key::Home,
-        7 => Key::End,
-        8 => Key::Enter,
-        9 => Key::Escape,
-        10 => Key::Tab,
-        _ => return,
+    if let Some(key) = key_from_raw(key, 0) {
+        ctx.core.input.push_key(key);
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_push_key_event(
+    ctx: *mut AkarCtx,
+    key: u32,
+    character: u32,
+    modifiers: u32,
+    repeat: bool,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
     };
-    ctx.core.input.push_key(k);
+    let Some(key) = key_from_raw(key, character) else {
+        return;
+    };
+    ctx.core.input.push_key_event(KeyEvent {
+        key,
+        modifiers: modifiers_from_raw(modifiers),
+        repeat,
+    });
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_push_paste(
+    ctx: *mut AkarCtx,
+    widget_id: u64,
+    utf8: *const u8,
+    utf8_len: u32,
+) -> bool {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return false;
+    };
+    if utf8.is_null() && utf8_len != 0 {
+        return false;
+    }
+    let bytes = if utf8_len == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(utf8, utf8_len as usize) }
+    };
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    ctx.core.input.push_paste(widget_id, text);
+    true
 }
 
 #[no_mangle]
@@ -1269,48 +1447,141 @@ pub unsafe extern "C" fn akar_select(
 pub struct AkarTextInputResponse {
     pub changed: bool,
     pub submitted: bool,
-    pub new_cursor_pos: u32,
+    pub widget_id: u64,
+    pub edit_state: AkarTextEditState,
+    pub copy_len: u32,
+    pub copy_required_len: u32,
+    pub request_paste: bool,
+}
+
+fn empty_text_input_response() -> AkarTextInputResponse {
+    AkarTextInputResponse {
+        changed: false,
+        submitted: false,
+        widget_id: 0,
+        edit_state: AkarTextEditState::default(),
+        copy_len: 0,
+        copy_required_len: 0,
+        request_paste: false,
+    }
+}
+
+fn empty_textarea_response() -> AkarTextAreaResponse {
+    AkarTextAreaResponse {
+        changed: false,
+        widget_id: 0,
+        edit_state: AkarTextEditState::default(),
+        copy_len: 0,
+        copy_required_len: 0,
+        request_paste: false,
+    }
+}
+
+unsafe fn value_from_ffi(
+    value_buf: *mut u8,
+    value_len: *mut u32,
+    value_capacity: u32,
+) -> Option<String> {
+    if value_buf.is_null() || value_len.is_null() {
+        return None;
+    }
+    let len = unsafe { *value_len } as usize;
+    if len > value_capacity as usize {
+        return None;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(value_buf, len) };
+    std::str::from_utf8(bytes).ok().map(str::to_owned)
+}
+
+fn utf8_prefix_len(value: &str, capacity: usize) -> usize {
+    let mut len = value.len().min(capacity);
+    while !value.is_char_boundary(len) {
+        len -= 1;
+    }
+    len
+}
+
+unsafe fn write_value_to_ffi(
+    value_buf: *mut u8,
+    value_len: *mut u32,
+    value_capacity: u32,
+    value: &str,
+) -> usize {
+    let capacity = value_capacity as usize;
+    let len = utf8_prefix_len(value, capacity);
+    if len != 0 {
+        unsafe { std::ptr::copy_nonoverlapping(value.as_ptr(), value_buf, len) };
+    }
+    if len < capacity {
+        unsafe { *value_buf.add(len) = 0 };
+    }
+    unsafe { *value_len = len as u32 };
+    len
+}
+
+unsafe fn write_copy_to_ffi(
+    copy_text: Option<&str>,
+    copy_buf: *mut u8,
+    copy_capacity: u32,
+) -> (u32, u32) {
+    let Some(copy_text) = copy_text else {
+        return (0, 0);
+    };
+    let required = copy_text.len();
+    if copy_buf.is_null() || copy_capacity == 0 {
+        return (0, required as u32);
+    }
+    let capacity = copy_capacity as usize;
+    let len = utf8_prefix_len(copy_text, capacity);
+    if len != 0 {
+        unsafe { std::ptr::copy_nonoverlapping(copy_text.as_ptr(), copy_buf, len) };
+    }
+    if len < capacity {
+        unsafe { *copy_buf.add(len) = 0 };
+    }
+    (len as u32, required as u32)
 }
 
 #[no_mangle]
+/// Edits a caller-owned UTF-8 buffer.
+///
+/// `value_len` is the meaningful byte length on input and receives the new
+/// meaningful byte length. `value_capacity` is the allocation size in bytes.
+/// Output is truncated only at a UTF-8 boundary and is NUL-terminated when the
+/// resulting length is smaller than the capacity. Copy text is written to
+/// `copy_buf`; `copy_len` reports bytes written and `copy_required_len` reports
+/// the complete selected byte length.
 pub unsafe extern "C" fn akar_text_input(
     ctx: *mut AkarCtx,
     node_id: u64,
     value_buf: *mut u8,
-    buf_len: u32,
-    cursor_pos: *mut u32,
+    value_len: *mut u32,
+    value_capacity: u32,
+    edit_state: *mut AkarTextEditState,
     placeholder: *const c_char,
     cursor_visible: bool,
+    copy_buf: *mut u8,
+    copy_capacity: u32,
 ) -> AkarTextInputResponse {
-    let ctx = unsafe { &mut *ctx };
-    if value_buf.is_null() || buf_len == 0 || cursor_pos.is_null() || placeholder.is_null() {
-        return AkarTextInputResponse {
-            changed: false,
-            submitted: false,
-            new_cursor_pos: 0,
-        };
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return empty_text_input_response();
+    };
+    if edit_state.is_null() || placeholder.is_null() {
+        return empty_text_input_response();
     }
 
     let Ok(placeholder_str) = unsafe { std::ffi::CStr::from_ptr(placeholder) }.to_str() else {
-        return AkarTextInputResponse {
-            changed: false,
-            submitted: false,
-            new_cursor_pos: 0,
-        };
+        return empty_text_input_response();
     };
 
-    let slice = unsafe { std::slice::from_raw_parts_mut(value_buf, buf_len as usize) };
-    let Ok(mut value) = String::from_utf8(slice.to_vec()) else {
-        return AkarTextInputResponse {
-            changed: false,
-            submitted: false,
-            new_cursor_pos: 0,
-        };
+    let Some(mut value) = (unsafe { value_from_ffi(value_buf, value_len, value_capacity) }) else {
+        return empty_text_input_response();
     };
 
-    let mut edit_state = akar_components::TextEditState {
-        cursor: unsafe { *cursor_pos } as usize,
-        anchor: unsafe { *cursor_pos } as usize,
+    let ffi_state = unsafe { &mut *edit_state };
+    let mut rust_state = akar_components::TextEditState {
+        cursor: ffi_state.cursor as usize,
+        anchor: ffi_state.anchor as usize,
     };
     let nid: akar_layout::NodeId = node_id.into();
     let result = akar_components::akar_text_input(
@@ -1318,32 +1589,39 @@ pub unsafe extern "C" fn akar_text_input(
         &ctx.layout,
         nid,
         &mut value,
-        &mut edit_state,
+        &mut rust_state,
         placeholder_str,
         cursor_visible,
         &ctx.theme,
     );
 
-    let value_bytes = value.as_bytes();
-    let copy_len = value_bytes.len().min(buf_len as usize);
-    unsafe { std::ptr::copy_nonoverlapping(value_bytes.as_ptr(), slice.as_mut_ptr(), copy_len) };
-
-    if copy_len < buf_len as usize {
-        unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
-    }
-
-    unsafe { *cursor_pos = edit_state.cursor as u32 };
+    let written_len = unsafe { write_value_to_ffi(value_buf, value_len, value_capacity, &value) };
+    rust_state.normalize(&value[..written_len]);
+    *ffi_state = AkarTextEditState {
+        cursor: rust_state.cursor as u32,
+        anchor: rust_state.anchor as u32,
+    };
+    let (copy_len, copy_required_len) =
+        unsafe { write_copy_to_ffi(result.copy_text.as_deref(), copy_buf, copy_capacity) };
     AkarTextInputResponse {
         changed: result.changed,
         submitted: result.submitted,
-        new_cursor_pos: edit_state.cursor as u32,
+        widget_id: ctx.layout.widget_id(nid),
+        edit_state: *ffi_state,
+        copy_len,
+        copy_required_len,
+        request_paste: result.request_paste,
     }
 }
 
 #[repr(C)]
 pub struct AkarTextAreaResponse {
     pub changed: bool,
-    pub new_cursor_pos: u32,
+    pub widget_id: u64,
+    pub edit_state: AkarTextEditState,
+    pub copy_len: u32,
+    pub copy_required_len: u32,
+    pub request_paste: bool,
 }
 
 // ---- Data Item / Data List ----
@@ -1499,47 +1777,41 @@ pub unsafe extern "C" fn akar_data_list_end(ctx: *mut AkarCtx) {
 }
 
 #[no_mangle]
+/// Edits a caller-owned multiline UTF-8 buffer.
+///
+/// Buffer and copy-output semantics match `akar_text_input`.
 pub unsafe extern "C" fn akar_textarea(
     ctx: *mut AkarCtx,
     node_id: u64,
     value_buf: *mut u8,
-    buf_len: u32,
-    cursor_pos: *mut u32,
+    value_len: *mut u32,
+    value_capacity: u32,
+    edit_state: *mut AkarTextEditState,
     scroll_y: *mut f32,
     placeholder: *const c_char,
     cursor_visible: bool,
+    copy_buf: *mut u8,
+    copy_capacity: u32,
 ) -> AkarTextAreaResponse {
-    let ctx = unsafe { &mut *ctx };
-    if value_buf.is_null()
-        || buf_len == 0
-        || cursor_pos.is_null()
-        || scroll_y.is_null()
-        || placeholder.is_null()
-    {
-        return AkarTextAreaResponse {
-            changed: false,
-            new_cursor_pos: 0,
-        };
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return empty_textarea_response();
+    };
+    if edit_state.is_null() || scroll_y.is_null() || placeholder.is_null() {
+        return empty_textarea_response();
     }
 
     let Ok(placeholder_str) = unsafe { std::ffi::CStr::from_ptr(placeholder) }.to_str() else {
-        return AkarTextAreaResponse {
-            changed: false,
-            new_cursor_pos: 0,
-        };
+        return empty_textarea_response();
     };
 
-    let slice = unsafe { std::slice::from_raw_parts_mut(value_buf, buf_len as usize) };
-    let Ok(mut value) = String::from_utf8(slice.to_vec()) else {
-        return AkarTextAreaResponse {
-            changed: false,
-            new_cursor_pos: 0,
-        };
+    let Some(mut value) = (unsafe { value_from_ffi(value_buf, value_len, value_capacity) }) else {
+        return empty_textarea_response();
     };
 
-    let mut edit_state = akar_components::TextEditState {
-        cursor: unsafe { *cursor_pos } as usize,
-        anchor: unsafe { *cursor_pos } as usize,
+    let ffi_state = unsafe { &mut *edit_state };
+    let mut rust_state = akar_components::TextEditState {
+        cursor: ffi_state.cursor as usize,
+        anchor: ffi_state.anchor as usize,
     };
     let nid: akar_layout::NodeId = node_id.into();
     let result = akar_components::akar_textarea(
@@ -1547,23 +1819,71 @@ pub unsafe extern "C" fn akar_textarea(
         &ctx.layout,
         nid,
         &mut value,
-        &mut edit_state,
+        &mut rust_state,
         unsafe { &mut *scroll_y },
         placeholder_str,
         cursor_visible,
         &ctx.theme,
     );
 
-    let value_bytes = value.as_bytes();
-    let copy_len = value_bytes.len().min(buf_len as usize);
-    unsafe { std::ptr::copy_nonoverlapping(value_bytes.as_ptr(), slice.as_mut_ptr(), copy_len) };
-    if copy_len < buf_len as usize {
-        unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
-    }
-
-    unsafe { *cursor_pos = edit_state.cursor as u32 };
+    let written_len = unsafe { write_value_to_ffi(value_buf, value_len, value_capacity, &value) };
+    rust_state.normalize(&value[..written_len]);
+    *ffi_state = AkarTextEditState {
+        cursor: rust_state.cursor as u32,
+        anchor: rust_state.anchor as u32,
+    };
+    let (copy_len, copy_required_len) =
+        unsafe { write_copy_to_ffi(result.copy_text.as_deref(), copy_buf, copy_capacity) };
     AkarTextAreaResponse {
         changed: result.changed,
-        new_cursor_pos: edit_state.cursor as u32,
+        widget_id: ctx.layout.widget_id(nid),
+        edit_state: *ffi_state,
+        copy_len,
+        copy_required_len,
+        request_paste: result.request_paste,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{utf8_prefix_len, write_copy_to_ffi, write_value_to_ffi};
+
+    #[test]
+    fn utf8_prefix_never_splits_a_character() {
+        assert_eq!(utf8_prefix_len("aé日", 0), 0);
+        assert_eq!(utf8_prefix_len("aé日", 2), 1);
+        assert_eq!(utf8_prefix_len("aé日", 3), 3);
+        assert_eq!(utf8_prefix_len("aé日", 5), 3);
+        assert_eq!(utf8_prefix_len("aé日", 6), 6);
+    }
+
+    #[test]
+    fn value_write_updates_length_and_terminates_when_possible() {
+        let mut buffer = [0x55; 5];
+        let mut len = 0;
+        let written = unsafe { write_value_to_ffi(buffer.as_mut_ptr(), &mut len, 5, "ééé") };
+        assert_eq!(written, 4);
+        assert_eq!(len, 4);
+        assert_eq!(std::str::from_utf8(&buffer[..4]).unwrap(), "éé");
+        assert_eq!(buffer[4], 0);
+    }
+
+    #[test]
+    fn copy_write_reports_full_required_length() {
+        let mut buffer = [0x55; 3];
+        let (written, required) =
+            unsafe { write_copy_to_ffi(Some("éé"), buffer.as_mut_ptr(), 3) };
+        assert_eq!(written, 2);
+        assert_eq!(required, 4);
+        assert_eq!(std::str::from_utf8(&buffer[..2]).unwrap(), "é");
+        assert_eq!(buffer[2], 0);
+    }
+
+    #[test]
+    fn no_selection_copy_leaves_caller_buffer_untouched() {
+        let mut buffer = [0x55; 4];
+        let result = unsafe { write_copy_to_ffi(None, buffer.as_mut_ptr(), 4) };
+        assert_eq!(result, (0, 0));
+        assert_eq!(buffer, [0x55; 4]);
     }
 }

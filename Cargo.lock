@@ -45,6 +45,7 @@ dependencies = [
  "akar-core",
  "akar-layout",
  "cbindgen",
+ "cc",
  "glyphon",
  "wgpu",
 ]
