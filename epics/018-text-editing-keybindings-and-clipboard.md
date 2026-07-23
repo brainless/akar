@@ -174,6 +174,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 5 — Selection and Caret Rendering
 
+**Status:** Done
+
 - Obtain caret and selection geometry from shaped glyphon/cosmic-text layout.
 - Render selection backgrounds beneath text and caret above text under the active scissor.
 - Verify single-line, wrapped textarea, multiline, scrolled, Unicode, and zero-area cases with `MockDrawList` where possible and component screenshots where visual layout matters.

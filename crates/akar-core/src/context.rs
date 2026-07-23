@@ -10,6 +10,7 @@ pub struct AkarCore {
     pub input: InputState,
     pub text_edit_keybindings: TextEditKeybindings,
     pub(crate) quad_pipeline: QuadPipeline,
+    foreground_quad_pipeline: QuadPipeline,
     pub text_pipeline: TextPipeline,
     screenshot_capture: ScreenshotCapture,
     #[allow(dead_code)]
@@ -30,6 +31,7 @@ impl AkarCore {
             input: InputState::new(),
             text_edit_keybindings: TextEditKeybindings::default(),
             quad_pipeline: QuadPipeline::new(device, surface_format),
+            foreground_quad_pipeline: QuadPipeline::new(device, surface_format),
             text_pipeline: TextPipeline::new(device, queue, surface_format),
             screenshot_capture: ScreenshotCapture::new(device, surface_format),
             surface_format,
@@ -89,17 +91,27 @@ impl AkarCore {
             &text_calls,
         )?;
 
+        let quads = self.draw_list.sorted_quads();
+        let foreground_start = quads.partition_point(|quad| quad.z < crate::Z_TEXT_FOREGROUND);
         self.quad_pipeline.flush(
             device,
             queue,
             pass,
-            &self.draw_list.sorted_quads(),
+            &quads[..foreground_start],
             self.viewport_width,
             self.viewport_height,
         );
 
         self.text_pipeline.trim_atlas();
         self.text_pipeline.render(pass)?;
+        self.foreground_quad_pipeline.flush(
+            device,
+            queue,
+            pass,
+            &quads[foreground_start..],
+            self.viewport_width,
+            self.viewport_height,
+        );
 
         // Clear single-frame input events after all components have read them.
         self.input.begin_frame();

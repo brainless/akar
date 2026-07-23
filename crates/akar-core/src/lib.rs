@@ -10,7 +10,7 @@ pub mod quad_pipeline;
 pub use quad_pipeline::QuadPipeline;
 
 pub mod text_pipeline;
-pub use text_pipeline::TextPipeline;
+pub use text_pipeline::{TextGeometry, TextPipeline};
 
 pub mod screenshot;
 pub use screenshot::{CapturedFrame, ScreenshotError};
@@ -22,6 +22,7 @@ pub const Z_BASE: f32 = 0.0;
 pub const Z_SCRIM: f32 = 0.25;
 pub const Z_FLOAT: f32 = 0.5;
 pub const Z_OVERLAY: f32 = 0.75;
+pub const Z_TEXT_FOREGROUND: f32 = 2.0;
 
 pub fn list_clip(
     total: usize,

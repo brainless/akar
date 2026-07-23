@@ -1,4 +1,4 @@
-use akar_core::{AkarCore, Key, QuadCall, TextCall};
+use akar_core::{AkarCore, Key, QuadCall, TextCall, Z_TEXT_FOREGROUND};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
@@ -205,6 +205,32 @@ pub fn textarea(
         None,
     );
 
+    let geometry = core.text_pipeline.geometry(
+        buffer_id,
+        display_text,
+        edit_state.cursor,
+        edit_state.anchor,
+    );
+    if focused {
+        let mut selection_color = color_to_f32(theme.info);
+        selection_color[3] = 0.35;
+        for selection in &geometry.selection {
+            if let Some(quad) = text_edit_quad(
+                [
+                    text_x + selection[0],
+                    text_y + selection[1],
+                    selection[2],
+                    selection[3],
+                ],
+                selection_color,
+                0.01,
+                rect,
+            ) {
+                core.draw_list.push_quad(quad);
+            }
+        }
+    }
+
     core.draw_list.push_text(TextCall {
         buffer_id,
         x: text_x,
@@ -215,34 +241,44 @@ pub fn textarea(
     });
 
     if focused && cursor_visible {
-        let line = value[..edit_state.cursor].matches('\n').count();
-        let line_start = value[..edit_state.cursor]
-            .rfind('\n')
-            .map(|i| i + 1)
-            .unwrap_or(0);
-        let col = edit_state.cursor - line_start;
-        let cursor_x = text_x + col as f32 * theme.font_size_base * 0.5;
-        let cursor_y = rect[1] + theme.padding_y + line as f32 * line_height - *scroll_y;
-        let cursor_height = line_height;
-
-        core.draw_list.push_quad(QuadCall {
-            rect: [cursor_x, cursor_y, 2.0, cursor_height],
-            fill: color_to_f32(theme.primary),
-            border_color: [0.0; 4],
-            corner_radii: [0.0; 4],
-            border_width: 0.0,
-            z: 0.0,
-            shadow_blur: 0.0,
-            shadow_spread: 0.0,
-            shadow_color: [0.0; 4],
-            shadow_offset: [0.0; 2],
-            _pad: [0.0; 2],
-        });
+        if let Some(caret) = geometry.caret {
+            if let Some(quad) = text_edit_quad(
+                [text_x + caret[0], text_y + caret[1], caret[2], caret[3]],
+                color_to_f32(theme.primary),
+                Z_TEXT_FOREGROUND,
+                rect,
+            ) {
+                core.draw_list.push_quad(quad);
+            }
+        }
     }
 
     core.draw_list.pop_scissor();
 
     TextAreaResponse { changed }
+}
+
+fn text_edit_quad(rect: [f32; 4], fill: [f32; 4], z: f32, clip: [f32; 4]) -> Option<QuadCall> {
+    let x = rect[0].max(clip[0]);
+    let y = rect[1].max(clip[1]);
+    let width = (rect[0] + rect[2]).min(clip[0] + clip[2]) - x;
+    let height = (rect[1] + rect[3]).min(clip[1] + clip[3]) - y;
+    if width <= 0.0 || height <= 0.0 {
+        return None;
+    }
+    Some(QuadCall {
+        rect: [x, y, width, height],
+        fill,
+        border_color: [0.0; 4],
+        corner_radii: [0.0; 4],
+        border_width: 0.0,
+        z,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
+        _pad: [0.0; 2],
+    })
 }
 
 #[cfg(test)]
@@ -295,5 +331,17 @@ mod tests {
         assert_eq!(move_vertical(value, 2, 1), 6);
         assert_eq!(move_vertical(value, 6, 1), 8);
         assert_eq!(move_vertical(value, value.len(), 1), value.len());
+    }
+
+    #[test]
+    fn scrolled_text_edit_geometry_is_clipped_to_viewport() {
+        let quad = text_edit_quad(
+            [10.0, -15.0, 12.0, 20.0],
+            [1.0; 4],
+            0.01,
+            [0.0, 0.0, 100.0, 40.0],
+        )
+        .expect("partially visible");
+        assert_eq!(quad.rect, [10.0, 0.0, 12.0, 5.0]);
     }
 }
