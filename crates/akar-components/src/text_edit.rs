@@ -74,6 +74,46 @@ pub fn normalize_paste(text: &str, multiline: bool) -> String {
     }
 }
 
+pub(crate) fn copy_selection(value: &str, state: &TextEditState) -> Option<String> {
+    state
+        .has_selection()
+        .then(|| value[state.selection()].to_owned())
+}
+
+pub(crate) fn clipboard_shortcut(
+    bindings: &akar_core::TextEditKeybindings,
+    event: &akar_core::KeyEvent,
+    value: &str,
+    state: &TextEditState,
+) -> (Option<String>, bool, bool) {
+    if bindings.matches_copy(event) {
+        (copy_selection(value, state), false, true)
+    } else if bindings.matches_paste(event) {
+        (None, true, true)
+    } else {
+        (None, false, false)
+    }
+}
+
+pub(crate) fn apply_targeted_pastes(
+    input: &akar_core::InputState,
+    focused_target: Option<u64>,
+    target: u64,
+    value: &mut String,
+    state: &mut TextEditState,
+    multiline: bool,
+) -> bool {
+    if focused_target != Some(target) {
+        return false;
+    }
+
+    let mut changed = false;
+    for paste in input.pastes_for(target) {
+        changed |= replace_selection(value, state, &normalize_paste(paste, multiline));
+    }
+    changed
+}
+
 pub fn previous_boundary(value: &str, position: usize) -> usize {
     let position = normalize_position(value, position);
     value[..position]
@@ -279,5 +319,135 @@ mod tests {
     fn paste_normalization_is_mode_specific() {
         assert_eq!(normalize_paste("a\r\nb\rc", false), "a b c");
         assert_eq!(normalize_paste("a\r\nb\rc", true), "a\nb\nc");
+    }
+
+    #[test]
+    fn copy_returns_selected_text_only() {
+        let value = "aé🙂";
+        assert_eq!(
+            copy_selection(
+                value,
+                &TextEditState {
+                    anchor: 1,
+                    cursor: value.len()
+                }
+            ),
+            Some("é🙂".to_owned())
+        );
+        assert_eq!(
+            copy_selection(
+                value,
+                &TextEditState {
+                    anchor: 1,
+                    cursor: 1
+                }
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn paste_requires_matching_focused_target() {
+        let mut input = akar_core::InputState::new();
+        input.push_paste(7, "new");
+
+        let mut value = "old".to_owned();
+        let mut state = TextEditState {
+            anchor: 0,
+            cursor: 3,
+        };
+        assert!(!apply_targeted_pastes(
+            &input,
+            Some(8),
+            7,
+            &mut value,
+            &mut state,
+            false
+        ));
+        assert_eq!(value, "old");
+
+        assert!(apply_targeted_pastes(
+            &input,
+            Some(7),
+            7,
+            &mut value,
+            &mut state,
+            false
+        ));
+        assert_eq!(value, "new");
+    }
+
+    #[test]
+    fn targeted_paste_uses_widget_newline_policy() {
+        let mut input = akar_core::InputState::new();
+        input.push_paste(7, "a\r\nb");
+
+        let mut single = String::new();
+        let mut single_state = TextEditState::default();
+        assert!(apply_targeted_pastes(
+            &input,
+            Some(7),
+            7,
+            &mut single,
+            &mut single_state,
+            false
+        ));
+        assert_eq!(single, "a b");
+
+        let mut multiline = String::new();
+        let mut multiline_state = TextEditState::default();
+        assert!(apply_targeted_pastes(
+            &input,
+            Some(7),
+            7,
+            &mut multiline,
+            &mut multiline_state,
+            true
+        ));
+        assert_eq!(multiline, "a\nb");
+    }
+
+    #[test]
+    fn clipboard_shortcuts_report_copy_and_paste_requests() {
+        let bindings = akar_core::TextEditKeybindings::default();
+        let modifiers = if cfg!(target_os = "macos") {
+            akar_core::Modifiers {
+                super_key: true,
+                ..Default::default()
+            }
+        } else {
+            akar_core::Modifiers {
+                control: true,
+                ..Default::default()
+            }
+        };
+        let event = |key| akar_core::KeyEvent {
+            key,
+            modifiers,
+            repeat: false,
+        };
+        let state = TextEditState {
+            anchor: 1,
+            cursor: 3,
+        };
+
+        assert_eq!(
+            clipboard_shortcut(
+                &bindings,
+                &event(akar_core::Key::Character('c')),
+                "abcd",
+                &state
+            ),
+            (Some("bc".to_owned()), false, true)
+        );
+        assert_eq!(
+            clipboard_shortcut(
+                &bindings,
+                &event(akar_core::Key::Character('v')),
+                "abcd",
+                &state
+            ),
+            (None, true, true)
+        );
     }
 }

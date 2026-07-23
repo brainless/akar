@@ -182,6 +182,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 6 — Clipboard Request and Paste Injection
 
+**Status:** Done
+
 - Extend text edit responses with copy output and paste request state.
 - Add target-addressed paste injection to `InputState`.
 - Ensure copy and paste only affect the focused matching widget and copy never exposes unselected text.

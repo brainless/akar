@@ -32,6 +32,12 @@ pub struct KeyEvent {
     pub repeat: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PasteEvent {
+    pub target: u64,
+    pub text: String,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ShortcutModifiers(u8);
 
@@ -146,6 +152,7 @@ pub struct InputState {
     pub chars: Vec<char>,
     pub keys_pressed: Vec<Key>,
     pub key_events: Vec<KeyEvent>,
+    pub paste_events: Vec<PasteEvent>,
     pub modifiers: Modifiers,
     pub focused_id: Option<u64>,
 }
@@ -162,6 +169,7 @@ impl InputState {
             chars: Vec::new(),
             keys_pressed: Vec::new(),
             key_events: Vec::new(),
+            paste_events: Vec::new(),
             modifiers: Modifiers::default(),
             focused_id: None,
         }
@@ -175,6 +183,7 @@ impl InputState {
         self.chars.clear();
         self.keys_pressed.clear();
         self.key_events.clear();
+        self.paste_events.clear();
     }
 
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
@@ -213,6 +222,20 @@ impl InputState {
     pub fn push_key_event(&mut self, event: KeyEvent) {
         self.keys_pressed.push(event.key);
         self.key_events.push(event);
+    }
+
+    pub fn push_paste(&mut self, target: u64, text: impl Into<String>) {
+        self.paste_events.push(PasteEvent {
+            target,
+            text: text.into(),
+        });
+    }
+
+    pub fn pastes_for(&self, target: u64) -> impl Iterator<Item = &str> {
+        self.paste_events
+            .iter()
+            .filter(move |event| event.target == target)
+            .map(|event| event.text.as_str())
     }
 
     pub fn is_hovering(&self, rect: [f32; 4]) -> bool {
@@ -303,6 +326,20 @@ mod tests {
         input.begin_frame();
         assert!(input.key_events.is_empty());
         assert!(input.keys_pressed.is_empty());
+    }
+
+    #[test]
+    fn paste_events_are_targeted_and_clear_per_frame() {
+        let mut input = InputState::new();
+        input.push_paste(7, "first");
+        input.push_paste(9, "other");
+        input.push_paste(7, "second");
+
+        assert_eq!(input.pastes_for(7).collect::<Vec<_>>(), ["first", "second"]);
+        assert_eq!(input.pastes_for(9).collect::<Vec<_>>(), ["other"]);
+
+        input.begin_frame();
+        assert!(input.paste_events.is_empty());
     }
 
     #[test]

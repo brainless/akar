@@ -25,6 +25,7 @@ pub enum ScriptStep {
     Scroll(f32, f32),
     Key(Key),
     Type(String),
+    Paste(HoverTarget, String),
     Delay(f64),
     Screenshot(String),
 }
@@ -83,6 +84,20 @@ pub fn parse_script(input: &str) -> Result<Vec<ScriptStep>, String> {
         }
         if let Some(rest) = line.strip_prefix("type") {
             steps.push(ScriptStep::Type(parse_quoted(rest)?));
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("paste") {
+            let mut parts = rest.split_whitespace();
+            let target = parts
+                .next()
+                .ok_or_else(|| format!("line {}: paste requires a target", i + 1))?;
+            let label = target
+                .strip_prefix('@')
+                .ok_or_else(|| format!("line {}: paste target must be a label", i + 1))?;
+            steps.push(ScriptStep::Paste(
+                HoverTarget::Label(label.to_string()),
+                parse_quoted(rest)?,
+            ));
             continue;
         }
         let mut parts = line.split_whitespace();
@@ -254,6 +269,13 @@ impl ScriptRunner {
                 }
                 None
             }
+            ScriptStep::Paste(HoverTarget::Label(name), text) => {
+                if let Some(node) = layout.resolve_label(&name) {
+                    input.push_paste(layout.widget_id(node), text);
+                }
+                None
+            }
+            ScriptStep::Paste(HoverTarget::Coords(_, _), _) => unreachable!(),
             ScriptStep::Delay(_) => unreachable!(),
         }
     }
@@ -316,6 +338,31 @@ mod tests {
     }
 
     #[test]
+    fn parse_and_inject_targeted_paste() {
+        let steps = parse_script("paste @field \"hello clipboard\"\n").unwrap();
+        assert_eq!(
+            steps,
+            vec![ScriptStep::Paste(
+                HoverTarget::Label("field".to_string()),
+                "hello clipboard".to_string()
+            )]
+        );
+
+        use akar_layout::{Layout as L, Style};
+        let mut layout = L::new();
+        let node = layout.new_leaf(Style::default());
+        layout.register_label("field", node);
+        let target = layout.widget_id(node);
+        let mut runner = ScriptRunner::new(steps);
+        let mut input = InputState::new();
+        runner.advance(&mut input, &layout, Instant::now());
+        assert_eq!(
+            input.pastes_for(target).collect::<Vec<_>>(),
+            ["hello clipboard"]
+        );
+    }
+
+    #[test]
     fn parse_delay_and_screenshot() {
         let steps = parse_script("delay 0.25\nscreenshot /tmp/out.png\n").unwrap();
         assert_eq!(
@@ -367,6 +414,8 @@ mod tests {
         assert!(parse_script("type").is_err());
         assert!(parse_script("type noquotes").is_err());
         assert!(parse_script("type \"unterminated").is_err());
+        assert!(parse_script("paste \"text\"").is_err());
+        assert!(parse_script("paste 10 20 \"text\"").is_err());
     }
 
     #[test]

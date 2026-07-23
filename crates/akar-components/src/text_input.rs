@@ -3,14 +3,17 @@ use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_edit::{
-    delete_selection, next_boundary, normalize_paste, previous_boundary, replace_selection,
-    TextEditState,
+    apply_targeted_pastes, clipboard_shortcut, delete_selection, next_boundary, normalize_paste,
+    previous_boundary, replace_selection, TextEditState,
 };
 use crate::AkarTheme;
 
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct TextInputResponse {
     pub changed: bool,
     pub submitted: bool,
+    pub copy_text: Option<String>,
+    pub request_paste: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -27,10 +30,7 @@ pub fn text_input(
     let rect = layout.rect(node_id);
 
     if rect[2] == 0.0 || rect[3] == 0.0 {
-        return TextInputResponse {
-            changed: false,
-            submitted: false,
-        };
+        return TextInputResponse::default();
     }
 
     let id_u64 = layout.widget_id(node_id);
@@ -50,9 +50,19 @@ pub fn text_input(
 
     let mut changed = false;
     let mut submitted = false;
+    let mut copy_text = None;
+    let mut request_paste = false;
 
     if focused {
         edit_state.normalize(value);
+        changed |= apply_targeted_pastes(
+            &core.input,
+            core.input.focused_id,
+            id_u64,
+            value,
+            edit_state,
+            false,
+        );
         let chars: String = core.input.chars.iter().collect();
         if !chars.is_empty() {
             changed |= replace_selection(value, edit_state, &normalize_paste(&chars, false));
@@ -61,7 +71,18 @@ pub fn text_input(
         for event in core.input.key_events.clone() {
             if core.text_edit_keybindings.matches_select_all(&event) {
                 edit_state.select_all(value);
-            } else if event.key == Key::Backspace {
+                continue;
+            }
+            let clipboard =
+                clipboard_shortcut(&core.text_edit_keybindings, &event, value, edit_state);
+            if clipboard.2 {
+                if clipboard.0.is_some() {
+                    copy_text = clipboard.0;
+                }
+                request_paste |= clipboard.1;
+                continue;
+            }
+            if event.key == Key::Backspace {
                 if edit_state.has_selection() {
                     changed |= delete_selection(value, edit_state);
                 } else if edit_state.cursor > 0 {
@@ -206,7 +227,12 @@ pub fn text_input(
     }
     core.draw_list.pop_scissor();
 
-    TextInputResponse { changed, submitted }
+    TextInputResponse {
+        changed,
+        submitted,
+        copy_text,
+        request_paste,
+    }
 }
 
 fn text_edit_quad(rect: [f32; 4], fill: [f32; 4], z: f32, clip: [f32; 4]) -> Option<QuadCall> {
