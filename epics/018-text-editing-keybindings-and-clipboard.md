@@ -165,6 +165,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 4 — Shared Selection and Editing Engine
 
+**Status:** Done
+
 - Introduce `TextEditState` and shared UTF-8-safe range/edit helpers used by both widgets.
 - Migrate TextInput and Textarea from `cursor_pos: &mut usize`.
 - Implement select-all, selection deletion/replacement, collapse-on-arrow behavior, and multiline-safe paste normalization.

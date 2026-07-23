@@ -88,6 +88,9 @@ pub use select::select as akar_select;
 pub mod text_input;
 pub use text_input::{text_input as akar_text_input, TextInputResponse};
 
+pub mod text_edit;
+pub use text_edit::TextEditState;
+
 pub mod textarea;
 pub use textarea::{textarea as akar_textarea, TextAreaResponse};
 

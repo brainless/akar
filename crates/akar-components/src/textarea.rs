@@ -2,34 +2,14 @@ use akar_core::{AkarCore, Key, QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
+use crate::text_edit::{
+    delete_selection, next_boundary, normalize_paste, previous_boundary, replace_selection,
+    TextEditState,
+};
 use crate::AkarTheme;
 
 pub struct TextAreaResponse {
     pub changed: bool,
-}
-
-fn prev_char_boundary(s: &str, pos: usize) -> usize {
-    let mut i = pos.min(s.len());
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    s[..i]
-        .char_indices()
-        .next_back()
-        .map(|(i, _)| i)
-        .unwrap_or(0)
-}
-
-fn next_char_boundary(s: &str, pos: usize) -> usize {
-    let mut i = pos.min(s.len());
-    while i < s.len() && !s.is_char_boundary(i) {
-        i += 1;
-    }
-    if i >= s.len() {
-        return s.len();
-    }
-    let c = s[i..].chars().next().unwrap();
-    i + c.len_utf8()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -38,7 +18,7 @@ pub fn textarea(
     layout: &Layout,
     node_id: NodeId,
     value: &mut String,
-    cursor_pos: &mut usize,
+    edit_state: &mut TextEditState,
     scroll_y: &mut f32,
     placeholder: &str,
     cursor_visible: bool,
@@ -77,97 +57,104 @@ pub fn textarea(
     let mut changed = false;
 
     if focused {
-        for &c in &core.input.chars {
-            value.insert(*cursor_pos, c);
-            *cursor_pos += 1;
-            changed = true;
+        edit_state.normalize(value);
+        let chars: String = core.input.chars.iter().collect();
+        if !chars.is_empty() {
+            changed |= replace_selection(value, edit_state, &normalize_paste(&chars, true));
         }
 
-        for key in &core.input.keys_pressed {
-            match key {
-                Key::Backspace if *cursor_pos > 0 => {
-                    let len = value[..*cursor_pos]
-                        .chars()
-                        .last()
-                        .map(|c| c.len_utf8())
-                        .unwrap_or(0);
-                    if len > 0 {
-                        value.drain(*cursor_pos - len..*cursor_pos);
-                        *cursor_pos -= len;
-                        changed = true;
-                    }
+        for event in core.input.key_events.clone() {
+            if core.text_edit_keybindings.matches_select_all(&event) {
+                edit_state.select_all(value);
+            } else if event.key == Key::Backspace {
+                if edit_state.has_selection() {
+                    changed |= delete_selection(value, edit_state);
+                } else if edit_state.cursor > 0 {
+                    let start = previous_boundary(value, edit_state.cursor);
+                    edit_state.anchor = start;
+                    changed |= delete_selection(value, edit_state);
                 }
-                Key::Delete if *cursor_pos < value.len() => {
-                    let len = value[*cursor_pos..]
-                        .chars()
-                        .next()
-                        .map(|c| c.len_utf8())
-                        .unwrap_or(0);
-                    if len > 0 {
-                        value.drain(*cursor_pos..*cursor_pos + len);
-                        changed = true;
-                    }
+            } else if event.key == Key::Delete {
+                if edit_state.has_selection() {
+                    changed |= delete_selection(value, edit_state);
+                } else if edit_state.cursor < value.len() {
+                    let end = next_boundary(value, edit_state.cursor);
+                    edit_state.anchor = end;
+                    changed |= delete_selection(value, edit_state);
                 }
-                Key::Left if *cursor_pos > 0 => {
-                    *cursor_pos = prev_char_boundary(value, *cursor_pos);
-                }
-                Key::Right if *cursor_pos < value.len() => {
-                    *cursor_pos = next_char_boundary(value, *cursor_pos);
-                }
-                Key::Up => {
-                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                    if line_start > 0 {
-                        let prev_line_end = value[..line_start.saturating_sub(1)]
+            } else {
+                match event.key {
+                    Key::Left if edit_state.has_selection() => edit_state.collapse_to_start(),
+                    Key::Left => edit_state.cursor = previous_boundary(value, edit_state.cursor),
+                    Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
+                    Key::Right => edit_state.cursor = next_boundary(value, edit_state.cursor),
+                    Key::Up => {
+                        let line_start = value[..edit_state.cursor]
                             .rfind('\n')
                             .map(|i| i + 1)
                             .unwrap_or(0);
-                        let col = *cursor_pos - line_start;
-                        *cursor_pos = (prev_line_end + col).min(
-                            value[prev_line_end..]
+                        if line_start > 0 {
+                            let prev_line_end = value[..line_start.saturating_sub(1)]
+                                .rfind('\n')
+                                .map(|i| i + 1)
+                                .unwrap_or(0);
+                            let col = edit_state.cursor - line_start;
+                            edit_state.cursor = (prev_line_end + col).min(
+                                value[prev_line_end..]
+                                    .find('\n')
+                                    .map(|i| prev_line_end + i)
+                                    .unwrap_or(value.len()),
+                            );
+                        } else {
+                            edit_state.cursor = 0;
+                        }
+                    }
+                    Key::Down => {
+                        let line_start = value[..edit_state.cursor]
+                            .rfind('\n')
+                            .map(|i| i + 1)
+                            .unwrap_or(0);
+                        let col = edit_state.cursor - line_start;
+                        if let Some(next_nl) = value[edit_state.cursor..].find('\n') {
+                            let next_line_start = edit_state.cursor + next_nl + 1;
+                            let next_line_end = value[next_line_start..]
                                 .find('\n')
-                                .map(|i| prev_line_end + i)
-                                .unwrap_or(value.len()),
-                        );
-                    } else {
-                        *cursor_pos = 0;
+                                .map(|i| next_line_start + i)
+                                .unwrap_or(value.len());
+                            edit_state.cursor = (next_line_start + col).min(next_line_end);
+                        } else {
+                            edit_state.cursor = value.len();
+                        }
                     }
-                }
-                Key::Down => {
-                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                    let col = *cursor_pos - line_start;
-                    if let Some(next_nl) = value[*cursor_pos..].find('\n') {
-                        let next_line_start = *cursor_pos + next_nl + 1;
-                        let next_line_end = value[next_line_start..]
+                    Key::Home => {
+                        let line_start = value[..edit_state.cursor]
+                            .rfind('\n')
+                            .map(|i| i + 1)
+                            .unwrap_or(0);
+                        edit_state.cursor = line_start;
+                    }
+                    Key::End => {
+                        let line_end = value[edit_state.cursor..]
                             .find('\n')
-                            .map(|i| next_line_start + i)
+                            .map(|i| edit_state.cursor + i)
                             .unwrap_or(value.len());
-                        *cursor_pos = (next_line_start + col).min(next_line_end);
-                    } else {
-                        *cursor_pos = value.len();
+                        edit_state.cursor = line_end;
                     }
+                    Key::Enter => {
+                        changed |= replace_selection(value, edit_state, "\n");
+                    }
+                    Key::Escape => {
+                        core.input.focused_id = None;
+                    }
+                    _ => {}
                 }
-                Key::Home => {
-                    let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-                    *cursor_pos = line_start;
-                }
-                Key::End => {
-                    let line_end = value[*cursor_pos..]
-                        .find('\n')
-                        .map(|i| *cursor_pos + i)
-                        .unwrap_or(value.len());
-                    *cursor_pos = line_end;
-                }
-                Key::Enter => {
-                    value.insert(*cursor_pos, '\n');
-                    *cursor_pos += 1;
-                    changed = true;
-                }
-                Key::Escape => {
-                    core.input.focused_id = None;
-                }
-                _ => {}
+                edit_state.anchor = edit_state.cursor;
             }
         }
+    }
+
+    if !focused {
+        edit_state.normalize(value);
     }
 
     core.draw_list.push_scissor(rect);
@@ -225,9 +212,12 @@ pub fn textarea(
     });
 
     if focused && cursor_visible {
-        let line = value[..*cursor_pos].matches('\n').count();
-        let line_start = value[..*cursor_pos].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let col = *cursor_pos - line_start;
+        let line = value[..edit_state.cursor].matches('\n').count();
+        let line_start = value[..edit_state.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let col = edit_state.cursor - line_start;
         let cursor_x = text_x + col as f32 * theme.font_size_base * 0.5;
         let cursor_y = rect[1] + theme.padding_y + line as f32 * line_height - *scroll_y;
         let cursor_height = line_height;
@@ -265,7 +255,7 @@ mod tests {
 
         let mut core = AkarCore::mock();
         let mut value = String::new();
-        let mut cursor_pos = 0usize;
+        let mut edit_state = TextEditState::default();
         let mut scroll_y = 0.0f32;
 
         let result = textarea(
@@ -273,7 +263,7 @@ mod tests {
             &layout,
             node_id,
             &mut value,
-            &mut cursor_pos,
+            &mut edit_state,
             &mut scroll_y,
             "Placeholder",
             true,

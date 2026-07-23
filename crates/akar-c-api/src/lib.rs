@@ -1308,14 +1308,17 @@ pub unsafe extern "C" fn akar_text_input(
         };
     };
 
-    let mut cp = unsafe { *cursor_pos } as usize;
+    let mut edit_state = akar_components::TextEditState {
+        cursor: unsafe { *cursor_pos } as usize,
+        anchor: unsafe { *cursor_pos } as usize,
+    };
     let nid: akar_layout::NodeId = node_id.into();
     let result = akar_components::akar_text_input(
         &mut ctx.core,
         &ctx.layout,
         nid,
         &mut value,
-        &mut cp,
+        &mut edit_state,
         placeholder_str,
         cursor_visible,
         &ctx.theme,
@@ -1329,11 +1332,11 @@ pub unsafe extern "C" fn akar_text_input(
         unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
     }
 
-    unsafe { *cursor_pos = cp as u32 };
+    unsafe { *cursor_pos = edit_state.cursor as u32 };
     AkarTextInputResponse {
         changed: result.changed,
         submitted: result.submitted,
-        new_cursor_pos: cp as u32,
+        new_cursor_pos: edit_state.cursor as u32,
     }
 }
 
@@ -1534,14 +1537,17 @@ pub unsafe extern "C" fn akar_textarea(
         };
     };
 
-    let mut cp = unsafe { *cursor_pos } as usize;
+    let mut edit_state = akar_components::TextEditState {
+        cursor: unsafe { *cursor_pos } as usize,
+        anchor: unsafe { *cursor_pos } as usize,
+    };
     let nid: akar_layout::NodeId = node_id.into();
     let result = akar_components::akar_textarea(
         &mut ctx.core,
         &ctx.layout,
         nid,
         &mut value,
-        &mut cp,
+        &mut edit_state,
         unsafe { &mut *scroll_y },
         placeholder_str,
         cursor_visible,
@@ -1555,9 +1561,9 @@ pub unsafe extern "C" fn akar_textarea(
         unsafe { *slice.as_mut_ptr().add(copy_len) = 0 };
     }
 
-    unsafe { *cursor_pos = cp as u32 };
+    unsafe { *cursor_pos = edit_state.cursor as u32 };
     AkarTextAreaResponse {
         changed: result.changed,
-        new_cursor_pos: cp as u32,
+        new_cursor_pos: edit_state.cursor as u32,
     }
 }

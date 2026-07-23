@@ -34,7 +34,7 @@ struct DemoObject {
 struct ObjectState {
     button_clicked: bool,
     text_value: String,
-    text_cursor: usize,
+    text_cursor: akar_components::TextEditState,
 }
 
 struct PortalLayout {
@@ -176,7 +176,7 @@ impl ApplicationHandler for App {
             .map(|_| ObjectState {
                 button_clicked: false,
                 text_value: String::new(),
-                text_cursor: 0,
+                text_cursor: akar_components::TextEditState::default(),
             })
             .collect();
 

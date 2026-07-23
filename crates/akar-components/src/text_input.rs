@@ -2,35 +2,15 @@ use akar_core::{AkarCore, Key, QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
+use crate::text_edit::{
+    delete_selection, next_boundary, normalize_paste, previous_boundary, replace_selection,
+    TextEditState,
+};
 use crate::AkarTheme;
 
 pub struct TextInputResponse {
     pub changed: bool,
     pub submitted: bool,
-}
-
-fn prev_char_boundary(s: &str, pos: usize) -> usize {
-    let mut i = pos.min(s.len());
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    s[..i]
-        .char_indices()
-        .next_back()
-        .map(|(i, _)| i)
-        .unwrap_or(0)
-}
-
-fn next_char_boundary(s: &str, pos: usize) -> usize {
-    let mut i = pos.min(s.len());
-    while i < s.len() && !s.is_char_boundary(i) {
-        i += 1;
-    }
-    if i >= s.len() {
-        return s.len();
-    }
-    let c = s[i..].chars().next().unwrap();
-    i + c.len_utf8()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -39,7 +19,7 @@ pub fn text_input(
     layout: &Layout,
     node_id: NodeId,
     value: &mut String,
-    cursor_pos: &mut usize,
+    edit_state: &mut TextEditState,
     placeholder: &str,
     cursor_visible: bool,
     theme: &AkarTheme,
@@ -72,58 +52,59 @@ pub fn text_input(
     let mut submitted = false;
 
     if focused {
-        for &c in &core.input.chars {
-            value.insert(*cursor_pos, c);
-            *cursor_pos += 1;
-            changed = true;
+        edit_state.normalize(value);
+        let chars: String = core.input.chars.iter().collect();
+        if !chars.is_empty() {
+            changed |= replace_selection(value, edit_state, &normalize_paste(&chars, false));
         }
 
-        for key in &core.input.keys_pressed {
-            match key {
-                Key::Backspace if *cursor_pos > 0 => {
-                    let len = value[..*cursor_pos]
-                        .chars()
-                        .last()
-                        .map(|c| c.len_utf8())
-                        .unwrap_or(0);
-                    if len > 0 {
-                        value.drain(*cursor_pos - len..*cursor_pos);
-                        *cursor_pos -= len;
-                        changed = true;
+        for event in core.input.key_events.clone() {
+            if core.text_edit_keybindings.matches_select_all(&event) {
+                edit_state.select_all(value);
+            } else if event.key == Key::Backspace {
+                if edit_state.has_selection() {
+                    changed |= delete_selection(value, edit_state);
+                } else if edit_state.cursor > 0 {
+                    let start = previous_boundary(value, edit_state.cursor);
+                    edit_state.anchor = start;
+                    changed |= delete_selection(value, edit_state);
+                }
+            } else if event.key == Key::Delete {
+                if edit_state.has_selection() {
+                    changed |= delete_selection(value, edit_state);
+                } else if edit_state.cursor < value.len() {
+                    let end = next_boundary(value, edit_state.cursor);
+                    edit_state.anchor = end;
+                    changed |= delete_selection(value, edit_state);
+                }
+            } else {
+                match event.key {
+                    Key::Left if edit_state.has_selection() => edit_state.collapse_to_start(),
+                    Key::Left => edit_state.cursor = previous_boundary(value, edit_state.cursor),
+                    Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
+                    Key::Right => edit_state.cursor = next_boundary(value, edit_state.cursor),
+                    Key::Home => {
+                        edit_state.cursor = 0;
+                        edit_state.anchor = 0;
                     }
-                }
-                Key::Delete if *cursor_pos < value.len() => {
-                    let len = value[*cursor_pos..]
-                        .chars()
-                        .next()
-                        .map(|c| c.len_utf8())
-                        .unwrap_or(0);
-                    if len > 0 {
-                        value.drain(*cursor_pos..*cursor_pos + len);
-                        changed = true;
+                    Key::End => {
+                        edit_state.cursor = value.len();
+                        edit_state.anchor = value.len();
                     }
+                    Key::Enter => {
+                        submitted = true;
+                    }
+                    Key::Escape => {
+                        core.input.focused_id = None;
+                    }
+                    _ => {}
                 }
-                Key::Left if *cursor_pos > 0 => {
-                    *cursor_pos = prev_char_boundary(value, *cursor_pos);
-                }
-                Key::Right if *cursor_pos < value.len() => {
-                    *cursor_pos = next_char_boundary(value, *cursor_pos);
-                }
-                Key::Home => {
-                    *cursor_pos = 0;
-                }
-                Key::End => {
-                    *cursor_pos = value.len();
-                }
-                Key::Enter => {
-                    submitted = true;
-                }
-                Key::Escape => {
-                    core.input.focused_id = None;
-                }
-                _ => {}
             }
         }
+    }
+
+    if !focused {
+        edit_state.normalize(value);
     }
 
     let border_color = if focused {
@@ -179,7 +160,7 @@ pub fn text_input(
     });
 
     if focused && cursor_visible {
-        let cursor_x = text_x + *cursor_pos as f32 * theme.font_size_base * 0.5;
+        let cursor_x = text_x + edit_state.cursor as f32 * theme.font_size_base * 0.5;
         let cursor_y = rect[1] + theme.padding_y;
         let cursor_height = theme.font_size_base * 1.2;
 
@@ -214,14 +195,14 @@ mod tests {
 
         let mut core = AkarCore::mock();
         let mut value = String::new();
-        let mut cursor_pos = 0usize;
+        let mut edit_state = TextEditState::default();
 
         let result = text_input(
             &mut core,
             &layout,
             node_id,
             &mut value,
-            &mut cursor_pos,
+            &mut edit_state,
             "Placeholder",
             true,
             &AKAR_THEME_DARK,
