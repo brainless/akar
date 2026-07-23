@@ -67,7 +67,7 @@ cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --
 
 Beyond the basic capture, the binary exposes a full debug toolchain (see `AGENTS.md` → "Debug toolchain" for the recommended loop and full flag reference):
 
-- `--script <FILE>` — line-based input injection (`hover`, `press`, `release`, `click`, `scroll`, `key`, `type`, `delay`, `screenshot`) with `@label` element addressing, for capturing non-idle/interactive states frame-precisely.
+- `--script <FILE>` — line-based input injection (`hover`, `press`, `release`, `click`, `scroll`, modifier-aware `key`, `type`, targeted `paste`, `text-bindings`, `delay`, `screenshot`) with `@label` element addressing, for capturing non-idle/interactive states frame-precisely. Text editing examples are under `examples/demo-rust/scripts/text_edit_*.txt`.
 - `--dump-layout` — prints `name x y w h` for every labeled layout node and exits (element discovery).
 - `--dump-frame <PATH>` — structured JSON dump for the captured frame: every draw call (including culled ones, with z-order and scissor), labeled layout rects, and an input snapshot.
 - `--component <name>` / `--list-components` — isolate a single component, force its interesting state once (open drawer/dropdown/modal), and **auto-crop** the PNG to its bounding box, removing unrelated UI as visual noise.

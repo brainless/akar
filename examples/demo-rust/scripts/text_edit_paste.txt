@@ -1,0 +1,7 @@
+# Inject host-owned clipboard text into both Form editors.
+click @form_name
+paste @form_name "new name"
+screenshot /tmp/form-name-pasted.png
+click @form_notes
+paste @form_notes "first line\r\nsecond line"
+screenshot /tmp/form-notes-pasted.png

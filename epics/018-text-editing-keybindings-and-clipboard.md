@@ -1,6 +1,6 @@
 # Epic 018: Text Editing, Keybindings, and Clipboard Interop
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Make `text_input` and `textarea` reliable, configurable text editors with selection, platform-standard select/copy/paste shortcuts, and a platform-neutral clipboard boundary.
 
 **Prerequisite:** Epic 017 is `Status: Done` and `cargo clippy --workspace -- -D warnings` passes clean.
@@ -200,6 +200,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 8 — Demo, Documentation, and Verification
 
+**Status:** Done
+
 - Configure the Form demo with platform defaults and show visible selection state.
 - Extend scripts with modifier shortcuts and injected paste text.
 - Capture TextInput and Textarea through `--component form` or a focused isolation target for Backspace, select-all, copy request, paste, and customized bindings.
@@ -209,14 +211,14 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ## Acceptance Criteria
 
-- [ ] Backspace removes the preceding visible character in both Form text widgets through the real winit/demo input path.
-- [ ] TextInput and Textarea support selectable UTF-8 text with visible selection rendering.
-- [ ] Default Select All, Copy, and Paste use Cmd on macOS and Ctrl on Windows/Linux.
-- [ ] Downstream applications can change all three bindings once at context level.
-- [ ] Copy operates only on selected text; paste and typed text replace selected text.
-- [ ] Clipboard reads/writes remain host-owned; akar core/components have no platform clipboard dependency.
-- [ ] C callers can configure bindings, pass paste text, receive copy requests safely, and use explicit buffer length/capacity.
-- [ ] Unit, C ABI, scripted demo, and visual verification cover the new behavior.
+- [x] Backspace removes the preceding visible character in both Form text widgets through the real winit/demo input path.
+- [x] TextInput and Textarea support selectable UTF-8 text with visible selection rendering.
+- [x] Default Select All, Copy, and Paste use Cmd on macOS and Ctrl on Windows/Linux.
+- [x] Downstream applications can change all three bindings once at context level.
+- [x] Copy operates only on selected text; paste and typed text replace selected text.
+- [x] Clipboard reads/writes remain host-owned; akar core/components have no platform clipboard dependency.
+- [x] C callers can configure bindings, pass paste text, receive copy requests safely, and use explicit buffer length/capacity.
+- [x] Unit, C ABI, scripted demo, and visual verification cover the new behavior.
 
 ---
 

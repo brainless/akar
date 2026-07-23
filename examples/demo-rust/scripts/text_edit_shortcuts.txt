@@ -1,0 +1,7 @@
+# Capture the default platform Select All and Copy shortcuts in TextInput.
+click @form_name
+type "Selected name"
+key Primary+a
+screenshot /tmp/form-name-selected.png
+key Primary+c
+screenshot /tmp/form-name-copy-request.png

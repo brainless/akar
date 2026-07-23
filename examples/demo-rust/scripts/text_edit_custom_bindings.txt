@@ -1,0 +1,9 @@
+# Replace the context-wide defaults and exercise Alt+A/C/V.
+text-bindings Alt+a Alt+c Alt+v
+click @form_notes
+type "custom bindings"
+key Alt+a
+screenshot /tmp/form-notes-custom-selected.png
+key Alt+c
+key Alt+v
+screenshot /tmp/form-notes-custom-paste-request.png

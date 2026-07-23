@@ -1,6 +1,8 @@
 use std::time::{Duration, Instant};
 
-use akar_core::{InputState, Key};
+use akar_core::{
+    InputState, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
+};
 use akar_layout::Layout;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -23,7 +25,8 @@ pub enum ScriptStep {
     Release(MouseButton),
     Click(HoverTarget),
     Scroll(f32, f32),
-    Key(Key),
+    Key(KeyEvent),
+    TextBindings(TextEditKeybindings),
     Type(String),
     Paste(HoverTarget, String),
     Delay(f64),
@@ -60,8 +63,53 @@ fn parse_key(s: &str) -> Result<Key, String> {
         "Enter" => Ok(Key::Enter),
         "Escape" => Ok(Key::Escape),
         "Tab" => Ok(Key::Tab),
+        other if other.chars().count() == 1 => {
+            let character = other.chars().next().unwrap();
+            Ok(Key::Character(character.to_ascii_lowercase()))
+        }
         other => Err(format!("unknown key '{other}'")),
     }
+}
+
+fn parse_shortcut(s: &str) -> Result<(Shortcut, Modifiers), String> {
+    let mut modifiers = ShortcutModifiers::NONE;
+    let mut event_modifiers = Modifiers::default();
+    let mut key = None;
+    for part in s.split('+') {
+        match part {
+            "Primary" => {
+                modifiers |= ShortcutModifiers::PRIMARY;
+                if cfg!(target_os = "macos") {
+                    event_modifiers.super_key = true;
+                } else {
+                    event_modifiers.control = true;
+                }
+            }
+            "Control" => {
+                modifiers |= ShortcutModifiers::CONTROL;
+                event_modifiers.control = true;
+            }
+            "Super" => {
+                modifiers |= ShortcutModifiers::SUPER;
+                event_modifiers.super_key = true;
+            }
+            "Alt" => {
+                modifiers |= ShortcutModifiers::ALT;
+                event_modifiers.alt = true;
+            }
+            "Shift" => {
+                modifiers |= ShortcutModifiers::SHIFT;
+                event_modifiers.shift = true;
+            }
+            other => {
+                if key.replace(parse_key(other)?).is_some() {
+                    return Err(format!("shortcut '{s}' has more than one key"));
+                }
+            }
+        }
+    }
+    let key = key.ok_or_else(|| format!("shortcut '{s}' requires a key"))?;
+    Ok((Shortcut::new(modifiers, key), event_modifiers))
 }
 
 fn parse_quoted(line: &str) -> Result<String, String> {
@@ -72,7 +120,26 @@ fn parse_quoted(line: &str) -> Result<String, String> {
     let end = rest
         .find('"')
         .ok_or_else(|| "type command requires a closing quote".to_string())?;
-    Ok(rest[..end].to_string())
+    let mut parsed = String::new();
+    let mut chars = rest[..end].chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            parsed.push(c);
+            continue;
+        }
+        let escaped = chars
+            .next()
+            .ok_or_else(|| "quoted string ends with an escape".to_string())?;
+        parsed.push(match escaped {
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            '\\' => '\\',
+            '"' => '"',
+            other => return Err(format!("unsupported escape '\\{other}'")),
+        });
+    }
+    Ok(parsed)
 }
 
 pub fn parse_script(input: &str) -> Result<Vec<ScriptStep>, String> {
@@ -157,7 +224,34 @@ pub fn parse_script(input: &str) -> Result<Vec<ScriptStep>, String> {
                 let name = parts
                     .next()
                     .ok_or_else(|| format!("line {}: key requires a name", i + 1))?;
-                ScriptStep::Key(parse_key(name)?)
+                let (shortcut, modifiers) = parse_shortcut(name)?;
+                ScriptStep::Key(KeyEvent {
+                    key: shortcut.key,
+                    modifiers,
+                    repeat: false,
+                })
+            }
+            "text-bindings" => {
+                let select_all = parts.next().ok_or_else(|| {
+                    format!("line {}: text-bindings requires three shortcuts", i + 1)
+                })?;
+                let copy = parts.next().ok_or_else(|| {
+                    format!("line {}: text-bindings requires three shortcuts", i + 1)
+                })?;
+                let paste = parts.next().ok_or_else(|| {
+                    format!("line {}: text-bindings requires three shortcuts", i + 1)
+                })?;
+                if parts.next().is_some() {
+                    return Err(format!(
+                        "line {}: text-bindings accepts exactly three shortcuts",
+                        i + 1
+                    ));
+                }
+                ScriptStep::TextBindings(TextEditKeybindings {
+                    select_all: parse_shortcut(select_all)?.0,
+                    copy: parse_shortcut(copy)?.0,
+                    paste: parse_shortcut(paste)?.0,
+                })
             }
             "delay" => {
                 let secs = parts
@@ -214,6 +308,7 @@ impl ScriptRunner {
     pub fn advance(
         &mut self,
         input: &mut InputState,
+        text_edit_keybindings: &mut TextEditKeybindings,
         layout: &Layout,
         now: Instant,
     ) -> Option<String> {
@@ -259,8 +354,12 @@ impl ScriptRunner {
                 input.push_scroll(dx, dy);
                 None
             }
-            ScriptStep::Key(k) => {
-                input.push_key(k);
+            ScriptStep::Key(event) => {
+                input.push_key_event(event);
+                None
+            }
+            ScriptStep::TextBindings(bindings) => {
+                *text_edit_keybindings = bindings;
                 None
             }
             ScriptStep::Type(s) => {
@@ -330,8 +429,16 @@ mod tests {
             steps,
             vec![
                 ScriptStep::Scroll(-10.0, 20.0),
-                ScriptStep::Key(Key::Enter),
-                ScriptStep::Key(Key::Escape),
+                ScriptStep::Key(KeyEvent {
+                    key: Key::Enter,
+                    modifiers: Modifiers::default(),
+                    repeat: false,
+                }),
+                ScriptStep::Key(KeyEvent {
+                    key: Key::Escape,
+                    modifiers: Modifiers::default(),
+                    repeat: false,
+                }),
                 ScriptStep::Type("hello world".to_string()),
             ]
         );
@@ -355,7 +462,8 @@ mod tests {
         let target = layout.widget_id(node);
         let mut runner = ScriptRunner::new(steps);
         let mut input = InputState::new();
-        runner.advance(&mut input, &layout, Instant::now());
+        let mut bindings = TextEditKeybindings::default();
+        runner.advance(&mut input, &mut bindings, &layout, Instant::now());
         assert_eq!(
             input.pastes_for(target).collect::<Vec<_>>(),
             ["hello clipboard"]
@@ -404,6 +512,29 @@ mod tests {
     }
 
     #[test]
+    fn parse_modifier_shortcuts_and_custom_bindings() {
+        let steps = parse_script("key Primary+A\nkey Control+c\ntext-bindings Alt+a Alt+c Alt+v\n")
+            .unwrap();
+        assert!(matches!(
+            steps[0],
+            ScriptStep::Key(KeyEvent {
+                key: Key::Character('a'),
+                ..
+            })
+        ));
+        assert!(matches!(steps[2], ScriptStep::TextBindings(_)));
+    }
+
+    #[test]
+    fn parse_paste_decodes_newline_escapes() {
+        let steps = parse_script("paste @field \"first\\r\\nsecond\"\n").unwrap();
+        assert!(matches!(
+            &steps[0],
+            ScriptStep::Paste(_, text) if text == "first\r\nsecond"
+        ));
+    }
+
+    #[test]
     fn parse_malformed_lines_error() {
         assert!(parse_script("hover onlyone").is_err());
         assert!(parse_script("click @missing x").is_err());
@@ -422,9 +553,10 @@ mod tests {
     fn runner_fires_click_same_frame() {
         let layout = Layout::new();
         let mut input = InputState::new();
+        let mut bindings = TextEditKeybindings::default();
         let steps = parse_script("click 10 10\n").unwrap();
         let mut runner = ScriptRunner::new(steps);
-        let path = runner.advance(&mut input, &layout, Instant::now());
+        let path = runner.advance(&mut input, &mut bindings, &layout, Instant::now());
         assert!(path.is_none());
         assert!(input.is_clicked([0.0, 0.0, 20.0, 20.0]));
     }
@@ -435,15 +567,18 @@ mod tests {
         let steps = parse_script("delay 0.05\nhover 5 5\n").unwrap();
         let mut runner = ScriptRunner::new(steps);
         let mut input = InputState::new();
+        let mut bindings = TextEditKeybindings::default();
         let layout = Layout::new();
 
         let t0 = Instant::now();
-        assert!(runner.advance(&mut input, &layout, t0).is_none());
+        assert!(runner
+            .advance(&mut input, &mut bindings, &layout, t0)
+            .is_none());
         assert!(!runner.is_exhausted());
 
         thread::sleep(Duration::from_millis(60));
         let t1 = Instant::now();
-        runner.advance(&mut input, &layout, t1);
+        runner.advance(&mut input, &mut bindings, &layout, t1);
         assert!(runner.is_exhausted());
     }
 
@@ -452,8 +587,9 @@ mod tests {
         let steps = parse_script("screenshot /tmp/x.png\n").unwrap();
         let mut runner = ScriptRunner::new(steps);
         let mut input = InputState::new();
+        let mut bindings = TextEditKeybindings::default();
         let layout = Layout::new();
-        let path = runner.advance(&mut input, &layout, Instant::now());
+        let path = runner.advance(&mut input, &mut bindings, &layout, Instant::now());
         assert_eq!(path, Some("/tmp/x.png".to_string()));
         assert!(runner.is_exhausted());
     }
@@ -474,9 +610,10 @@ mod tests {
         layout.compute(root, (Some(100.0), Some(100.0)), |_, _, _, _, _| Size::ZERO);
         layout.register_label("box", node);
         let mut input = InputState::new();
+        let mut bindings = TextEditKeybindings::default();
         let steps = parse_script("hover @box\n").unwrap();
         let mut runner = ScriptRunner::new(steps);
-        runner.advance(&mut input, &layout, Instant::now());
+        runner.advance(&mut input, &mut bindings, &layout, Instant::now());
         assert_eq!(input.mouse_pos.x, 20.0);
         assert_eq!(input.mouse_pos.y, 10.0);
     }

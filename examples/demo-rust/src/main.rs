@@ -1413,7 +1413,8 @@ impl ApplicationHandler for App {
         let surface_format = surface_config.format;
         surface.configure(&device, &surface_config);
 
-        let core = AkarCore::new(&device, &queue, surface_format);
+        let mut core = AkarCore::new(&device, &queue, surface_format);
+        core.set_text_edit_keybindings(akar_core::TextEditKeybindings::platform_default());
         let mut layout = Layout::new();
 
         let page = layout.page(PageConfig {
@@ -1952,7 +1953,12 @@ impl ApplicationHandler for App {
                 }
 
                 let script_capture_path = if let Some(runner) = self.script_runner.as_mut() {
-                    runner.advance(&mut state.core.input, &state.layout, Instant::now())
+                    runner.advance(
+                        &mut state.core.input,
+                        &mut state.core.text_edit_keybindings,
+                        &state.layout,
+                        Instant::now(),
+                    )
                 } else {
                     None
                 };
@@ -2154,6 +2160,8 @@ impl ApplicationHandler for App {
         if let Some(runner) = &self.script_runner {
             if self.exit_after && runner.is_exhausted() {
                 event_loop.exit();
+            } else if !runner.is_exhausted() {
+                state.window.request_redraw();
             }
         }
 

@@ -61,6 +61,20 @@ Beyond the basic capture, the toolchain includes:
 
 See `AGENTS.md` → "Debug toolchain" for the recommended iteration loop and full flag reference. Design and history: `epics/013-screenshot-utility.md`, `epics/014-screenshot-enhancements.md`, `epics/015-component-isolation.md`.
 
+## Text editing and clipboard integration
+
+Text selection is caller-owned through `akar_components::TextEditState { cursor, anchor }`; both fields are UTF-8 byte positions, and a collapsed selection has equal positions. Pass the same state and `String` to `akar_text_input` or `akar_textarea` every frame. The widgets normalize invalid external positions, draw the selection and caret from shaped text geometry, and return `copy_text` and `request_paste` in their response.
+
+Select All, Copy, and Paste use platform defaults (`Cmd` on macOS, `Ctrl` on Windows/Linux). Configure all editors in a context once with `AkarCore::set_text_edit_keybindings(TextEditKeybindings { ... })`; per-widget overrides are not supported. Clipboard access remains host-owned:
+
+1. When a focused widget returns `copy_text`, write that selected text to the platform clipboard.
+2. When it returns `request_paste`, read the clipboard and retain the response's widget identity (`layout.widget_id(node)` in Rust, `widget_id` in C).
+3. Before the next frame, call `core.input.push_paste(widget_id, text)`. The target prevents delayed clipboard data from reaching a different focused editor.
+
+The C ABI mirrors this flow with `AkarTextEditState`, `AkarTextEditKeybindings`, `akar_set_text_edit_keybindings`, and `akar_push_paste`. Text buffers use separate logical `value_len` and allocation `value_capacity` arguments. Copy responses write into the caller-provided copy buffer and report both `copy_len` and `copy_required_len`; no Rust-owned pointer escapes the call.
+
+Demo scripts support modifier-aware keys such as `key Primary+a`, `key Control+c`, and `key Alt+v`; `paste @form_name "text"` injects a targeted payload. `text-bindings Alt+a Alt+c Alt+v` replaces the demo context's Select All, Copy, and Paste bindings. See `examples/demo-rust/scripts/text_edit_*.txt` for focused Form scenarios.
+
 ## License
 
 MIT
