@@ -41,6 +41,8 @@ struct InputSnapshot {
     scroll_delta: [f32; 2],
     chars: Vec<String>,
     keys_pressed: Vec<String>,
+    key_events: Vec<String>,
+    modifiers: [bool; 4],
     focused_id: Option<u64>,
 }
 
@@ -64,6 +66,17 @@ fn input_snapshot(input: &akar_core::InputState) -> InputSnapshot {
             .iter()
             .map(|k| format!("{k:?}"))
             .collect(),
+        key_events: input
+            .key_events
+            .iter()
+            .map(|event| format!("{event:?}"))
+            .collect(),
+        modifiers: [
+            input.modifiers.shift,
+            input.modifiers.control,
+            input.modifiers.alt,
+            input.modifiers.super_key,
+        ],
         focused_id: input.focused_id,
     }
 }

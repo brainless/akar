@@ -1,4 +1,4 @@
-use akar_core::InputState;
+use akar_core::{InputState, Key, KeyEvent, Modifiers};
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 fn is_committed_text_char(c: char) -> bool {
@@ -28,6 +28,64 @@ fn named_key(name: &winit::keyboard::NamedKey) -> Option<akar_core::Key> {
     })
 }
 
+fn modifiers(state: winit::keyboard::ModifiersState) -> Modifiers {
+    Modifiers {
+        shift: state.shift_key(),
+        control: state.control_key(),
+        alt: state.alt_key(),
+        super_key: state.super_key(),
+    }
+}
+
+fn logical_key(key: &winit::keyboard::Key) -> Option<Key> {
+    match key {
+        winit::keyboard::Key::Named(name) => named_key(name),
+        winit::keyboard::Key::Character(text) => {
+            let mut chars = text.chars();
+            let c = chars.next()?;
+            (c.is_ascii_alphabetic() && chars.next().is_none())
+                .then_some(Key::Character(c.to_ascii_lowercase()))
+        }
+        _ => None,
+    }
+}
+
+fn physical_latin_key(key: winit::keyboard::PhysicalKey) -> Option<Key> {
+    let winit::keyboard::PhysicalKey::Code(code) = key else {
+        return None;
+    };
+    let c = match code {
+        winit::keyboard::KeyCode::KeyA => 'a',
+        winit::keyboard::KeyCode::KeyB => 'b',
+        winit::keyboard::KeyCode::KeyC => 'c',
+        winit::keyboard::KeyCode::KeyD => 'd',
+        winit::keyboard::KeyCode::KeyE => 'e',
+        winit::keyboard::KeyCode::KeyF => 'f',
+        winit::keyboard::KeyCode::KeyG => 'g',
+        winit::keyboard::KeyCode::KeyH => 'h',
+        winit::keyboard::KeyCode::KeyI => 'i',
+        winit::keyboard::KeyCode::KeyJ => 'j',
+        winit::keyboard::KeyCode::KeyK => 'k',
+        winit::keyboard::KeyCode::KeyL => 'l',
+        winit::keyboard::KeyCode::KeyM => 'm',
+        winit::keyboard::KeyCode::KeyN => 'n',
+        winit::keyboard::KeyCode::KeyO => 'o',
+        winit::keyboard::KeyCode::KeyP => 'p',
+        winit::keyboard::KeyCode::KeyQ => 'q',
+        winit::keyboard::KeyCode::KeyR => 'r',
+        winit::keyboard::KeyCode::KeyS => 's',
+        winit::keyboard::KeyCode::KeyT => 't',
+        winit::keyboard::KeyCode::KeyU => 'u',
+        winit::keyboard::KeyCode::KeyV => 'v',
+        winit::keyboard::KeyCode::KeyW => 'w',
+        winit::keyboard::KeyCode::KeyX => 'x',
+        winit::keyboard::KeyCode::KeyY => 'y',
+        winit::keyboard::KeyCode::KeyZ => 'z',
+        _ => return None,
+    };
+    Some(Key::Character(c))
+}
+
 pub fn process_window_event(input: &mut InputState, event: &WindowEvent) {
     match event {
         WindowEvent::CursorMoved { position, .. } => {
@@ -55,13 +113,18 @@ pub fn process_window_event(input: &mut InputState, event: &WindowEvent) {
                 }
             }
             if event.state == ElementState::Pressed {
-                if let winit::keyboard::Key::Named(name) = &event.logical_key {
-                    if let Some(key) = named_key(name) {
-                        input.push_key(key);
-                    }
+                let key = logical_key(&event.logical_key)
+                    .or_else(|| physical_latin_key(event.physical_key));
+                if let Some(key) = key {
+                    input.push_key_event(KeyEvent {
+                        key,
+                        modifiers: input.modifiers,
+                        repeat: event.repeat,
+                    });
                 }
             }
         }
+        WindowEvent::ModifiersChanged(state) => input.modifiers = modifiers(state.state()),
         _ => {}
     }
 }
@@ -107,5 +170,43 @@ mod tests {
             named_key(&winit::keyboard::NamedKey::ArrowLeft),
             Some(akar_core::Key::Left)
         );
+    }
+
+    #[test]
+    fn logical_shortcut_keys_are_layout_aware_and_lowercase() {
+        assert_eq!(
+            logical_key(&winit::keyboard::Key::Character("A".into())),
+            Some(Key::Character('a'))
+        );
+        assert_eq!(
+            logical_key(&winit::keyboard::Key::Character("é".into())),
+            None
+        );
+    }
+
+    #[test]
+    fn physical_latin_fallback_covers_shortcut_letters() {
+        assert_eq!(
+            physical_latin_key(winit::keyboard::PhysicalKey::Code(
+                winit::keyboard::KeyCode::KeyC
+            )),
+            Some(Key::Character('c'))
+        );
+    }
+
+    #[test]
+    fn modifier_snapshot_is_independent_of_later_changes() {
+        let mut input = InputState::new();
+        input.modifiers = Modifiers {
+            super_key: true,
+            ..Modifiers::default()
+        };
+        input.push_key_event(KeyEvent {
+            key: Key::Character('v'),
+            modifiers: input.modifiers,
+            repeat: false,
+        });
+        input.modifiers = Modifiers::default();
+        assert!(input.key_events[0].modifiers.super_key);
     }
 }

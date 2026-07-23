@@ -2,6 +2,7 @@ use glam;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
+    Character(char),
     Backspace,
     Delete,
     Left,
@@ -15,6 +16,21 @@ pub enum Key {
     Tab,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Modifiers {
+    pub shift: bool,
+    pub control: bool,
+    pub alt: bool,
+    pub super_key: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct KeyEvent {
+    pub key: Key,
+    pub modifiers: Modifiers,
+    pub repeat: bool,
+}
+
 pub struct InputState {
     pub mouse_pos: glam::Vec2,
     pub mouse_pos_prev: glam::Vec2,
@@ -24,6 +40,8 @@ pub struct InputState {
     pub scroll_delta: glam::Vec2,
     pub chars: Vec<char>,
     pub keys_pressed: Vec<Key>,
+    pub key_events: Vec<KeyEvent>,
+    pub modifiers: Modifiers,
     pub focused_id: Option<u64>,
 }
 
@@ -38,6 +56,8 @@ impl InputState {
             scroll_delta: glam::Vec2::ZERO,
             chars: Vec::new(),
             keys_pressed: Vec::new(),
+            key_events: Vec::new(),
+            modifiers: Modifiers::default(),
             focused_id: None,
         }
     }
@@ -49,6 +69,7 @@ impl InputState {
         self.scroll_delta = glam::Vec2::ZERO;
         self.chars.clear();
         self.keys_pressed.clear();
+        self.key_events.clear();
     }
 
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
@@ -77,6 +98,16 @@ impl InputState {
 
     pub fn push_key(&mut self, key: Key) {
         self.keys_pressed.push(key);
+        self.key_events.push(KeyEvent {
+            key,
+            modifiers: self.modifiers,
+            repeat: false,
+        });
+    }
+
+    pub fn push_key_event(&mut self, event: KeyEvent) {
+        self.keys_pressed.push(event.key);
+        self.key_events.push(event);
     }
 
     pub fn is_hovering(&self, rect: [f32; 4]) -> bool {
@@ -147,5 +178,25 @@ mod tests {
         input.set_mouse_pos(50.0, 50.0);
         input.push_mouse_button(0, true);
         assert!(input.is_pressed([0.0, 0.0, 100.0, 100.0]));
+    }
+
+    #[test]
+    fn key_event_keeps_modifier_snapshot_and_clears_per_frame() {
+        let mut input = InputState::new();
+        input.modifiers = Modifiers {
+            control: true,
+            ..Modifiers::default()
+        };
+        input.push_key_event(KeyEvent {
+            key: Key::Character('a'),
+            modifiers: input.modifiers,
+            repeat: false,
+        });
+        input.modifiers = Modifiers::default();
+        assert_eq!(input.key_events[0].modifiers.control, true);
+        assert!(!input.modifiers.control);
+        input.begin_frame();
+        assert!(input.key_events.is_empty());
+        assert!(input.keys_pressed.is_empty());
     }
 }

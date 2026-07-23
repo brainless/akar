@@ -147,6 +147,8 @@ While touching these functions, replace `value_buf + buf_len` with explicit `val
 
 ### Task 2 — Modifier and Key Event Infrastructure
 
+**Status:** Done
+
 - Add `Modifiers`, `KeyEvent`, character shortcut keys, and per-frame event clearing to `akar-core`.
 - Update `akar-winit` for `ModifiersChanged`, logical key translation, modifier snapshots, and physical Latin-key fallback.
 - Preserve or deliberately migrate existing `keys_pressed` consumers across the workspace.
