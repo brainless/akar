@@ -27,6 +27,21 @@ pub fn text_input(
     cursor_visible: bool,
     theme: &AkarTheme,
 ) -> TextInputResponse {
+    text_input_masked(core, layout, node_id, value, edit_state, placeholder, cursor_visible, theme, false)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn text_input_masked(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    value: &mut String,
+    edit_state: &mut TextEditState,
+    placeholder: &str,
+    cursor_visible: bool,
+    theme: &AkarTheme,
+    masked: bool,
+) -> TextInputResponse {
     let rect = layout.rect(node_id);
 
     if rect[2] == 0.0 || rect[3] == 0.0 {
@@ -159,9 +174,11 @@ pub fn text_input(
     let max_text_width = rect[2] - 2.0 * theme.padding_x;
 
     let display_text = if value.is_empty() && !focused {
-        placeholder
+        placeholder.to_string()
+    } else if masked && !value.is_empty() {
+        "*".repeat(value.chars().count())
     } else {
-        value.as_str()
+        value.clone()
     };
     let text_color = if value.is_empty() && !focused {
         theme.base_300
@@ -171,7 +188,7 @@ pub fn text_input(
 
     let buffer_id = core.text_pipeline.set_text(
         Some(layout.widget_id(node_id)),
-        display_text,
+        &display_text,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(max_text_width.max(0.0)),
         None,
@@ -179,7 +196,7 @@ pub fn text_input(
 
     let geometry = core.text_pipeline.geometry(
         buffer_id,
-        display_text,
+        &display_text,
         edit_state.cursor,
         edit_state.anchor,
     );
