@@ -63,7 +63,10 @@ pub fn navbar(
     });
 
     layout.set_children(node_id, &[start, center, end]);
-    container(core, layout, node_id, &BoxStyle::panel(theme));
+
+    let mut style = BoxStyle::panel(theme);
+    style.corner_radii = [0.0, 0.0, theme.radius_box, theme.radius_box];
+    container(core, layout, node_id, &style);
 
     NavbarSlots { start, center, end }
 }
