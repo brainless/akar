@@ -2614,6 +2614,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "webpage-rust"
+version = "0.1.0"
+dependencies = [
+ "akar-components",
+ "akar-core",
+ "akar-layout",
+ "akar-winit",
+ "anyhow",
+ "glyphon",
+ "png",
+ "pollster",
+ "taffy",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "wgpu"
 version = "29.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

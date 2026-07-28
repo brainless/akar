@@ -1,0 +1,17 @@
+[package]
+name = "webpage-rust"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+akar-core = { path = "../../crates/akar-core" }
+akar-layout = { path = "../../crates/akar-layout" }
+akar-components = { path = "../../crates/akar-components" }
+akar-winit = { path = "../../crates/akar-winit" }
+taffy = { workspace = true }
+glyphon = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }
+pollster = "0.4"
+anyhow = "1"
+png = "0.17"
