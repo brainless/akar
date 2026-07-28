@@ -90,7 +90,6 @@ struct AppState {
     core: AkarCore,
     layout: Layout,
     page: akar_layout::PageLayout,
-    two_col: akar_layout::TwoColumnLayout,
     scroll_y: f32,
     scroll_container: akar_layout::NodeId,
     navbar_slots: Option<NavbarSlots>,
@@ -414,18 +413,6 @@ fn render_containers(state: &mut AppState) {
         &state.layout,
         state.page.main,
         &BoxStyle::surface(&AKAR_THEME_DARK),
-    );
-    akar_container(
-        &mut state.core,
-        &state.layout,
-        state.two_col.left,
-        &BoxStyle::flat(0x172554ff),
-    );
-    akar_container(
-        &mut state.core,
-        &state.layout,
-        state.two_col.right,
-        &BoxStyle::flat(0x27272aff),
     );
 }
 
@@ -1430,10 +1417,8 @@ impl ApplicationHandler for App {
             sidebar_right_width: None,
         });
 
-        let two_col = layout.two_column(page.main, 0.5, 1.0);
-
         layout.set_style(
-            two_col.right,
+            page.main,
             Style {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Column,
@@ -1471,7 +1456,7 @@ impl ApplicationHandler for App {
             ..Default::default()
         });
 
-        layout.set_children(two_col.right, &[alert_node, tab_bar_node, panel_container]);
+        layout.set_children(page.main, &[alert_node, tab_bar_node, panel_container]);
 
         let stat_row = layout.new_leaf(Style {
             display: Display::Flex,
@@ -1848,7 +1833,6 @@ impl ApplicationHandler for App {
             core,
             layout,
             page,
-            two_col,
             scroll_y: 0.0,
             scroll_container,
             navbar_slots: None,
