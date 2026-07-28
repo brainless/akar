@@ -42,6 +42,7 @@ pub fn stat(
         glyphon::Metrics::new(theme.font_size_sm, lh_sm),
         Some(text_max_w),
         None,
+        None,
     );
     core.draw_list.push_text(TextCall {
         buffer_id: title_id,
@@ -58,6 +59,7 @@ pub fn stat(
         value,
         glyphon::Metrics::new(theme.font_size_lg, lh_lg),
         Some(text_max_w),
+        None,
         None,
     );
     core.draw_list.push_text(TextCall {
@@ -76,6 +78,7 @@ pub fn stat(
             desc,
             glyphon::Metrics::new(theme.font_size_sm, lh_sm),
             Some(text_max_w),
+            None,
             None,
         );
         core.draw_list.push_text(TextCall {

@@ -58,6 +58,7 @@ pub fn checkbox(
             glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
             Some(box_size),
             None,
+            None,
         );
         core.draw_list.push_text(TextCall {
             buffer_id: check_buffer,
@@ -74,6 +75,7 @@ pub fn checkbox(
         label,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2] - 24.0),
+        None,
         None,
     );
     core.draw_list.push_text(TextCall {

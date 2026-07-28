@@ -109,9 +109,10 @@ pub fn alert(
         let key: u64 = layout.widget_id(node_id);
         let close_buffer_id = core.text_pipeline.set_text(
             Some(key.wrapping_add(1)),
-            "×",
+            "\u{00d7}",
             glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
             Some(close_btn_size),
+            None,
             None,
         );
 
@@ -141,6 +142,7 @@ pub fn alert(
             text,
             glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
             Some(text_max_w),
+            None,
             None,
         );
 

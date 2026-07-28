@@ -227,6 +227,7 @@ pub fn textarea(
         glyphon::Metrics::new(theme.font_size_base, line_height),
         Some(max_text_width.max(0.0)),
         None,
+        None,
     );
 
     let geometry = core.text_pipeline.geometry(

@@ -75,6 +75,7 @@ pub fn avatar(
         glyphon::Metrics::new(font_size, line_height),
         Some(diameter),
         None,
+        None,
     );
 
     let text_size = core.text_pipeline.measure(buf_id, Some(diameter));

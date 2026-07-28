@@ -72,6 +72,7 @@ pub fn select(
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2] - 24.0),
         None,
+        None,
     );
     core.draw_list.push_text(TextCall {
         buffer_id: label_buffer,
@@ -86,6 +87,7 @@ pub fn select(
         Some(layout.widget_id(node_id).wrapping_add(1_000_000)),
         "\u{25BC}",
         glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
+        None,
         None,
         None,
     );
@@ -143,6 +145,7 @@ pub fn select(
                     option,
                     glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
                     Some(state.content_rect[2]),
+                    None,
                     None,
                 );
                 core.draw_list.push_text(TextCall {

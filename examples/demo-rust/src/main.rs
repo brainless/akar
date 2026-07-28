@@ -340,7 +340,12 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
             fill: AKAR_THEME_DARK.base_200,
             border_color: AKAR_THEME_DARK.base_300,
             border_width: AKAR_THEME_DARK.border_width,
-            corner_radii: [0.0, 0.0, AKAR_THEME_DARK.radius_box, AKAR_THEME_DARK.radius_box],
+            corner_radii: [
+                0.0,
+                0.0,
+                AKAR_THEME_DARK.radius_box,
+                AKAR_THEME_DARK.radius_box,
+            ],
             shadow: None,
         },
     );
@@ -519,6 +524,7 @@ fn render_list_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
             glyphon::Metrics::new(14.0, 14.0 * 1.2),
             Some(inner_rect[2] * 0.6),
             None,
+            None,
         );
         state.core.draw_list.push_text(akar_core::TextCall {
             buffer_id,
@@ -568,6 +574,7 @@ fn render_canvas_tab(state: &mut AppState) {
         text,
         glyphon::Metrics::new(18.0, 18.0 * 1.2),
         Some(canvas_rect[2]),
+        None,
         None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
@@ -658,6 +665,7 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         glyphon::Metrics::new(18.0, 18.0 * 1.2),
         Some(form_rect[2] - 32.0),
         None,
+        None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
         buffer_id: title_buf,
@@ -674,6 +682,7 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         "Name",
         glyphon::Metrics::new(14.0, 14.0 * 1.2),
         Some(name_rect[2]),
+        None,
         None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
@@ -702,6 +711,7 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
         "Notes",
         glyphon::Metrics::new(14.0, 14.0 * 1.2),
         Some(notes_rect[2]),
+        None,
         None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
@@ -844,6 +854,7 @@ fn render_drawer(state: &mut AppState, viewport_rect: [f32; 4]) {
             glyphon::Metrics::new(16.0, 16.0 * 1.2),
             Some(40.0),
             None,
+            None,
         );
         state.core.draw_list.push_text(akar_core::TextCall {
             buffer_id: initials_buf,
@@ -884,6 +895,7 @@ fn render_drawer(state: &mut AppState, viewport_rect: [f32; 4]) {
                 glyphon::Metrics::new(14.0, 14.0 * 1.2),
                 Some(link_rect[2]),
                 None,
+                None,
             );
             state.core.draw_list.push_text(akar_core::TextCall {
                 buffer_id: link_buf,
@@ -923,6 +935,7 @@ fn render_modal(state: &mut AppState, viewport_rect: [f32; 4]) {
             "Modal content area \u{2014} add your form here.",
             glyphon::Metrics::new(16.0, 16.0 * 1.2),
             Some(content_rect[2] - 32.0),
+            None,
             None,
         );
         state.core.draw_list.push_text(akar_core::TextCall {
@@ -999,6 +1012,7 @@ fn render_dropdown(state: &mut AppState, viewport_rect: [f32; 4]) {
                 item,
                 glyphon::Metrics::new(14.0, 14.0 * 1.2),
                 Some(item_rect[2] - 8.0),
+                None,
                 None,
             );
             state.core.draw_list.push_text(akar_core::TextCall {

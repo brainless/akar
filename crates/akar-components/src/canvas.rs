@@ -355,6 +355,7 @@ pub fn canvas_end(core: &mut AkarCore, painter: CanvasPainter) {
             metrics,
             Some(text_area_w),
             None,
+            None,
         );
 
         let text_size = core.text_pipeline.measure(buffer_id, Some(text_area_w));

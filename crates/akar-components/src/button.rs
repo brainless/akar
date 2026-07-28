@@ -97,6 +97,7 @@ pub fn button(
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2]),
         None,
+        None,
     );
 
     let text_color = match variant {

@@ -91,7 +91,9 @@ pub fn tooltip(
 
     let metrics = glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2);
 
-    let buffer_id = core.text_pipeline.set_text(None, text, metrics, None, None);
+    let buffer_id = core
+        .text_pipeline
+        .set_text(None, text, metrics, None, None, None);
 
     let text_size = core.text_pipeline.measure(buffer_id, None);
 
@@ -111,6 +113,7 @@ pub fn tooltip(
         text,
         metrics,
         Some(tooltip_w - padding * 2.0),
+        None,
         None,
     );
 

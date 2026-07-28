@@ -1,17 +1,16 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::AkarCore;
-use akar_layout::{
-    length, Dimension, Display, FlexDirection, JustifyContent, Layout, Size, Style,
-};
+use akar_layout::{length, Dimension, Display, FlexDirection, JustifyContent, Layout, Size, Style};
 use akar_winit::process_window_event;
 use wgpu::{
     CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
 };
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalSize},
+    dpi::PhysicalSize,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Window, WindowAttributes},
@@ -20,7 +19,6 @@ use winit::{
 const THEME_BG: u32 = 0xfafafaff;
 const THEME_TEXT: u32 = 0x09090bff;
 const THEME_TEXT_SECONDARY: u32 = 0x52525bff;
-const THEME_BORDER: u32 = 0xe4e4e7ff;
 const THEME_HERO_BG: u32 = 0xf4f4f5ff;
 const THEME_CARD_BG: u32 = 0xffffffff;
 const THEME_PATTERN: u32 = 0xd4d4d8ff;
@@ -45,6 +43,8 @@ struct AppState {
     root: akar_layout::NodeId,
     header_node: akar_layout::NodeId,
     hero_node: akar_layout::NodeId,
+    scroll_container: akar_layout::NodeId,
+    scroll_y: f32,
     card_nodes: [akar_layout::NodeId; 3],
     build_section: akar_layout::NodeId,
     paper_section: akar_layout::NodeId,
@@ -121,7 +121,10 @@ struct App {
     screenshot_taken: bool,
 }
 
-fn build_mimo_layout(layout: &mut Layout) -> (
+fn build_mimo_layout(
+    layout: &mut Layout,
+) -> (
+    akar_layout::NodeId,
     akar_layout::NodeId,
     akar_layout::NodeId,
     akar_layout::NodeId,
@@ -216,7 +219,7 @@ fn build_mimo_layout(layout: &mut Layout) -> (
             margin: taffy::geometry::Rect {
                 top: length(0.0f32),
                 right: length(0.0f32),
-                bottom: length(32.0f32),
+                bottom: length(0.0f32),
                 left: length(0.0f32),
             },
             ..Default::default()
@@ -230,12 +233,12 @@ fn build_mimo_layout(layout: &mut Layout) -> (
         flex_shrink: 0.0,
         size: Size {
             width: Dimension::percent(1.0),
-            height: Dimension::auto(),
+            height: length(304.0f32),
         },
         margin: taffy::geometry::Rect {
             top: length(0.0f32),
             right: length(0.0f32),
-            bottom: length(24.0f32),
+            bottom: length(0.0f32),
             left: length(0.0f32),
         },
         ..Default::default()
@@ -247,20 +250,33 @@ fn build_mimo_layout(layout: &mut Layout) -> (
         flex_shrink: 0.0,
         size: Size {
             width: Dimension::percent(1.0),
-            height: Dimension::auto(),
-        },
-        margin: taffy::geometry::Rect {
-            top: length(16.0f32),
-            right: length(0.0f32),
-            bottom: length(0.0f32),
-            left: length(0.0f32),
+            height: length(210.0f32),
         },
         ..Default::default()
     });
 
-    layout.set_children(root, &[header_node, hero_node, cards_row, build_section, paper_section]);
+    let scroll_container = layout.new_leaf(Style {
+        display: Display::Flex,
+        flex_direction: FlexDirection::Column,
+        flex_grow: 1.0,
+        ..Default::default()
+    });
 
-    (root, header_node, hero_node, card_nodes, build_section, paper_section)
+    layout.set_children(root, &[header_node, scroll_container]);
+    layout.set_children(
+        scroll_container,
+        &[hero_node, cards_row, build_section, paper_section],
+    );
+
+    (
+        root,
+        header_node,
+        hero_node,
+        scroll_container,
+        card_nodes,
+        build_section,
+        paper_section,
+    )
 }
 
 fn render_mimo_header(state: &mut AppState, header_rect: [f32; 4]) {
@@ -285,6 +301,7 @@ fn render_mimo_header(state: &mut AppState, header_rect: [f32; 4]) {
         glyphon::Metrics::new(20.0, 20.0 * 1.3),
         None,
         None,
+        None,
     );
     state.core.draw_list.push_text(akar_core::TextCall {
         buffer_id: logo_buf,
@@ -302,6 +319,7 @@ fn render_mimo_header(state: &mut AppState, header_rect: [f32; 4]) {
             Some(200 + i as u64),
             item,
             glyphon::Metrics::new(15.0, 15.0 * 1.4),
+            None,
             None,
             None,
         );
@@ -325,9 +343,9 @@ fn render_mimo_hero(state: &mut AppState, hero_rect: [f32; 4]) {
     state.core.draw_list.push_quad(akar_core::QuadCall {
         rect: hero_rect,
         fill: bg,
-        border_color: hex_to_f4(THEME_BORDER),
+        border_color: [0.0; 4],
         corner_radii: [0.0; 4],
-        border_width: 1.0,
+        border_width: 0.0,
         z: 0.0,
         shadow_blur: 0.0,
         shadow_spread: 0.0,
@@ -350,6 +368,7 @@ fn render_mimo_hero(state: &mut AppState, hero_rect: [f32; 4]) {
             glyphon::Metrics::new(28.0, 28.0 * 1.2),
             Some(hero_rect[2] + 80.0),
             None,
+            None,
         );
         state.core.draw_list.push_text(akar_core::TextCall {
             buffer_id: buf,
@@ -369,6 +388,7 @@ fn render_mimo_hero(state: &mut AppState, hero_rect: [f32; 4]) {
         glyphon::Metrics::new(72.0, 72.0 * 1.1),
         None,
         None,
+        Some(glyphon::Attrs::new().family(glyphon::Family::Serif)),
     );
     let measured = state.core.text_pipeline.measure(title_buf, None);
     let title_w = measured.x;
@@ -390,9 +410,9 @@ fn render_mimo_card(core: &mut AkarCore, card_rect: [f32; 4], index: usize) {
     core.draw_list.push_quad(akar_core::QuadCall {
         rect: card_rect,
         fill: bg,
-        border_color: hex_to_f4(THEME_BORDER),
+        border_color: [0.0; 4],
         corner_radii: [0.0; 4],
-        border_width: 1.0,
+        border_width: 0.0,
         z: 0.0,
         shadow_blur: 0.0,
         shadow_spread: 0.0,
@@ -402,7 +422,10 @@ fn render_mimo_card(core: &mut AkarCore, card_rect: [f32; 4], index: usize) {
     });
 
     let (title, subtitle) = match index {
-        0 => ("Xiaomi MiMo-V2.5-Pro", "A leap in agentic and long horizon coherence."),
+        0 => (
+            "Xiaomi MiMo-V2.5-Pro",
+            "A leap in agentic and long horizon coherence.",
+        ),
         1 => ("Xiaomi MiMo-V2.5", "A leap in agency and multimodality."),
         2 => (
             "Xiaomi MiMo-V2.5-TTS Series",
@@ -416,6 +439,7 @@ fn render_mimo_card(core: &mut AkarCore, card_rect: [f32; 4], index: usize) {
         title,
         glyphon::Metrics::new(20.0, 20.0 * 1.3),
         Some(card_rect[2] - 40.0),
+        None,
         None,
     );
     core.draw_list.push_text(akar_core::TextCall {
@@ -432,6 +456,7 @@ fn render_mimo_card(core: &mut AkarCore, card_rect: [f32; 4], index: usize) {
         subtitle,
         glyphon::Metrics::new(14.0, 14.0 * 1.4),
         Some(card_rect[2] - 40.0),
+        None,
         None,
     );
     core.draw_list.push_text(akar_core::TextCall {
@@ -491,14 +516,12 @@ fn render_mimo_card(core: &mut AkarCore, card_rect: [f32; 4], index: usize) {
 }
 
 fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
-    let border_color = hex_to_f4(THEME_BORDER);
-
     core.draw_list.push_quad(akar_core::QuadCall {
         rect: section_rect,
         fill: hex_to_f4(THEME_BG),
-        border_color,
+        border_color: [0.0; 4],
         corner_radii: [0.0; 4],
-        border_width: 1.0,
+        border_width: 0.0,
         z: 0.0,
         shadow_blur: 0.0,
         shadow_spread: 0.0,
@@ -513,6 +536,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
         glyphon::Metrics::new(42.0, 42.0 * 1.2),
         None,
         None,
+        Some(glyphon::Attrs::new().family(glyphon::Family::Serif)),
     );
     core.draw_list.push_text(akar_core::TextCall {
         buffer_id: heading_buf,
@@ -529,6 +553,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
         glyphon::Metrics::new(16.0, 16.0 * 1.5),
         Some(400.0),
         None,
+        None,
     );
     core.draw_list.push_text(akar_core::TextCall {
         buffer_id: desc_buf,
@@ -540,7 +565,11 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
     });
 
     let items = [
-        ("01", "Web Demo", "Interact with MiMo directly through the web"),
+        (
+            "01",
+            "Web Demo",
+            "Interact with MiMo directly through the web",
+        ),
         (
             "02",
             "API Access",
@@ -557,9 +586,9 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
         core.draw_list.push_quad(akar_core::QuadCall {
             rect: [section_rect[0], row_y, section_rect[2], row_height],
             fill: hex_to_f4(THEME_BG),
-            border_color,
+            border_color: [0.0; 4],
             corner_radii: [0.0; 4],
-            border_width: 1.0,
+            border_width: 0.0,
             z: 0.0,
             shadow_blur: 0.0,
             shadow_spread: 0.0,
@@ -573,6 +602,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             num,
             glyphon::Metrics::new(18.0, 18.0 * 1.3),
             Some(60.0),
+            None,
             None,
         );
         core.draw_list.push_text(akar_core::TextCall {
@@ -590,6 +620,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             glyphon::Metrics::new(20.0, 20.0 * 1.3),
             Some(section_rect[2] * 0.5),
             None,
+            None,
         );
         core.draw_list.push_text(akar_core::TextCall {
             buffer_id: title_buf,
@@ -605,6 +636,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             desc,
             glyphon::Metrics::new(14.0, 14.0 * 1.4),
             Some(section_rect[2] * 0.5),
+            None,
             None,
         );
         core.draw_list.push_text(akar_core::TextCall {
@@ -622,6 +654,7 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             glyphon::Metrics::new(24.0, 24.0 * 1.3),
             None,
             None,
+            None,
         );
         core.draw_list.push_text(akar_core::TextCall {
             buffer_id: arrow_buf,
@@ -635,14 +668,12 @@ fn render_mimo_build_section(core: &mut AkarCore, section_rect: [f32; 4]) {
 }
 
 fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
-    let border_color = hex_to_f4(THEME_BORDER);
-
     core.draw_list.push_quad(akar_core::QuadCall {
         rect: section_rect,
         fill: hex_to_f4(THEME_BG),
-        border_color,
+        border_color: [0.0; 4],
         corner_radii: [0.0; 4],
-        border_width: 1.0,
+        border_width: 0.0,
         z: 0.0,
         shadow_blur: 0.0,
         shadow_spread: 0.0,
@@ -657,6 +688,7 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
         glyphon::Metrics::new(42.0, 42.0 * 1.2),
         None,
         None,
+        Some(glyphon::Attrs::new().family(glyphon::Family::Serif)),
     );
     core.draw_list.push_text(akar_core::TextCall {
         buffer_id: heading_buf,
@@ -682,9 +714,9 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
         core.draw_list.push_quad(akar_core::QuadCall {
             rect: [section_rect[0], row_y, section_rect[2], row_height],
             fill: hex_to_f4(THEME_BG),
-            border_color,
+            border_color: [0.0; 4],
             corner_radii: [0.0; 4],
-            border_width: 1.0,
+            border_width: 0.0,
             z: 0.0,
             shadow_blur: 0.0,
             shadow_spread: 0.0,
@@ -698,6 +730,7 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             num,
             glyphon::Metrics::new(18.0, 18.0 * 1.3),
             Some(60.0),
+            None,
             None,
         );
         core.draw_list.push_text(akar_core::TextCall {
@@ -715,6 +748,7 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             glyphon::Metrics::new(20.0, 20.0 * 1.3),
             Some(section_rect[2] * 0.6),
             None,
+            None,
         );
         core.draw_list.push_text(akar_core::TextCall {
             buffer_id: title_buf,
@@ -731,6 +765,7 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             glyphon::Metrics::new(13.0, 13.0 * 1.4),
             Some(section_rect[2] * 0.6),
             None,
+            None,
         );
         core.draw_list.push_text(akar_core::TextCall {
             buffer_id: date_buf,
@@ -745,6 +780,7 @@ fn render_mimo_paper_section(core: &mut AkarCore, section_rect: [f32; 4]) {
             Some(7400 + i as u64),
             "\u{2192}",
             glyphon::Metrics::new(24.0, 24.0 * 1.3),
+            None,
             None,
             None,
         );
@@ -778,7 +814,7 @@ fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
         border_color: [0.0; 4],
         corner_radii: [0.0; 4],
         border_width: 0.0,
-        z: -1.0,
+        z: 0.0,
         shadow_blur: 0.0,
         shadow_spread: 0.0,
         shadow_color: [0.0; 4],
@@ -789,19 +825,142 @@ fn render_all(state: &mut AppState, viewport_rect: [f32; 4]) {
     let header_rect = state.layout.rect(state.header_node);
     render_mimo_header(state, header_rect);
 
+    let scroll_rect = state.layout.rect(state.scroll_container);
+    let paper_rect = state.layout.rect(state.paper_section);
+    let content_height = (paper_rect[1] + paper_rect[3]) - scroll_rect[1];
+    let resp = scroll_area_begin(
+        &mut state.core,
+        scroll_rect,
+        &mut state.scroll_y,
+        content_height,
+    );
+    let offset_y = resp.content_y - scroll_rect[1];
+
+    state.core.draw_list.push_quad(akar_core::QuadCall {
+        rect: [
+            scroll_rect[0],
+            scroll_rect[1],
+            scroll_rect[2],
+            content_height,
+        ],
+        fill: bg,
+        border_color: [0.0; 4],
+        corner_radii: [0.0; 4],
+        border_width: 0.0,
+        z: 0.0,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
+        _pad: [0.0; 2],
+    });
+
+    let hero_abs = state.layout.rect(state.hero_node);
+    let build_abs = state.layout.rect(state.build_section);
+    let gap_bg_top = hero_abs[1] + hero_abs[3];
+    let gap_bg_height = build_abs[1] - gap_bg_top;
+    if gap_bg_height > 0.0 {
+        state.core.draw_list.push_quad(akar_core::QuadCall {
+            rect: [
+                scroll_rect[0],
+                gap_bg_top + offset_y,
+                scroll_rect[2],
+                gap_bg_height,
+            ],
+            fill: bg,
+            border_color: [0.0; 4],
+            corner_radii: [0.0; 4],
+            border_width: 0.0,
+            z: 0.0,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        });
+    }
+
     let hero_rect = state.layout.rect(state.hero_node);
+    let hero_rect = [
+        hero_rect[0],
+        hero_rect[1] + offset_y,
+        hero_rect[2],
+        hero_rect[3],
+    ];
     render_mimo_hero(state, hero_rect);
 
-    let card_rects: Vec<[f32; 4]> = state.card_nodes.iter().map(|&n| state.layout.rect(n)).collect();
+    let card_rects: Vec<[f32; 4]> = state
+        .card_nodes
+        .iter()
+        .map(|&n| state.layout.rect(n))
+        .collect();
+
+    let cards_with_y: Vec<[f32; 4]> = card_rects
+        .iter()
+        .map(|&r| [r[0], r[1] + offset_y, r[2], r[3]])
+        .collect();
+    let cards_left = cards_with_y
+        .iter()
+        .map(|r| r[0])
+        .fold(f32::INFINITY, f32::min);
+    let cards_top = cards_with_y
+        .iter()
+        .map(|r| r[1])
+        .fold(f32::INFINITY, f32::min);
+    let cards_right = cards_with_y
+        .iter()
+        .map(|r| r[0] + r[2])
+        .fold(f32::NEG_INFINITY, f32::max);
+    let cards_bottom = cards_with_y
+        .iter()
+        .map(|r| r[1] + r[3])
+        .fold(f32::NEG_INFINITY, f32::max);
+    state.core.draw_list.push_quad(akar_core::QuadCall {
+        rect: [
+            cards_left,
+            cards_top,
+            cards_right - cards_left,
+            cards_bottom - cards_top,
+        ],
+        fill: bg,
+        border_color: [0.0; 4],
+        corner_radii: [0.0; 4],
+        border_width: 0.0,
+        z: 0.0,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
+        _pad: [0.0; 2],
+    });
     for (i, card_rect) in card_rects.into_iter().enumerate() {
+        let card_rect = [
+            card_rect[0],
+            card_rect[1] + offset_y,
+            card_rect[2],
+            card_rect[3],
+        ];
         render_mimo_card(&mut state.core, card_rect, i);
     }
 
     let build_rect = state.layout.rect(state.build_section);
+    let build_rect = [
+        build_rect[0],
+        build_rect[1] + offset_y,
+        build_rect[2],
+        build_rect[3],
+    ];
     render_mimo_build_section(&mut state.core, build_rect);
 
-    let paper_rect = state.layout.rect(state.paper_section);
+    let paper_rect = [
+        paper_rect[0],
+        paper_rect[1] + offset_y,
+        paper_rect[2],
+        paper_rect[3],
+    ];
     render_mimo_paper_section(&mut state.core, paper_rect);
+
+    scroll_area_end(&mut state.core);
 }
 
 impl ApplicationHandler for App {
@@ -810,9 +969,17 @@ impl ApplicationHandler for App {
             return;
         }
 
+        let monitor = event_loop.primary_monitor();
+        let monitor_size = monitor
+            .map(|m| m.size())
+            .unwrap_or(PhysicalSize::new(1280, 900));
+
         let window_attrs = WindowAttributes::default()
             .with_title("akar webpage demo")
-            .with_inner_size(LogicalSize::new(1280.0, 900.0));
+            .with_inner_size(PhysicalSize::new(
+                monitor_size.width,
+                monitor_size.height.saturating_sub(40),
+            ));
         let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
 
         let instance = wgpu::Instance::new(InstanceDescriptor::new_with_display_handle(Box::new(
@@ -840,8 +1007,15 @@ impl ApplicationHandler for App {
         let core = AkarCore::new(&device, &queue, surface_format);
         let mut layout = Layout::new();
 
-        let (root, header_node, hero_node, card_nodes, build_section, paper_section) =
-            build_mimo_layout(&mut layout);
+        let (
+            root,
+            header_node,
+            hero_node,
+            scroll_container,
+            card_nodes,
+            build_section,
+            paper_section,
+        ) = build_mimo_layout(&mut layout);
 
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
@@ -858,6 +1032,8 @@ impl ApplicationHandler for App {
             root,
             header_node,
             hero_node,
+            scroll_container,
+            scroll_y: 0.0,
             card_nodes,
             build_section,
             paper_section,
@@ -1008,6 +1184,7 @@ impl ApplicationHandler for App {
                     state.queue.submit(std::iter::once(encoder.finish()));
                 }
                 output.present();
+                state.window.request_redraw();
             }
             _ => {}
         }

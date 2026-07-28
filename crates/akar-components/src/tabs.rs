@@ -146,6 +146,7 @@ pub fn tab_bar(
             glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
             Some(tab_width),
             None,
+            None,
         );
 
         let text_color = match (variant, is_active) {

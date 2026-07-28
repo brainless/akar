@@ -114,6 +114,7 @@ pub fn steps(
             glyphon::Metrics::new(theme.font_size_sm, theme.font_size_sm * 1.2),
             Some(step_spacing),
             None,
+            None,
         );
 
         core.draw_list.push_text(TextCall {

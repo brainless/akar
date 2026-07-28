@@ -137,6 +137,7 @@ pub fn modal_begin(
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(title_rect[2]),
         None,
+        None,
     );
     core.draw_list.push_text(TextCall {
         buffer_id: title_buffer_id,
@@ -153,6 +154,7 @@ pub fn modal_begin(
         Some(close_node.into()),
         "\u{00d7}",
         glyphon::Metrics::new(theme.font_size_lg, theme.font_size_lg * 1.2),
+        None,
         None,
         None,
     );

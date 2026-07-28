@@ -27,7 +27,17 @@ pub fn text_input(
     cursor_visible: bool,
     theme: &AkarTheme,
 ) -> TextInputResponse {
-    text_input_masked(core, layout, node_id, value, edit_state, placeholder, cursor_visible, theme, false)
+    text_input_masked(
+        core,
+        layout,
+        node_id,
+        value,
+        edit_state,
+        placeholder,
+        cursor_visible,
+        theme,
+        false,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -191,6 +201,7 @@ pub fn text_input_masked(
         &display_text,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(max_text_width.max(0.0)),
+        None,
         None,
     );
 

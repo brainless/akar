@@ -52,6 +52,7 @@ impl TextPipeline {
         metrics: glyphon::Metrics,
         width: Option<f32>,
         height: Option<f32>,
+        attrs: Option<glyphon::Attrs>,
     ) -> u64 {
         let id = buffer_id.unwrap_or_else(|| {
             let id = self.next_id;
@@ -73,7 +74,7 @@ impl TextPipeline {
         buffer.set_text(
             &mut self.font_system,
             text,
-            &glyphon::Attrs::new(),
+            attrs.as_ref().unwrap_or(&glyphon::Attrs::new()),
             glyphon::Shaping::Advanced,
             None,
         );
@@ -364,13 +365,13 @@ mod tests {
         let mut pipeline = create_pipeline();
         let metrics = glyphon::Metrics::new(16.0, 20.0);
 
-        let id1 = pipeline.set_text(None, "hello", metrics, None, None);
+        let id1 = pipeline.set_text(None, "hello", metrics, None, None, None);
         assert_eq!(id1, 1);
 
-        let id2 = pipeline.set_text(None, "world", metrics, None, None);
+        let id2 = pipeline.set_text(None, "world", metrics, None, None, None);
         assert_eq!(id2, 2);
 
-        pipeline.set_text(Some(id1), "updated", metrics, Some(200.0), None);
+        pipeline.set_text(Some(id1), "updated", metrics, Some(200.0), None, None);
         assert_eq!(pipeline.buffers.len(), 2);
     }
 

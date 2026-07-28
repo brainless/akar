@@ -52,6 +52,7 @@ pub fn toasts(
             metrics,
             Some(text_max_w),
             None,
+            None,
         );
 
         let text_size = core.text_pipeline.measure(buffer_id, None);
