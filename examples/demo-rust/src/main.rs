@@ -337,7 +337,13 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
         &mut state.core,
         &state.layout,
         navbar_id,
-        &BoxStyle::panel(&AKAR_THEME_DARK),
+        &BoxStyle {
+            fill: AKAR_THEME_DARK.base_200,
+            border_color: AKAR_THEME_DARK.base_300,
+            border_width: AKAR_THEME_DARK.border_width,
+            corner_radii: [0.0, 0.0, AKAR_THEME_DARK.radius_box, AKAR_THEME_DARK.radius_box],
+            shadow: None,
+        },
     );
 
     akar_label(
