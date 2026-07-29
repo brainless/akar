@@ -107,3 +107,9 @@ pub use data_item::{
 
 pub mod data_list;
 pub use data_list::{data_list_begin, data_list_end, DataListResponse, DataListState};
+
+pub mod heading;
+pub use heading::{heading as akar_heading, HeadingLevel};
+
+pub mod paragraph;
+pub use paragraph::paragraph as akar_paragraph;

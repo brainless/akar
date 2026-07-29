@@ -1,0 +1,37 @@
+# User Taste Profile
+- Prefers a structured read-before-work protocol: always read `DEVELOP.md`, `README.md`, `AGENTS.md` (and `CLAUDE.md` when the user names it) at the start of a task before doing anything else. Confidence: 0.95
+- Prefers epic-driven development with numbered epics in an `epics/` folder; each epic broken into clearly marked `Task` blocks plus a `Notes`/`Further work` section at the end for future work. Confidence: 0.95
+- Prefers explicit Task/Epic status updates in the epic file itself as work progresses (commit + status update together). Confidence: 0.9
+- Prefers sub-agent delegation for multi-task epics — go Task by Task, delegate with a compact prompt that names `DEVELOP.md`, `README.md`, `AGENTS.md`, `CLAUDE.md` (when in scope), the epic file path, the Task identifier, plus any other relevant files or sources under `~/Projects/`. Confidence: 0.95
+- After a sub-agent finishes, prefers the agent to wait, review the work, update the Epic/Task status, commit, and then move to the next task. Confidence: 0.95
+- Prefers compact sub-agent prompts — no over-explanation, just the essentials (project files, epic + task ID, relevant files, scope boundary). Confidence: 0.9
+- Prefers explicit scope boundaries on sub-agent tasks ("Keep scope Task X", "Do not touch later tasks") to avoid scope creep. Confidence: 0.9
+- Prefers focused tests run after each sub-agent task rather than full test suites; reports should include changed files + test results. Confidence: 0.9
+- Prefers committing after each meaningful step; "Please commit" is a common user trigger. Confidence: 0.95
+- Prefers asking about cross-project checks before implementing — cross-check plans against reference projects (egui, xilem, daisy UI, shadcn UI, imgui, Figma/Miro, wgpu examples) when designing new features. Confidence: 0.85
+- Prefers a brainstorm → update Epic → commit loop for planning work, rather than jumping to implementation. Confidence: 0.9
+- Prefers planning Epics in `epics/{NNN}-{slug}.md` numbered in chronological order; uses TDB placeholder files (`epics/00X-tbd.md`) for epics not yet scoped. Confidence: 0.9
+- Prefers having reference dependency sources checked out under `~/Projects/` (wgpu, glyphon, xilem, egui, taffy, daisy UI examples, etc.) — these are read-only references, not part of the project. Confidence: 0.95
+- Prefers API designs where the caller owns mutable state (e.g. caller-owned `CanvasState`, caller-owned `TextEditState`) rather than the toolkit holding an ID-keyed internal store. Convenience wrappers with internal storage can be layered on later as additive opts-in. Confidence: 0.85
+- Prefers type-driven safety over convention: e.g. a scoped `CanvasPainter` whose only drawing API accepts world-space coords, so misuse fails to compile rather than silently misrenders. Confidence: 0.85
+- Prefers explicit scope begin/end calls (`canvas_begin` / `canvas_end`) that take ownership of typed painter/scoped resources rather than implicit Drop semantics, when the scope has side effects (clip rects, etc.). Confidence: 0.8
+- Prefers UTF-8-safe text APIs (byte indices, codepoint-aware) and explicit testing of ASCII, multibyte, newlines, and invalid external positions. Confidence: 0.85
+- Prefers separating platform conventions (macOS vs non-macOS keybindings) via cfg rather than runtime branching. Confidence: 0.8
+- Prefers plain named types (`Rect`, `Transform2D`) for layout primitives rather than reusing generic tuples or external types. Confidence: 0.8
+- Prefers flat, stateless draw lists over transform stacks when possible; correctness should be enforced via types/ownership rather than runtime state. Confidence: 0.75
+- Prefers deferring C ABI surface to a later dedicated Epic rather than designing it inline with the Rust API. Confidence: 0.8
+- Uses `demo-rust` (with `--component <name>` CLI flag) as the primary demo harness; prefers showing components in isolation, not in a sidebar/two-column showcase layout (a dedicated showcase flag can be added later). Confidence: 0.9
+- Prefers that demo-rust be runnable for visual testing of components — wants visible/printable evidence (logs, screenshots) when debugging UI behavior. Confidence: 0.9
+- Prefers fast dev feedback: willing to tune `[profile.dev]` (e.g. `debug = 0`, large `codegen-units`) and sccache for fastest `cargo check`/`cargo build`. Does NOT want global config changes without being asked. Confidence: 0.85
+- Manual user testing is a first-class step in the loop — implements, the user tests, reports back, then fixes. Confidence: 0.95
+- Prefers MVP-level scope for early epics; explicitly opts into smaller steps (e.g. "MVP only", "container types before text+input", "Grid as its own Epic") over comprehensive upfront scope. Confidence: 0.9
+- Prefers discussion before implementation for non-trivial features: review Epic/codebase, surface options with trade-offs, then write/update the Epic. Confidence: 0.9
+- Prefers honest disagreement / pushback with rationale when a stated plan has a flaw (rather than just executing). Confidence: 0.75
+- Prefers keeping lessons-learned in `AGENTS.md` so they don't repeat in future (e.g. UI update-on-pointer-move gotcha). Confidence: 0.85
+- Prefers adding Codex/GPT as Git co-author on sub-agent-generated commits when asked; ask first if not raised. Confidence: 0.8
+- Prefers migrating existing reference apps (e.g. `~/Projects/sugacode`) onto the framework as a way to validate API ergonomics, but treats that work as a separate project/epic. Confidence: 0.8
+- Prefers numbered, structured responses when multiple points are involved. Confidence: 0.85
+- Prefers concise replies; sub-agent prompts especially should be tight. Confidence: 0.9
+- Prefers framing choices with rationale ("I agree with X because Y"), not just "yes/no". Confidence: 0.8
+- Prefers clearly flagging open questions / unknowns explicitly (e.g. "Honestly, I do not know the differences between…"). Encourages asking rather than guessing. Confidence: 0.85
+- Prefers asking the model to brainstorm first when requirements are fuzzy, then converge on a written Epic. Confidence: 0.8

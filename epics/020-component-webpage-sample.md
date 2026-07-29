@@ -8,6 +8,7 @@
 **Progress:**
 - [x] Task 1 — Component lifecycle and text measurement foundation
 - [x] Task 2 — Typography types, theme tokens, and resolution
+- [x] Task 3 — Heading and paragraph components
 
 ---
 
@@ -201,7 +202,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 3 — Heading and paragraph components
 
-**Status:** Not Started
+**Status:** Done
 
 - Add `HeadingLevel::{H1, H2, H3, H4}`.
 - Add `heading` with level defaults and `TextStyle` overrides.
