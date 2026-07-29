@@ -7,6 +7,7 @@
 
 **Progress:**
 - [x] Task 1 — Component lifecycle and text measurement foundation
+- [x] Task 2 — Typography types, theme tokens, and resolution
 
 ---
 
@@ -181,7 +182,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 2 — Typography types, theme tokens, and resolution
 
-**Status:** Not Started
+**Status:** Done
 
 - Add akar-owned `FontFamily`, `FontWeight`, `TextAlign`, and `TextStyle` types.
 - Add semantic heading tokens to `AkarTheme`:

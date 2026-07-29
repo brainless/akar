@@ -1,6 +1,9 @@
 pub mod theme;
 pub use theme::{AkarTheme, AKAR_THEME_DARK, AKAR_THEME_LIGHT};
 
+pub mod text_style;
+pub use text_style::{FontFamily, FontWeight, TextAlign, TextStyle};
+
 pub(crate) mod color;
 
 pub mod button;
