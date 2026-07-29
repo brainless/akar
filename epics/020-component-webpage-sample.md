@@ -1,6 +1,6 @@
 # Epic 020: Component-Based Webpage Sample
 
-**Status:** In Progress
+**Status:** Done
 **Goal:** Rebuild the webpage sample using akar's component catalog instead of raw draw calls, proving that the component, layout, text, and C ABI building blocks are production-ready for real-world web-style layouts.
 
 **Prerequisite:** Epic 019 is `Status: Done`.
