@@ -4,7 +4,7 @@ use akar_layout::{Layout, NodeId};
 use crate::color::color_to_f32;
 use crate::text_style::{
     resolve_text_style, resolved_to_attrs, resolved_to_metrics, FontFamily, FontWeight,
-    ResolvedTextStyle, TextStyle,
+    ResolvedTextStyle, TextAlign, TextStyle,
 };
 use crate::AkarTheme;
 
@@ -68,11 +68,18 @@ pub fn link(
         measured.x
     };
 
+    let x_offset = match resolved.align {
+        TextAlign::Start => 0.0,
+        TextAlign::Center => (rect[2] - text_width) * 0.5,
+        TextAlign::End => rect[2] - text_width,
+    };
+    let text_x = rect[0] + x_offset.max(0.0);
+
     if hovered {
         let underline_height = 2.0;
         let underline_y = rect[1] + metrics.line_height - underline_height;
         core.draw_list.push_quad(QuadCall {
-            rect: [rect[0], underline_y, text_width, underline_height],
+            rect: [text_x, underline_y, text_width, underline_height],
             fill: color_to_f32(resolved.color),
             border_color: [0.0; 4],
             corner_radii: [0.0; 4],
@@ -88,7 +95,7 @@ pub fn link(
 
     core.draw_list.push_text(TextCall {
         buffer_id,
-        x: rect[0],
+        x: text_x,
         y: rect[1],
         clip: rect,
         color: color_to_f32(resolved.color),

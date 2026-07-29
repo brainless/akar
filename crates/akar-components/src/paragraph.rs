@@ -4,7 +4,7 @@ use akar_layout::{Layout, NodeId};
 use crate::color::color_to_f32;
 use crate::text_style::{
     resolve_text_style, resolved_to_attrs, resolved_to_metrics, FontFamily, FontWeight,
-    ResolvedTextStyle, TextStyle,
+    ResolvedTextStyle, TextAlign, TextStyle,
 };
 use crate::AkarTheme;
 
@@ -49,9 +49,16 @@ pub fn paragraph(
         Some(attrs),
     );
 
+    let text_width = core.text_pipeline.measure(buffer_id, Some(rect[2])).x;
+    let x_offset = match resolved.align {
+        TextAlign::Start => 0.0,
+        TextAlign::Center => (rect[2] - text_width) * 0.5,
+        TextAlign::End => rect[2] - text_width,
+    };
+
     core.draw_list.push_text(TextCall {
         buffer_id,
-        x: rect[0],
+        x: rect[0] + x_offset.max(0.0),
         y: rect[1],
         clip: rect,
         color: color_to_f32(resolved.color),

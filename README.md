@@ -45,10 +45,10 @@ akar's `demo-rust` binary ships with a visual debug toolchain purpose-built for 
 
 ```bash
 # Basic capture after default 5s delay, then exit
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
 
 # Configurable delay (float seconds; 0 = first frame)
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
 ```
 
 Beyond the basic capture, the toolchain includes:

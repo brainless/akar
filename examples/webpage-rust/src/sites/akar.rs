@@ -2,7 +2,7 @@ use akar_components::{
     akar_badge, akar_badge_styled, akar_button, akar_card, akar_container, akar_heading, akar_link,
     akar_navbar, akar_paragraph, akar_separator, akar_stat, akar_tab_bar, scroll_area_begin,
     scroll_area_end, BadgeStyle, BadgeVariant, BoxStyle, ButtonVariant, CardSlots, CardStyle,
-    FontFamily, HeadingLevel, NavbarStyle, TabVariant, TextStyle, AKAR_THEME_LIGHT,
+    FontFamily, HeadingLevel, NavbarStyle, TabVariant, TextAlign, TextStyle, AKAR_THEME_LIGHT,
 };
 use akar_core::AkarCore;
 use akar_layout::{
@@ -28,6 +28,7 @@ pub struct AkarSite {
     subtitle_node: NodeId,
     cta_solid: NodeId,
     cta_outline: NodeId,
+    cta_row: NodeId,
     stats_root: NodeId,
     stat_nodes: [NodeId; 3],
     cards_root: NodeId,
@@ -73,6 +74,7 @@ impl AkarSite {
             subtitle_node: n(),
             cta_solid: n(),
             cta_outline: n(),
+            cta_row: n(),
             stats_root: n(),
             stat_nodes: [n(); 3],
             cards_root: n(),
@@ -191,11 +193,11 @@ impl Site for AkarSite {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(480.0f32),
+                height: length(320.0f32),
             },
             gap: taffy::geometry::Size {
                 width: length(0.0f32),
-                height: length(16.0f32),
+                height: length(12.0f32),
             },
             ..Default::default()
         });
@@ -227,7 +229,17 @@ impl Site for AkarSite {
             },
             ..Default::default()
         });
-        layout.set_children(hero_root, &[h1_node, subtitle_node, cta_solid, cta_outline]);
+        let cta_row = layout.new_leaf(Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            gap: taffy::geometry::Size {
+                width: length(12.0f32),
+                height: length(0.0f32),
+            },
+            ..Default::default()
+        });
+        layout.set_children(cta_row, &[cta_solid, cta_outline]);
+        layout.set_children(hero_root, &[h1_node, subtitle_node, cta_row]);
 
         let stats_root = layout.new_leaf(Style {
             display: Display::Flex,
@@ -254,7 +266,7 @@ impl Site for AkarSite {
                 flex_grow: 1.0,
                 size: Size {
                     width: Dimension::auto(),
-                    height: length(140.0f32),
+                    height: length(80.0f32),
                 },
                 ..Default::default()
             })
@@ -267,7 +279,7 @@ impl Site for AkarSite {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(280.0f32),
+                height: length(190.0f32),
             },
             gap: taffy::geometry::Size {
                 width: length(24.0f32),
@@ -291,7 +303,7 @@ impl Site for AkarSite {
                 flex_grow: 1.0,
                 size: Size {
                     width: Dimension::auto(),
-                    height: length(260.0f32),
+                    height: length(170.0f32),
                 },
                 padding: taffy::geometry::Rect {
                     left: length(24.0f32),
@@ -305,11 +317,17 @@ impl Site for AkarSite {
                 },
                 ..Default::default()
             });
-            let heading = layout.new_leaf(Style::default());
+            let heading = layout.new_leaf(Style {
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: length(28.0f32),
+                },
+                ..Default::default()
+            });
             let para = layout.new_leaf(Style {
                 size: Size {
                     width: Dimension::percent(1.0),
-                    height: length(120.0f32),
+                    height: length(70.0f32),
                 },
                 ..Default::default()
             });
@@ -326,13 +344,13 @@ impl Site for AkarSite {
             flex_shrink: 0.0,
             gap: taffy::geometry::Size {
                 width: length(0.0f32),
-                height: length(12.0f32),
+                height: length(8.0f32),
             },
             padding: taffy::geometry::Rect {
                 left: length(48.0f32),
                 right: length(48.0f32),
-                top: length(48.0f32),
-                bottom: length(48.0f32),
+                top: length(32.0f32),
+                bottom: length(32.0f32),
             },
             ..Default::default()
         });
@@ -346,7 +364,7 @@ impl Site for AkarSite {
         let why_body_para = layout.new_leaf(Style {
             size: Size {
                 width: length(700.0f32),
-                height: length(48.0f32),
+                height: length(40.0f32),
             },
             ..Default::default()
         });
@@ -356,14 +374,14 @@ impl Site for AkarSite {
             why_h4s[i] = layout.new_leaf(Style {
                 size: Size {
                     width: Dimension::percent(1.0),
-                    height: length(28.0f32),
+                    height: length(24.0f32),
                 },
                 ..Default::default()
             });
             why_paras[i] = layout.new_leaf(Style {
                 size: Size {
                     width: length(700.0f32),
-                    height: length(40.0f32),
+                    height: length(32.0f32),
                 },
                 ..Default::default()
             });
@@ -383,13 +401,13 @@ impl Site for AkarSite {
             flex_shrink: 0.0,
             gap: taffy::geometry::Size {
                 width: length(0.0f32),
-                height: length(16.0f32),
+                height: length(12.0f32),
             },
             padding: taffy::geometry::Rect {
                 left: length(48.0f32),
                 right: length(48.0f32),
-                top: length(48.0f32),
-                bottom: length(48.0f32),
+                top: length(32.0f32),
+                bottom: length(32.0f32),
             },
             ..Default::default()
         });
@@ -495,13 +513,13 @@ impl Site for AkarSite {
             flex_shrink: 0.0,
             gap: taffy::geometry::Size {
                 width: length(0.0f32),
-                height: length(24.0f32),
+                height: length(16.0f32),
             },
             padding: taffy::geometry::Rect {
                 left: length(48.0f32),
                 right: length(48.0f32),
-                top: length(48.0f32),
-                bottom: length(48.0f32),
+                top: length(32.0f32),
+                bottom: length(32.0f32),
             },
             ..Default::default()
         });
@@ -642,6 +660,7 @@ impl Site for AkarSite {
         self.subtitle_node = subtitle_node;
         self.cta_solid = cta_solid;
         self.cta_outline = cta_outline;
+        self.cta_row = cta_row;
         self.stats_root = stats_root;
         self.stat_nodes = stat_nodes;
         self.cards_root = cards_root;
@@ -733,6 +752,7 @@ impl Site for AkarSite {
             Some(TextStyle {
                 font_size: Some(48.0),
                 font_family: Some(FontFamily::Serif),
+                align: Some(TextAlign::Center),
                 ..TextStyle::empty()
             }),
             &THEME,

@@ -351,8 +351,8 @@ Page structure:
 cargo fmt --check
 cargo test --workspace
 cargo clippy --workspace -- -D warnings
-cargo run --release --bin webpage-rust -- --site akar --width 1280 --height 900 --screenshot /tmp/akar-page.png --exit
-cargo run --release --bin webpage-rust -- --site mimo --width 1280 --height 900 --screenshot /tmp/mimo-page.png --exit
+cargo run --bin webpage-rust -- --site akar --width 1280 --height 900 --screenshot /tmp/akar-page.png --exit
+cargo run --bin webpage-rust -- --site mimo --width 1280 --height 900 --screenshot /tmp/mimo-page.png --exit
 ```
 
 ---

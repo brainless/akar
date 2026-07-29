@@ -59,10 +59,10 @@ The `demo-rust` binary is the primary visual feedback loop for UI work, and it i
 
 ```bash
 # Basic: full-window screenshot after the default 5s delay, then exit
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
 
 # Configurable delay (float seconds; 0 = first frame)
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
 ```
 
 Beyond the basic capture, the binary exposes a full debug toolchain (see `AGENTS.md` → "Debug toolchain" for the recommended loop and full flag reference):

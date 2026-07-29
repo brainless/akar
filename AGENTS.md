@@ -67,10 +67,10 @@ The screenshot captures exactly what akar rendered (no OS chrome) using wgpu int
 
 ```bash
 # Basic: full-window screenshot after default 5s delay, then exit
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
 
 # Configurable delay (float seconds; 0 = first frame). Lets agents iterate fast.
-cargo run --release --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
 ```
 
 ### Scripted input (non-idle states)
@@ -96,11 +96,11 @@ Element addressing is **labels-first on top of coordinates**. Labels are a `Hash
 
 ```bash
 # Print "name x y w h" for every labeled layout node, then exit (element discovery)
-cargo run --release --bin demo-rust -- --dump-layout
+cargo run --bin demo-rust -- --dump-layout
 
 # Structured JSON dump for the captured frame: every draw call (incl. culled, with
 # z-order and scissor), labeled layout rects, and an input snapshot.
-cargo run --release --bin demo-rust -- --dump-frame /tmp/frame.json --screenshot /tmp/x.png --exit
+cargo run --bin demo-rust -- --dump-frame /tmp/frame.json --screenshot /tmp/x.png --exit
 ```
 
 `--dump-frame` uses a gated recording mode in `DrawList` that snapshots `{call, scissor}` *before* the scissor-cull early-return, so culled calls are included — useful for "why didn't my quad render?" debugging.
@@ -111,13 +111,13 @@ cargo run --release --bin demo-rust -- --dump-frame /tmp/frame.json --screenshot
 
 ```bash
 # Discovery: list isolable component names and exit
-cargo run --release --bin demo-rust -- --list-components
+cargo run --bin demo-rust -- --list-components
 
 # Isolate just the drawer (forced open), auto-cropped
-cargo run --release --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
+cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
 
 # Composes with --script (force runs once, script may then transition state)
-cargo run --release --bin demo-rust -- --component dropdown --script /tmp/hover_item.txt
+cargo run --bin demo-rust -- --component dropdown --script /tmp/hover_item.txt
 ```
 
 Unknown component names print an error with the valid list and exit non-zero. Composes with `--dump-frame` (the dump reflects only the isolated component's calls). Demo-only feature; no `akar-core`/`akar-layout`/`akar-components` involvement.
