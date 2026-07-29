@@ -14,6 +14,7 @@
 - [x] Task 6 — Navbar lifecycle correction
 - [x] Task 7 — Styled button, badge, separator, stat, and tab bar APIs
 - [x] Task 8 — C ABI coverage
+- [x] Task 9 — Modularize webpage-rust
 
 ---
 
@@ -287,7 +288,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 9 — Modularize `webpage-rust`
 
-**Status:** Not Started
+**Status:** Done
 
 - Split the monolithic binary into application/dispatch code and per-site modules, for example:
 

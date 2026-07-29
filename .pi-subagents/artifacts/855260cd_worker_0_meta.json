@@ -1,0 +1,106 @@
+{
+  "runId": "855260cd",
+  "agent": "worker",
+  "task": "## Task 9 — Modularize webpage-rust\n\n**Epic:** epics/020-component-webpage-sample.md (read it fully for context)\n**Key references:** DEVELOP.md, AGENTS.md, README.md\n\n### Current state\n\n`examples/webpage-rust/src/main.rs` is a monolithic 1198-line file containing the MiMo webpage implementation. It needs to be split into modules.\n\n### What to implement\n\nSplit the monolithic binary into application/dispatch code and per-site modules:\n\n```\nexamples/webpage-rust/src/\n  main.rs       — CLI parsing, dispatch, rendering loop\n  app.rs        — shared application state and rendering\n  site.rs       — Site trait or enum\n  sites/\n    mod.rs      — site registry/discovery\n    mimo.rs     — MiMo page implementation\n    akar.rs     — Akar page (empty stub for now, Task 10 will fill it)\n```\n\n### Requirements from the epic\n\n1. Preserve the MiMo implementation and rendering behavior while moving it.\n2. Add `Site::Akar` and update CLI discovery/error output.\n3. Give each site its own stable layout and interaction state.\n4. Add deterministic `--width` and `--height` capture options, or define a fixed screenshot viewport.\n5. Build each site's layout once and recompute it on resize; do not create component nodes every frame.\n\n### Implementation approach\n\n1. **Read `examples/webpage-rust/src/main.rs` fully** to understand the current structure.\n2. Identify the MiMo-specific code vs shared code.\n3. Create a `Site` trait or enum that both sites implement.\n4. Move MiMo code to `sites/mimo.rs`.\n5. Create a stub `sites/akar.rs` with placeholder content.\n6. Add CLI support for `--site akar` (currently only supports `--site mimo` or defaults to it).\n7. Add `--width` and `--height` CLI options for deterministic viewport capture.\n8. Extract shared rendering/state code to `app.rs`.\n\n### Site trait pattern\n\n```rust\npub trait Site {\n    fn name(&self) -> &str;\n    fn build_layout(&mut self, layout: &mut Layout, core: &mut AkarCore, width: f32, height: f32);\n    fn paint(&mut self, core: &mut AkarCore, layout: &Layout, theme: &AkarTheme);\n}\n```\n\nOr use an enum if simpler:\n```rust\npub enum SiteKind {\n    Mimo(MimoSite),\n    Akar(AkarSite),\n}\n```\n\n### CLI changes\n\nCurrent CLI likely uses `--site mimo` or defaults. Add:\n- `--site akar` support\n- `--width <PX>` (default 1280)\n- `--height <PX>` (default 900)\n\n### Files to read first\n\n1. `examples/webpage-rust/src/main.rs` — the full monolithic file\n2. `examples/webpage-rust/Cargo.toml` — dependencies\n3. `examples/demo-rust/src/main.rs` — reference for CLI patterns and rendering loop\n\n### Key constraints\n\n- Preserve MiMo rendering behavior exactly.\n- Layout must be built once and recomputed on resize (not rebuilt every frame).\n- Each site has its own stable layout and interaction state.\n- The `--site akar` stub should compile and render something minimal (even just a blank page or \"Coming soon\" text).\n\n### Coding conventions\n- Edition 2021, no emojis, no unnecessary comments\n\nAfter implementing, run `cargo check --bin webpage-rust` and `cargo fmt` to verify compilation.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/brainless/Projects/akar/.pi-subagents/artifacts/outputs/855260cd/inline\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 72442,
+    "output": 37880,
+    "cacheRead": 2053952,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 41
+  },
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+  "attemptedModels": [
+    "xiaomi-token-plan-sgp/mimo-v2.5:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 72442,
+        "output": 37880,
+        "cacheRead": 2053952,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 41
+      }
+    }
+  ],
+  "durationMs": 408737,
+  "toolCount": 40,
+  "launchContractDigest": "b30ce68f620e8eb617a654b40084d43eb31a53809f825d51f781ff8fb22fe057",
+  "acceptance": {
+    "status": "rejected",
+    "evidenceStatus": "rejected",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": false,
+      "inferredReason": [
+        "write-capable worker/task"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Implement the requested change without widening scope",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "write-capable worker/task"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Implement the requested change without widening scope",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "attestation",
+        "status": "failed",
+        "message": "Structured acceptance report not found."
+      }
+    ],
+    "verifyRuns": [],
+    "childReportParseError": "Structured acceptance report not found."
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "observed",
+      "expected": true,
+      "attempted": true
+    }
+  },
+  "transcriptPath": "/Users/brainless/Projects/akar/.pi-subagents/artifacts/855260cd_worker_0_transcript.jsonl",
+  "timestamp": 1785327048860
+}
