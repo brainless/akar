@@ -1,0 +1,32 @@
+Implemented the `link` component for akar-components.
+
+## Changes
+
+### New file: `crates/akar-components/src/link.rs`
+- `LinkResult` struct with `clicked: bool`, `hovered: bool`, `pressed: bool`
+- `link()` function following the existing component pattern (heading/paragraph/button)
+- `link_defaults()` provides: primary color text, normal weight, base font size, no wrap
+- Zero-area guard returns `LinkResult::default()` (all false)
+- Hit testing via `core.input.is_hovering()`, `is_pressed()`, `is_clicked()`
+- Text style resolution via `resolve_text_style` with optional `TextStyle` overrides
+- Text rendered via `TextCall` (same pattern as heading/paragraph/label)
+- Hover underline: 2px-high `QuadCall` at `Z_TEXT_FOREGROUND` layer, width derived from `TextPipeline::measure()` (actual measured glyph width, not full node width)
+- 6 tests: zero area, renders text, hit state, style override, no underline when not hovered, default uses primary color
+
+### Modified file: `crates/akar-components/src/lib.rs`
+- Added `pub mod link;` and `pub use link::{link as akar_link, LinkResult};`
+
+## Validation
+- `cargo test -p akar-components` — 180 passed, 0 failed
+- `cargo fmt -p akar-components` — clean
+
+## Design notes
+- Underline width uses `TextPipeline::measure()` to get actual shaped glyph width, satisfying the epic requirement to size from measured glyph geometry rather than full node width.
+- Underline uses `Z_TEXT_FOREGROUND` (2.0) so it renders after text glyphs via the foreground quad pipeline.
+- Test helper `sized_node` uses a parent with padding to offset the child away from (0,0), ensuring mock's default mouse position at origin is outside the rect.
+
+## Open risks/questions
+- None. Implementation follows established patterns exactly.
+
+## Recommended next step
+- Task 5 (Card lifecycle and composition) or task registration with the parent orchestrator.

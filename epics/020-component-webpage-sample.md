@@ -9,6 +9,7 @@
 - [x] Task 1 — Component lifecycle and text measurement foundation
 - [x] Task 2 — Typography types, theme tokens, and resolution
 - [x] Task 3 — Heading and paragraph components
+- [x] Task 4 — Link component
 
 ---
 
@@ -216,7 +217,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 4 — Link component
 
-**Status:** Not Started
+**Status:** Done
 
 - Add `link` returning `LinkResult { clicked, hovered, pressed }`.
 - Default to the theme's primary color with `TextStyle` overrides.

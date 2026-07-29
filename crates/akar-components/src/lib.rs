@@ -113,3 +113,6 @@ pub use heading::{heading as akar_heading, HeadingLevel};
 
 pub mod paragraph;
 pub use paragraph::paragraph as akar_paragraph;
+
+pub mod link;
+pub use link::{link as akar_link, LinkResult};
