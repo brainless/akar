@@ -1,0 +1,69 @@
+## Task 5 — Card Lifecycle and Composition: Implementation Complete
+
+### What was implemented
+
+Added a composed `card` component with construct/paint lifecycle to `crates/akar-components/src/card.rs`.
+
+### Types
+
+- **`CardSlots`** — holds `header: Option<NodeId>`, `body: NodeId`, `footer: Option<NodeId>`
+- **`CardLayout`** — construction options: `direction`, `gap`, `padding`, `has_header`, `has_footer`
+- **`CardStyle`** — paint options: `background`, `border_color`, `border_width`, `corner_radii`, `shadow_*`, `separator_color`
+
+### Functions
+
+- **`card_layout(layout, node_id, options) -> CardSlots`** — creates stable child nodes (body always, header/footer conditionally), sets children order `[header?, body, footer?]`, configures root as Flex with direction/gap/padding
+- **`card(core, layout, node_id, slots, style)`** — paint-time only: draws background quad with border/radius/shadow, draws 1px separator quads between populated regions (header-body, body-footer); read-only on Layout
+
+### Design decisions
+
+- `CardStyle::default(theme)` uses `BoxStyle::card(theme)` for background/border/corner_radii values, with shadow off by default
+- Separators are 1px quads inset from border+corner radius, drawn only when the adjacent slot has content (non-zero rect)
+- `CardLayout::body_only(theme)` and `CardLayout::with_header_footer(theme)` convenience constructors use theme padding defaults
+- Gap defaults to 0.0 (no gap between regions); separator provides the visual divider
+
+### Files changed
+
+1. `crates/akar-components/src/card.rs` — new file (full component implementation + 8 tests)
+2. `crates/akar-components/src/lib.rs` — added `pub mod card` and re-exports: `akar_card`, `akar_card_layout`, `CardLayout`, `CardSlots`, `CardStyle`
+
+### Tests (8 total, all passing)
+
+| Test | Validates |
+|------|-----------|
+| `card_layout_creates_body_only` | `has_header=false, has_footer=false` → body only |
+| `card_layout_creates_header_body_footer` | all three slots present |
+| `card_layout_returns_distinct_slot_ids` | header, body, footer are different NodeIds |
+| `zero_area_does_nothing` | zero-size node → no draw calls |
+| `card_renders_background` | sized node with slots → quad emitted |
+| `card_separator_between_header_body` | header+body present → separator drawn |
+| `card_no_separator_body_only` | body-only → only 1 quad (no separator) |
+| `card_separator_between_body_footer` | body+footer present → separator drawn |
+
+### Commands run
+
+| Command | Result |
+|---------|--------|
+| `cargo fmt -p akar-components` | passed (no changes) |
+| `cargo fmt --check -p akar-components` | passed |
+| `cargo test -p akar-components --lib card` | passed (8/8) |
+| `cargo test -p akar-components` | passed (188/188 total) |
+
+### What already existed
+
+- `BoxStyle::card(theme)` — already present in `box_style.rs`; used as the basis for `CardStyle::default()`
+- No `spacing_lg` token in theme — used `padding_x` as the padding default, `0.0` for gap (separators provide visual spacing)
+
+### Residual risks/questions
+
+- The `gap` field defaults to 0.0; callers who want visible spacing between regions should set it explicitly or rely on separator quads
+- Theme does not have a `spacing_lg` token — if the epic's intent was a larger default gap, a theme token addition would be needed in a follow-up
+- No visual screenshot verification was performed (requires GPU; deferred to Task 11)
+
+### Recommended next step
+
+Run the demo toolchain to visually verify card rendering:
+```bash
+cargo run --release --bin demo-rust -- --component card --screenshot /tmp/card.png --exit
+```
+Then proceed with Task 6 (navbar lifecycle correction) or Task 10 (Akar page composition).

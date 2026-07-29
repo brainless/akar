@@ -1,0 +1,186 @@
+{
+  "runId": "2df8720f",
+  "agent": "worker",
+  "task": "## Task 5 — Card Lifecycle and Composition\n\n**Epic:** epics/020-component-webpage-sample.md (read it fully for context)\n**Key references:** DEVELOP.md, AGENTS.md, README.md (read for architecture, conventions, component contract)\n\n### What to implement\n\nAdd a composed `card` component with construct/paint lifecycle to `crates/akar-components/src/card.rs`.\n\nThe card is a composed component with body and optional header/footer slots. Construction creates stable layout nodes; paint draws background, border, radius, shadow, and separators without mutating layout.\n\n#### Types\n\n```rust\npub struct CardSlots {\n    pub header: Option<NodeId>,\n    pub body: NodeId,\n    pub footer: Option<NodeId>,\n}\n\npub struct CardLayout {\n    pub direction: FlexDirection,  // default Column\n    pub gap: f32,                  // default theme.spacing_lg or similar\n    pub padding: f32,              // default theme.padding_x\n    pub has_header: bool,\n    pub has_footer: bool,\n}\n\npub struct CardStyle {\n    pub background: u32,\n    pub border_color: u32,\n    pub border_width: f32,\n    pub corner_radii: [f32; 4],\n    pub shadow_blur: f32,\n    pub shadow_spread: f32,\n    pub shadow_color: u32,\n    pub shadow_offset: [f32; 2],\n    pub separator_color: u32,\n}\n```\n\n#### Construction: `card_layout`\n\n```rust\npub fn card_layout(layout: &mut Layout, node_id: NodeId, options: &CardLayout) -> CardSlots\n```\n\n- Sets the root node's display to Flex, direction from options, gap, padding.\n- Creates body node (always present).\n- Creates header node only if `options.has_header`.\n- Creates footer node only if `options.has_footer`.\n- Sets children on root node in order: [header?, body, footer?].\n- Returns `CardSlots` with the node IDs.\n- The caller adds content to the returned slot nodes.\n\n#### Paint: `card`\n\n```rust\npub fn card(core: &mut AkarCore, layout: &Layout, node_id: NodeId, slots: &CardSlots, style: &CardStyle)\n```\n\n- Gets the resolved rect from layout.\n- Zero-area guard.\n- Draws background quad with border, corner radii, shadow.\n- Draws separators between populated regions (header-body, body-footer) as 1px quads.\n- Does NOT mutate layout — read-only on `Layout`.\n\n#### Default style\n\nAdd a `CardStyle::default(theme: &AkarTheme) -> CardStyle` that uses:\n- `background: theme.base_100`\n- `border_color: theme.base_300`\n- `border_width: theme.border_width`\n- `corner_radii: [theme.radius_box; 4]`\n- `shadow_blur: 0.0` (no shadow by default)\n- `separator_color: theme.base_300`\n\nAlso add `BoxStyle::card()` if it doesn't already exist — check `box_style.rs`.\n\n### Files to read first\n\n1. `crates/akar-components/src/box_style.rs` — BoxStyle, BoxShadow, existing card/panel helpers\n2. `crates/akar-components/src/container.rs` — how container draws background\n3. `crates/akar-components/src/navbar.rs` — example of construct pattern with slots\n4. `crates/akar-components/src/separator.rs` — separator drawing\n5. `crates/akar-components/src/lib.rs` — module declarations\n6. `crates/akar-components/src/theme.rs` — AkarTheme tokens\n7. `crates/akar-core/src/lib.rs` — QuadCall, AkarCore\n8. `crates/akar-layout/src/lib.rs` — Layout, NodeId, Style, Display, FlexDirection\n\n### Key constraints from the epic\n\n- Card is a composed component, not a primitive layout container.\n- Empty optional slots are not created.\n- Separators are painted only between populated regions.\n- Paint functions never add children, replace children, or overwrite caller-owned layout properties.\n- Stable caller-owned NodeIds survive every frame.\n\n### Exports\n\nIn `lib.rs`:\n```rust\npub mod card;\npub use card::{card as akar_card, card_layout as akar_card_layout, CardLayout, CardSlots, CardStyle};\n```\n\n### Tests\n\n- `card_layout_creates_body_only` — has_header=false, has_footer=false → body only\n- `card_layout_creates_header_body_footer` — all three slots present\n- `card_layout_returns_distinct_slot_ids` — header, body, footer are different NodeIds\n- `zero_area_does_nothing` — zero-size node, no draw calls\n- `card_renders_background` — sized node with slots, assert quad present\n- `card_separator_between_header_body` — when header+body present, separator drawn\n\n### Coding conventions\n- Edition 2021, no emojis, no unnecessary comments, self-documenting code\n\nAfter implementing, run `cargo test -p akar-components` and `cargo fmt` to verify.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/brainless/Projects/akar/.pi-subagents/artifacts/outputs/2df8720f/inline\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 60634,
+    "output": 14819,
+    "cacheRead": 1422336,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 34
+  },
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+  "attemptedModels": [
+    "xiaomi-token-plan-sgp/mimo-v2.5:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 60634,
+        "output": 14819,
+        "cacheRead": 1422336,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 34
+      }
+    }
+  ],
+  "durationMs": 231851,
+  "toolCount": 44,
+  "launchContractDigest": "5e8cfe66692627308d0864ec1e9b691ba480e19d1019200a95662f857e9e0d46",
+  "acceptance": {
+    "status": "checked",
+    "evidenceStatus": "checked",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": false,
+      "inferredReason": [
+        "write-capable worker/task"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Implement the requested change without widening scope",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "write-capable worker/task"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Implement the requested change without widening scope",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "criterion:criterion-1",
+        "status": "passed",
+        "message": "Required criterion 'criterion-1' satisfied."
+      },
+      {
+        "id": "evidence:changed-files",
+        "status": "passed",
+        "message": "changed-files evidence present."
+      },
+      {
+        "id": "evidence:tests-added",
+        "status": "passed",
+        "message": "tests-added evidence present."
+      },
+      {
+        "id": "evidence:commands-run",
+        "status": "passed",
+        "message": "commands-run evidence present."
+      },
+      {
+        "id": "evidence:residual-risks",
+        "status": "passed",
+        "message": "residual-risks evidence present."
+      },
+      {
+        "id": "evidence:no-staged-files",
+        "status": "passed",
+        "message": "no-staged-files evidence present."
+      },
+      {
+        "id": "no-staged-files",
+        "status": "passed",
+        "message": "No staged files detected."
+      }
+    ],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "card.rs created with CardSlots/CardLayout/CardStyle types, card_layout construction fn, card paint fn, CardStyle::default(theme), 8 unit tests all passing. lib.rs updated with module declaration and re-exports. cargo test -p akar-components: 188 passed, 0 failed. cargo fmt --check: clean."
+        }
+      ],
+      "changedFiles": [
+        "crates/akar-components/src/card.rs",
+        "crates/akar-components/src/lib.rs"
+      ],
+      "testsAddedOrUpdated": [
+        "crates/akar-components/src/card.rs (8 new tests: card_layout_creates_body_only, card_layout_creates_header_body_footer, card_layout_returns_distinct_slot_ids, zero_area_does_nothing, card_renders_background, card_separator_between_header_body, card_no_separator_body_only, card_separator_between_body_footer)"
+      ],
+      "commandsRun": [
+        {
+          "command": "cargo fmt -p akar-components",
+          "result": "passed",
+          "summary": "Formatting applied cleanly"
+        },
+        {
+          "command": "cargo fmt --check -p akar-components",
+          "result": "passed",
+          "summary": "No formatting issues"
+        },
+        {
+          "command": "cargo test -p akar-components --lib card",
+          "result": "passed",
+          "summary": "8/8 card tests passed"
+        },
+        {
+          "command": "cargo test -p akar-components",
+          "result": "passed",
+          "summary": "188/188 total tests passed (8 new + 180 existing)"
+        }
+      ],
+      "validationOutput": [
+        "All 188 tests pass. cargo fmt --check clean. card.rs is a new file; lib.rs has 5 added lines (module + re-exports)."
+      ],
+      "residualRisks": [
+        "Theme has no spacing_lg token; gap defaults to 0.0",
+        "Visual screenshot verification requires GPU (deferred to Task 11)"
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "New card.rs (350 lines) with CardSlots/CardLayout/CardStyle types, card_layout() construction fn, card() paint fn, CardStyle::default(), 8 tests. lib.rs: 5 lines added for module declaration and re-exports.",
+      "reviewFindings": [
+        "no blockers"
+      ],
+      "manualNotes": "BoxStyle::card() already existed in box_style.rs; CardStyle::default() derives from it. The navbar construct pattern was followed for node creation. Separator quads are drawn at 1px height between header/body and body/footer slots, inset from border+corner radius."
+    }
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "observed",
+      "expected": true,
+      "attempted": true
+    }
+  },
+  "transcriptPath": "/Users/brainless/Projects/akar/.pi-subagents/artifacts/2df8720f_worker_0_transcript.jsonl",
+  "timestamp": 1785324697052
+}

@@ -10,6 +10,7 @@
 - [x] Task 2 — Typography types, theme tokens, and resolution
 - [x] Task 3 — Heading and paragraph components
 - [x] Task 4 — Link component
+- [x] Task 5 — Card lifecycle and composition
 
 ---
 
@@ -230,7 +231,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 5 — Card lifecycle and composition
 
-**Status:** Not Started
+**Status:** Done
 
 - Add `CardLayout`, `CardStyle`, and `CardSlots`.
 - Add a build-time `card_layout` operation that creates stable body and requested optional slots.

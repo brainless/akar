@@ -116,3 +116,8 @@ pub use paragraph::paragraph as akar_paragraph;
 
 pub mod link;
 pub use link::{link as akar_link, LinkResult};
+
+pub mod card;
+pub use card::{
+    card as akar_card, card_layout as akar_card_layout, CardLayout, CardSlots, CardStyle,
+};
