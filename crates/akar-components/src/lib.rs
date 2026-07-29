@@ -43,7 +43,10 @@ pub mod skeleton;
 pub use skeleton::{skeleton as akar_skeleton, SkeletonVariant};
 
 pub mod navbar;
-pub use navbar::{navbar as akar_navbar, NavbarSlots};
+pub use navbar::{
+    navbar as akar_navbar, navbar_combined as akar_navbar_combined,
+    navbar_layout as akar_navbar_layout, NavbarSlots, NavbarStyle,
+};
 
 pub mod steps;
 pub use steps::steps as akar_steps;

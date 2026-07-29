@@ -11,6 +11,7 @@
 - [x] Task 3 — Heading and paragraph components
 - [x] Task 4 — Link component
 - [x] Task 5 — Card lifecycle and composition
+- [x] Task 6 — Navbar lifecycle correction
 
 ---
 
@@ -244,7 +245,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 6 — Navbar lifecycle correction
 
-**Status:** Not Started
+**Status:** Done
 
 - Split navbar structure construction from painting.
 - Preserve caller-owned root size, padding, gap, min/max constraints, and placement.

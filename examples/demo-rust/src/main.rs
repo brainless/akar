@@ -3,11 +3,12 @@ use std::time::Instant;
 
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container, akar_label,
-    akar_navbar, akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat, akar_steps,
-    akar_switch, akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip, drawer_begin,
-    drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts,
-    AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots, ProgressStyle,
-    SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_navbar_layout, akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat,
+    akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip,
+    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
+    toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots,
+    ProgressStyle, SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide,
+    AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -316,12 +317,7 @@ fn render_navbar(state: &mut AppState, _viewport_rect: [f32; 4]) {
     let navbar_id = state.page.header.unwrap();
 
     if state.navbar_slots.is_none() {
-        let slots = akar_navbar(
-            &mut state.core,
-            &mut state.layout,
-            navbar_id,
-            &AKAR_THEME_DARK,
-        );
+        let slots = akar_navbar_layout(&mut state.layout, navbar_id, &AKAR_THEME_DARK);
         state.layout.add_child(slots.start, state.navbar_title_node);
         state.layout.add_child(slots.end, state.navbar_badge_node);
         state.layout.add_child(slots.end, state.navbar_btn_node);
@@ -1088,12 +1084,7 @@ enum Component {
 fn ensure_navbar_slots(state: &mut AppState) {
     if state.navbar_slots.is_none() {
         let navbar_id = state.page.header.unwrap();
-        let slots = akar_navbar(
-            &mut state.core,
-            &mut state.layout,
-            navbar_id,
-            &AKAR_THEME_DARK,
-        );
+        let slots = akar_navbar_layout(&mut state.layout, navbar_id, &AKAR_THEME_DARK);
         state.layout.add_child(slots.start, state.navbar_title_node);
         state.layout.add_child(slots.end, state.navbar_badge_node);
         state.layout.add_child(slots.end, state.navbar_btn_node);

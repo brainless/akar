@@ -1,10 +1,9 @@
-use akar_core::AkarCore;
+use akar_core::{AkarCore, QuadCall};
 use akar_layout::{
     AlignItems, Dimension, Display, FlexDirection, JustifyContent, Layout, NodeId, Size, Style,
 };
 
-use crate::box_style::BoxStyle;
-use crate::container::container;
+use crate::color::color_to_f32;
 use crate::AkarTheme;
 
 pub struct NavbarSlots {
@@ -13,12 +12,25 @@ pub struct NavbarSlots {
     pub end: NodeId,
 }
 
-pub fn navbar(
-    core: &mut AkarCore,
-    layout: &mut Layout,
-    node_id: NodeId,
-    theme: &AkarTheme,
-) -> NavbarSlots {
+pub struct NavbarStyle {
+    pub background: u32,
+    pub border_color: u32,
+    pub border_width: f32,
+    pub corner_radii: [f32; 4],
+}
+
+impl NavbarStyle {
+    pub fn default(theme: &AkarTheme) -> Self {
+        Self {
+            background: theme.base_200,
+            border_color: theme.base_300,
+            border_width: theme.border_width,
+            corner_radii: [0.0, 0.0, 0.0, 0.0],
+        }
+    }
+}
+
+pub fn navbar_layout(layout: &mut Layout, node_id: NodeId, _theme: &AkarTheme) -> NavbarSlots {
     layout.set_style(
         node_id,
         Style {
@@ -64,11 +76,40 @@ pub fn navbar(
 
     layout.set_children(node_id, &[start, center, end]);
 
-    let mut style = BoxStyle::panel(theme);
-    style.corner_radii = [0.0, 0.0, 0.0, 0.0];
-    container(core, layout, node_id, &style);
-
     NavbarSlots { start, center, end }
+}
+
+pub fn navbar(core: &mut AkarCore, layout: &Layout, node_id: NodeId, style: &NavbarStyle) {
+    let rect = layout.rect(node_id);
+    if rect[2] == 0.0 || rect[3] == 0.0 {
+        return;
+    }
+
+    core.draw_list.push_quad(QuadCall {
+        rect,
+        fill: color_to_f32(style.background),
+        border_color: color_to_f32(style.border_color),
+        corner_radii: style.corner_radii,
+        border_width: style.border_width,
+        z: 0.0,
+        shadow_blur: 0.0,
+        shadow_spread: 0.0,
+        shadow_color: [0.0; 4],
+        shadow_offset: [0.0; 2],
+        _pad: [0.0; 2],
+    });
+}
+
+pub fn navbar_combined(
+    core: &mut AkarCore,
+    layout: &mut Layout,
+    node_id: NodeId,
+    theme: &AkarTheme,
+) -> NavbarSlots {
+    let slots = navbar_layout(layout, node_id, theme);
+    let style = NavbarStyle::default(theme);
+    navbar(core, layout, node_id, &style);
+    slots
 }
 
 #[cfg(test)]
@@ -77,11 +118,10 @@ mod tests {
     use akar_layout::length;
 
     #[test]
-    fn navbar_creates_three_slots() {
+    fn navbar_layout_creates_three_slots() {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style::default());
-        let mut core = AkarCore::mock();
-        let slots = navbar(&mut core, &mut layout, node, &crate::AKAR_THEME_DARK);
+        let slots = navbar_layout(&mut layout, node, &crate::AKAR_THEME_DARK);
 
         assert_ne!(slots.start, slots.center);
         assert_ne!(slots.center, slots.end);
@@ -89,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn navbar_background_rendered() {
+    fn navbar_layout_does_not_draw() {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
@@ -102,8 +142,79 @@ mod tests {
             akar_layout::Size::ZERO
         });
         let mut core = AkarCore::mock();
-        navbar(&mut core, &mut layout, node, &crate::AKAR_THEME_DARK);
-        assert!(!core.draw_list.sorted_quads().is_empty());
+        let _slots = navbar_layout(&mut layout, node, &crate::AKAR_THEME_DARK);
+        assert!(
+            core.draw_list.sorted_quads().is_empty(),
+            "navbar_layout must not draw"
+        );
+    }
+
+    #[test]
+    fn navbar_paint_draws_background() {
+        let mut layout = akar_layout::Layout::new();
+        let node = layout.new_leaf(Style {
+            size: Size {
+                width: length(800.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        layout.compute(node, (Some(800.0), Some(60.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let mut core = AkarCore::mock();
+        let style = NavbarStyle::default(&crate::AKAR_THEME_DARK);
+        navbar(&mut core, &layout, node, &style);
+        let quads = core.draw_list.sorted_quads();
+        assert_eq!(
+            quads.len(),
+            1,
+            "navbar paint should emit exactly one background quad"
+        );
+    }
+
+    #[test]
+    fn zero_area_does_nothing() {
+        let mut layout = akar_layout::Layout::new();
+        let node = layout.new_leaf(Style::default());
+        layout.compute(node, (Some(0.0), Some(0.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let mut core = AkarCore::mock();
+        let style = NavbarStyle::default(&crate::AKAR_THEME_DARK);
+        navbar(&mut core, &layout, node, &style);
+        assert!(
+            core.draw_list.sorted_quads().is_empty(),
+            "zero-area navbar should not draw"
+        );
+    }
+
+    #[test]
+    fn navbar_preserves_caller_layout() {
+        let theme = &crate::AKAR_THEME_DARK;
+        let mut layout = akar_layout::Layout::new();
+        let node = layout.new_leaf(Style {
+            size: Size {
+                width: length(500.0),
+                height: length(80.0),
+            },
+            ..Default::default()
+        });
+        let _slots = navbar_layout(&mut layout, node, theme);
+        layout.compute(node, (Some(500.0), Some(80.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let rect_before = layout.rect(node);
+
+        let mut core = AkarCore::mock();
+        let style = NavbarStyle::default(theme);
+        navbar(&mut core, &layout, node, &style);
+
+        let rect_after = layout.rect(node);
+        assert_eq!(
+            rect_before, rect_after,
+            "navbar paint must not modify layout"
+        );
     }
 
     #[test]
@@ -116,8 +227,7 @@ mod tests {
             },
             ..Default::default()
         });
-        let mut core = AkarCore::mock();
-        let slots = navbar(&mut core, &mut layout, node, &crate::AKAR_THEME_DARK);
+        let slots = navbar_layout(&mut layout, node, &crate::AKAR_THEME_DARK);
 
         let child_start = layout.new_leaf(Style {
             size: Size {
@@ -171,5 +281,26 @@ mod tests {
             end_rect[0],
             center_rect[0] + center_rect[2]
         );
+    }
+
+    #[test]
+    fn navbar_combined_does_layout_and_paint() {
+        let mut layout = akar_layout::Layout::new();
+        let node = layout.new_leaf(Style {
+            size: Size {
+                width: length(800.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        layout.compute(node, (Some(800.0), Some(60.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let mut core = AkarCore::mock();
+        let slots = navbar_combined(&mut core, &mut layout, node, &crate::AKAR_THEME_DARK);
+
+        assert_ne!(slots.start, slots.center);
+        assert_ne!(slots.center, slots.end);
+        assert!(!core.draw_list.sorted_quads().is_empty());
     }
 }

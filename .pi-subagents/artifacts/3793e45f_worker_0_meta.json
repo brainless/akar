@@ -1,0 +1,240 @@
+{
+  "runId": "3793e45f",
+  "agent": "worker",
+  "task": "## Task 6 — Navbar Lifecycle Correction\n\n**Epic:** epics/020-component-webpage-sample.md (read it fully for context)\n**Key references:** DEVELOP.md, AGENTS.md, README.md (read for architecture, conventions, component contract)\n\n### Current state\n\nThe existing `navbar` in `crates/akar-components/src/navbar.rs` currently:\n1. Mutates the root node's style (sets display, flex_direction, align_items, size)\n2. Creates child slot nodes (start, center, end) every call\n3. Draws a background container via `container()`\n4. Returns `NavbarSlots`\n\nThis violates the construct/paint lifecycle: construction should be separate from painting, and paint must not mutate layout.\n\n### What to implement\n\nSplit navbar into `navbar_layout` (construction) and `navbar` (paint), following the same pattern as `card_layout`/`card`.\n\n#### Types to add\n\n```rust\npub struct NavbarStyle {\n    pub background: u32,\n    pub border_color: u32,\n    pub border_width: f32,\n    pub corner_radii: [f32; 4],\n}\n```\n\n#### Construction: `navbar_layout`\n\n```rust\npub fn navbar_layout(layout: &mut Layout, node_id: NodeId, theme: &AkarTheme) -> NavbarSlots\n```\n\n- Creates start, center, end child nodes with appropriate flex styles.\n- Sets children on root node.\n- Configures root node as flex row with center alignment.\n- Does NOT draw anything.\n- Returns `NavbarSlots { start, center, end }`.\n\n#### Paint: `navbar`\n\n```rust\npub fn navbar(core: &mut AkarCore, layout: &Layout, node_id: NodeId, style: &NavbarStyle)\n```\n\n- Gets rect from layout.\n- Zero-area guard.\n- Draws background quad with border, corner radii.\n- Does NOT mutate layout, does NOT create child nodes.\n\n### Key constraints from the epic\n\n- Preserve caller-owned root size, padding, gap, min/max constraints, and placement.\n- Keep stable start, center, and end slots.\n- Page-specific height belongs to the caller's Taffy layout.\n- Retain or provide a clear migration for the existing API.\n\n### Migration strategy\n\nKeep the old `navbar` function as a convenience that does both construction and paint in one call (for backward compatibility), but mark it as the \"combined\" entry point. The new split API (`navbar_layout` + `navbar`) is the preferred path.\n\nActually, looking at the epic more carefully: \"Retain or provide a clear migration for the existing API.\" The simplest approach is to rename the current function and provide the new split API. But since the existing `navbar` is already used in demo-rust and the webpage sample, we should keep backward compatibility.\n\nBest approach: keep the existing `navbar(core, layout, node_id, theme)` function signature but refactor it to use the new internal structure. Add `navbar_layout` and `navbar` (paint-only) as the new preferred API. The old `navbar` becomes a combined convenience that calls both.\n\n### Files to read first\n\n1. `crates/akar-components/src/navbar.rs` — current implementation\n2. `crates/akar-components/src/card.rs` — reference for the construct/paint split pattern\n3. `crates/akar-components/src/container.rs` — how container draws\n4. `crates/akar-components/src/box_style.rs` — BoxStyle\n5. `crates/akar-components/src/lib.rs` — module declarations\n6. `crates/akar-components/src/theme.rs` — AkarTheme tokens\n7. `crates/akar-core/src/lib.rs` — QuadCall, AkarCore\n\n### Exports\n\nIn `lib.rs`, update:\n```rust\npub mod navbar;\npub use navbar::{\n    navbar as akar_navbar, navbar_layout as akar_navbar_layout,\n    NavbarSlots, NavbarStyle,\n};\n```\n\n### Tests\n\n- `navbar_layout_creates_three_slots` — start, center, end are distinct\n- `navbar_layout_does_not_draw` — no draw calls after construction\n- `navbar_paint_draws_background` — sized node, assert quad present\n- `zero_area_does_nothing` — zero-size node, no draw calls\n- `navbar_preserves_caller_layout` — caller sets root style, paint doesn't overwrite it\n\n### Coding conventions\n- Edition 2021, no emojis, no unnecessary comments\n\nAfter implementing, run `cargo test -p akar-components` and `cargo fmt` to verify.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/brainless/Projects/akar/.pi-subagents/artifacts/outputs/3793e45f/inline\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 58255,
+    "output": 18760,
+    "cacheRead": 1825984,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 45
+  },
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+  "attemptedModels": [
+    "xiaomi-token-plan-sgp/mimo-v2.5:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 58255,
+        "output": 18760,
+        "cacheRead": 1825984,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 45
+      }
+    }
+  ],
+  "durationMs": 368828,
+  "toolCount": 54,
+  "launchContractDigest": "fbb1fa2163ba2f9c78da896b6858772f8e5bc3ad86771fc39de288914bb01389",
+  "acceptance": {
+    "status": "review-required",
+    "evidenceStatus": "checked",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": false,
+      "inferredReason": [
+        "risky write-capable run"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Implement the requested change without widening scope",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        },
+        {
+          "id": "criterion-2",
+          "must": "Return evidence sufficient for an independent acceptance review",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "review": {
+        "agent": "reviewer",
+        "required": true
+      },
+      "stopRules": []
+    },
+    "inferredReason": [
+      "risky write-capable run"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Implement the requested change without widening scope",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      },
+      {
+        "id": "criterion-2",
+        "must": "Return evidence sufficient for an independent acceptance review",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "criterion:criterion-1",
+        "status": "passed",
+        "message": "Required criterion 'criterion-1' satisfied."
+      },
+      {
+        "id": "criterion:criterion-2",
+        "status": "passed",
+        "message": "Required criterion 'criterion-2' satisfied."
+      },
+      {
+        "id": "evidence:changed-files",
+        "status": "passed",
+        "message": "changed-files evidence present."
+      },
+      {
+        "id": "evidence:tests-added",
+        "status": "passed",
+        "message": "tests-added evidence present."
+      },
+      {
+        "id": "evidence:commands-run",
+        "status": "passed",
+        "message": "commands-run evidence present."
+      },
+      {
+        "id": "evidence:residual-risks",
+        "status": "passed",
+        "message": "residual-risks evidence present."
+      },
+      {
+        "id": "evidence:no-staged-files",
+        "status": "passed",
+        "message": "no-staged-files evidence present."
+      },
+      {
+        "id": "no-staged-files",
+        "status": "passed",
+        "message": "No staged files detected."
+      }
+    ],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Navbar split into navbar_layout (construction) + navbar (paint) following card_layout/card pattern. Added NavbarStyle, navbar_combined for backward compat. Updated demo-rust call sites."
+        },
+        {
+          "id": "criterion-2",
+          "status": "satisfied",
+          "evidence": "7 new tests in navbar::tests covering slot creation, no-draw construction, background paint, zero-area guard, layout preservation, child composition, and combined entry. All 192 workspace tests pass."
+        }
+      ],
+      "changedFiles": [
+        "crates/akar-components/src/navbar.rs",
+        "crates/akar-components/src/lib.rs",
+        "examples/demo-rust/src/main.rs"
+      ],
+      "testsAddedOrUpdated": [
+        "navbar_layout_creates_three_slots",
+        "navbar_layout_does_not_draw",
+        "navbar_paint_draws_background",
+        "zero_area_does_nothing",
+        "navbar_preserves_caller_layout",
+        "children_can_be_added_to_slots",
+        "navbar_combined_does_layout_and_paint"
+      ],
+      "commandsRun": [
+        {
+          "command": "cargo test -p akar-components",
+          "result": "passed",
+          "summary": "192 passed, 0 failed"
+        },
+        {
+          "command": "cargo fmt --check",
+          "result": "passed",
+          "summary": "Clean, no diffs"
+        },
+        {
+          "command": "cargo check --bin demo-rust",
+          "result": "passed",
+          "summary": "Compiles with pre-existing float fallback warnings only"
+        },
+        {
+          "command": "cargo check --bin webpage-rust",
+          "result": "passed",
+          "summary": "Compiles with pre-existing float fallback warnings only"
+        }
+      ],
+      "validationOutput": [
+        "All 7 navbar tests pass. 192 total component tests pass. Format clean. Both binaries compile."
+      ],
+      "residualRisks": [
+        "none"
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "Split navbar into navbar_layout (construction), navbar (paint-only), and navbar_combined (backward compat). Added NavbarStyle type. Updated lib.rs exports. Migrated demo-rust from akar_navbar to akar_navbar_layout at both call sites.",
+      "reviewFindings": [
+        "no blockers"
+      ],
+      "manualNotes": ""
+    },
+    "reviewResult": {
+      "status": "review-required",
+      "findings": [
+        {
+          "severity": "non-blocking",
+          "issue": "Independent review has not been supplied.",
+          "rationale": "The run cannot be marked reviewed from child evidence alone."
+        }
+      ]
+    }
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "observed",
+      "expected": true,
+      "attempted": true
+    }
+  },
+  "transcriptPath": "/Users/brainless/Projects/akar/.pi-subagents/artifacts/3793e45f_worker_0_transcript.jsonl",
+  "timestamp": 1785325098082
+}
