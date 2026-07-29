@@ -15,8 +15,21 @@ pub use canvas_transform::{
 
 pub type NodeId = taffy::NodeId;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AkarNodeContext {
     pub text_buffer_id: u64,
+}
+
+impl AkarNodeContext {
+    pub const fn text(buffer_id: u64) -> Self {
+        Self {
+            text_buffer_id: buffer_id,
+        }
+    }
+
+    pub const fn empty() -> Self {
+        Self { text_buffer_id: 0 }
+    }
 }
 
 pub struct Layout {
@@ -166,6 +179,21 @@ impl Layout {
             .unwrap();
     }
 
+    /// Compute layout using the `TextPipeline` for intrinsic text measurement.
+    ///
+    /// Text-bearing leaves identify themselves through
+    /// `AkarNodeContext::text_buffer_id` (non-zero). The buffer must already
+    /// exist in `text_pipeline`; the same buffer is reused by the paint path
+    /// so measurement and rendering share the same shaped geometry.
+    pub fn compute_with_text(
+        &mut self,
+        root: NodeId,
+        available: (Option<f32>, Option<f32>),
+        text_pipeline: &mut akar_core::TextPipeline,
+    ) {
+        self.compute(root, available, default_measure_fn(text_pipeline));
+    }
+
     pub fn rect_offset(&self, node: NodeId, origin: [f32; 2]) -> [f32; 4] {
         let [x, y, w, h] = self.rect(node);
         [origin[0] + x, origin[1] + y, w, h]
@@ -197,6 +225,57 @@ fn mix_widget_id(mut value: u64) -> u64 {
     value ^= value >> 27;
     value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
     value ^ (value >> 31)
+}
+
+/// Returns a measure closure for `Layout::compute` that resolves intrinsic
+/// sizes from `TextPipeline`.
+///
+/// A node contributes a text-measured size when its `AkarNodeContext` holds a
+/// non-zero `text_buffer_id` that already exists in `text_pipeline`. Nodes
+/// without a context (or with `text_buffer_id == 0`) return `Size::ZERO`,
+/// matching the historical default for non-text leaves.
+///
+/// Known dimensions from the parent take precedence. The available width
+/// passed to `TextPipeline::measure_with_metadata` follows Taffy's
+/// `AvailableSpace` semantics: `Definite` yields the exact width, `MinContent`
+/// constrains to `0.0` (forcing wrap at every break opportunity), and
+/// `MaxContent` leaves the buffer unconstrained.
+pub fn default_measure_fn<'a>(
+    text_pipeline: &'a mut akar_core::TextPipeline,
+) -> impl FnMut(
+    Size<Option<f32>>,
+    Size<AvailableSpace>,
+    NodeId,
+    Option<&mut AkarNodeContext>,
+    &Style,
+) -> Size<f32>
+       + 'a {
+    move |known_dimensions, available_space, _node, context, _style| {
+        let Some(ctx) = context else {
+            return Size::ZERO;
+        };
+        if ctx.text_buffer_id == 0 {
+            return Size::ZERO;
+        }
+
+        let result = text_pipeline.measure_with_metadata(
+            ctx.text_buffer_id,
+            akar_core::TextMeasureInput {
+                known_width: known_dimensions.width,
+                known_height: known_dimensions.height,
+                available_width: match available_space.width {
+                    AvailableSpace::Definite(w) => Some(w.max(0.0)),
+                    AvailableSpace::MinContent => Some(0.0),
+                    AvailableSpace::MaxContent => None,
+                },
+            },
+        );
+
+        Size {
+            width: result.width,
+            height: result.height,
+        }
+    }
 }
 
 pub struct TwoColumnLayout {

@@ -11,7 +11,7 @@ pub mod quad_pipeline;
 pub use quad_pipeline::QuadPipeline;
 
 pub mod text_pipeline;
-pub use text_pipeline::{TextGeometry, TextPipeline};
+pub use text_pipeline::{TextGeometry, TextMeasureInput, TextMeasureResult, TextPipeline};
 
 pub mod screenshot;
 pub use screenshot::{CapturedFrame, ScreenshotError};

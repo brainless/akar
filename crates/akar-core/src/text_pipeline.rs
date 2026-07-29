@@ -7,6 +7,19 @@ pub struct TextGeometry {
     pub selection: Vec<[f32; 4]>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TextMeasureInput {
+    pub known_width: Option<f32>,
+    pub known_height: Option<f32>,
+    pub available_width: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextMeasureResult {
+    pub width: f32,
+    pub height: f32,
+}
+
 pub struct TextPipeline {
     font_system: glyphon::FontSystem,
     swash_cache: glyphon::SwashCache,
@@ -88,23 +101,61 @@ impl TextPipeline {
     }
 
     pub fn measure(&mut self, buffer_id: u64, width: Option<f32>) -> glam::Vec2 {
+        let result = self.measure_with_metadata(
+            buffer_id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: width,
+            },
+        );
+        glam::Vec2::new(result.width, result.height)
+    }
+
+    pub fn measure_with_metadata(
+        &mut self,
+        buffer_id: u64,
+        input: TextMeasureInput,
+    ) -> TextMeasureResult {
         let Some(buffer) = self.buffers.get_mut(&buffer_id) else {
-            return glam::Vec2::ZERO;
+            return TextMeasureResult::default();
         };
 
-        if let Some(w) = width {
-            buffer.set_size(&mut self.font_system, Some(w), None);
+        if let (Some(w), Some(h)) = (input.known_width, input.known_height) {
+            return TextMeasureResult {
+                width: w,
+                height: h,
+            };
+        }
+
+        let width_constraint = input
+            .known_width
+            .or(input.available_width)
+            .map(|w| w.max(0.0));
+
+        let current = buffer.size();
+        if width_constraint != current.0 {
+            buffer.set_size(&mut self.font_system, width_constraint, None);
             buffer.shape_until_scroll(&mut self.font_system, false);
         }
 
         let mut max_w: f32 = 0.0;
-        let mut last_bottom: f32 = 0.0;
+        let mut total_height: f32 = 0.0;
         for run in buffer.layout_runs() {
             max_w = max_w.max(run.line_w);
-            last_bottom = run.line_top + run.line_height;
+            total_height = run.line_top + run.line_height;
         }
 
-        glam::Vec2::new(max_w, last_bottom)
+        let width = match input.known_width {
+            Some(w) => w,
+            None => max_w,
+        };
+        let height = match input.known_height {
+            Some(h) => h,
+            None => total_height,
+        };
+
+        TextMeasureResult { width, height }
     }
 
     pub fn geometry(
@@ -410,5 +461,89 @@ mod tests {
 
         assert!(geometry.selection.is_empty());
         assert_eq!(geometry.caret, Some([0.0, 0.0, 2.0, 20.0]));
+    }
+
+    #[test]
+    fn measure_with_metadata_known_dimensions_short_circuit() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "abcdef", metrics, None, None, None);
+
+        let result = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: Some(120.0),
+                known_height: Some(40.0),
+                available_width: Some(100.0),
+            },
+        );
+
+        assert_eq!(result.width, 120.0);
+        assert_eq!(result.height, 40.0);
+    }
+
+    #[test]
+    fn measure_with_metadata_wrap_increases_height() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let text = "the rain in spain stays mainly in the plain";
+        let id = pipeline.set_text(None, text, metrics, None, None, None);
+
+        let wide = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: Some(800.0),
+            },
+        );
+        let narrow = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: Some(40.0),
+            },
+        );
+
+        assert!(narrow.height > wide.height, "wrapping yields taller text");
+        assert!(narrow.width <= 40.0 + 0.5);
+    }
+
+    #[test]
+    fn measure_with_metadata_explicit_newlines_count() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "a\nb\nc\nd", metrics, None, None, None);
+
+        let result = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: None,
+            },
+        );
+
+        assert!(
+            result.height >= 20.0 * 4.0 - 1.0,
+            "four lines should yield >= 4x line height, got {}",
+            result.height
+        );
+    }
+
+    #[test]
+    fn measure_with_metadata_missing_buffer_returns_zero() {
+        let mut pipeline = create_pipeline();
+        let result = pipeline.measure_with_metadata(
+            4242,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: Some(100.0),
+            },
+        );
+        assert_eq!(result.width, 0.0);
+        assert_eq!(result.height, 0.0);
     }
 }

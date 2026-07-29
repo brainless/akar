@@ -87,7 +87,9 @@ dependencies = [
 name = "akar-layout"
 version = "0.1.0"
 dependencies = [
+ "akar-core",
  "glam",
+ "glyphon",
  "taffy",
  "thiserror 2.0.18",
 ]

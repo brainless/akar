@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+akar-core = { path = "../akar-core" }
 taffy.workspace = true
 glam.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+glyphon.workspace = true

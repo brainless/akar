@@ -1,9 +1,12 @@
 # Epic 020: Component-Based Webpage Sample
 
-**Status:** Not Started
+**Status:** In Progress
 **Goal:** Rebuild the webpage sample using akar's component catalog instead of raw draw calls, proving that the component, layout, text, and C ABI building blocks are production-ready for real-world web-style layouts.
 
 **Prerequisite:** Epic 019 is `Status: Done`.
+
+**Progress:**
+- [x] Task 1 — Component lifecycle and text measurement foundation
 
 ---
 
@@ -166,7 +169,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 1 — Component lifecycle and text measurement foundation
 
-**Status:** Not Started
+**Status:** Done
 
 - Document the construct/compute/paint protocol in `DEVELOP.md`.
 - Extend `AkarNodeContext` or introduce the minimum equivalent context required for text measurement.

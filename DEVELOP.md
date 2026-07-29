@@ -104,6 +104,35 @@ akar/
 
 ## Architecture Notes
 
+### Component lifecycle: construct, compute, paint
+
+The frame lifecycle for slot-bearing components has three phases that must not overlap:
+
+1. **Construct.** The application builds the layout tree and runs any
+   component-level layout constructors (`card_layout`, `navbar_layout`,
+   future `heading_layout`, etc.). Construction happens once, or only when
+   the application deliberately rebuilds its layout. It creates nodes,
+   configures component-owned internal slots, and is the only phase that
+   may add or replace children.
+2. **Compute.** The application calls `Layout::compute` (or
+   `Layout::compute_with_text` when text is involved) to resolve Taffy
+   flex/grid layout. The text-measurement callback
+   (`akar_layout::default_measure_fn`) reads `AkarNodeContext::text_buffer_id`
+   on text-bearing leaves and shapes the corresponding `glyphon::Buffer` from
+   `akar_core::TextPipeline`. The same buffer is reused by the paint path so
+   measurement and rendering share one shaped geometry.
+3. **Paint.** The application calls paint functions (`akar_card`,
+   `akar_navbar`, etc.) using the resolved rectangles from `layout.rect`.
+   Paint functions never add children, replace children, or overwrite
+   caller-owned layout properties. Construction and paint are separate
+   entry points so that stable caller-owned `NodeId`s survive every frame
+   and widget IDs / text buffers remain stable across resizes.
+
+Construction is allowed to mutate the tree. Compute is allowed to read
+context and call `glyphon::Buffer::set_size`. Paint is read-only on
+`Layout`. Any paint function that adds nodes or overwrites caller-owned
+style is a bug.
+
 ### Rendering model
 
 akar uses a **draw list** (immediate mode, painter's algorithm): components submit draw calls into a frame-scoped list, which is sorted by Z-order, CPU-culled against the current scissor rect, then flushed to the GPU in one pass.
