@@ -184,6 +184,107 @@ typedef struct AkarTextAreaResponse {
     bool request_paste;
 } AkarTextAreaResponse;
 
+typedef struct AkarTextStyle {
+    float font_size;
+    float line_height;
+    uint32_t color;
+    uint32_t font_weight;
+    uint32_t font_family;
+    uint32_t align;
+    uint8_t wrap;
+} AkarTextStyle;
+
+typedef struct AkarLinkResult {
+    bool clicked;
+    bool hovered;
+    bool pressed;
+} AkarLinkResult;
+
+typedef struct AkarCardSlots {
+    uint64_t header;
+    uint64_t body;
+    uint64_t footer;
+} AkarCardSlots;
+
+typedef struct AkarCardLayout {
+    uint32_t direction;
+    float gap;
+    float padding;
+    uint8_t has_header;
+    uint8_t has_footer;
+} AkarCardLayout;
+
+typedef struct AkarCardStyle {
+    uint32_t background;
+    uint32_t border_color;
+    float border_width;
+    float corner_radii[4];
+    float shadow_blur;
+    float shadow_spread;
+    uint32_t shadow_color;
+    float shadow_offset[2];
+    uint32_t separator_color;
+} AkarCardStyle;
+
+typedef struct AkarNavbarStyle {
+    uint32_t background;
+    uint32_t border_color;
+    float border_width;
+    float corner_radii[4];
+} AkarNavbarStyle;
+
+typedef struct AkarButtonStyle {
+    uint32_t fill;
+    uint32_t hover_fill;
+    uint32_t pressed_fill;
+    uint32_t border_color;
+    uint32_t content_color;
+    struct AkarTextStyle text_style;
+} AkarButtonStyle;
+
+typedef struct AkarBadgeStyle {
+    uint32_t fill;
+    uint32_t border_color;
+    uint32_t content_color;
+    struct AkarTextStyle text_style;
+} AkarBadgeStyle;
+
+typedef struct AkarSeparatorStyle {
+    uint32_t color;
+    float thickness;
+} AkarSeparatorStyle;
+
+typedef struct AkarStatStyle {
+    uint32_t title_color;
+    uint32_t value_color;
+    uint32_t description_color;
+    struct AkarTextStyle title_text_style;
+    struct AkarTextStyle value_text_style;
+    struct AkarTextStyle description_text_style;
+} AkarStatStyle;
+
+typedef struct AkarTabBarStyle {
+    uint32_t active_color;
+    uint32_t inactive_color;
+    uint32_t indicator_color;
+} AkarTabBarStyle;
+
+typedef struct AkarFontFamily {
+    uint32_t value;
+} AkarFontFamily;
+
+typedef struct AkarFontWeight {
+    uint32_t value;
+} AkarFontWeight;
+
+typedef struct AkarTextAlign {
+    uint32_t value;
+} AkarTextAlign;
+
+typedef struct AkarHeadingLevel {
+    uint32_t value;
+} AkarHeadingLevel;
+
 struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
 
 void akar_ctx_free(struct AkarCtx *ctx);
@@ -446,5 +547,67 @@ struct AkarTextAreaResponse akar_textarea(struct AkarCtx *ctx,
                                           bool cursor_visible,
                                           uint8_t *copy_buf,
                                           uint32_t copy_capacity);
+
+void akar_heading(struct AkarCtx *ctx,
+                  uint64_t node_id,
+                  const char *text,
+                  uint32_t level,
+                  const struct AkarTextStyle *style);
+
+void akar_paragraph(struct AkarCtx *ctx,
+                    uint64_t node_id,
+                    const char *text,
+                    const struct AkarTextStyle *style);
+
+struct AkarLinkResult akar_link(struct AkarCtx *ctx,
+                                uint64_t node_id,
+                                const char *text,
+                                const struct AkarTextStyle *style);
+
+struct AkarCardSlots akar_card_layout(struct AkarCtx *ctx,
+                                      uint64_t node_id,
+                                      const struct AkarCardLayout *options);
+
+void akar_card(struct AkarCtx *ctx,
+               uint64_t node_id,
+               const struct AkarCardSlots *slots,
+               const struct AkarCardStyle *style);
+
+struct AkarNavbarSlots akar_navbar_layout(struct AkarCtx *ctx, uint64_t node_id);
+
+void akar_navbar_painted(struct AkarCtx *ctx,
+                         uint64_t node_id,
+                         const struct AkarNavbarStyle *style);
+
+struct AkarButtonResult akar_button_styled(struct AkarCtx *ctx,
+                                           uint64_t node_id,
+                                           const char *text,
+                                           uint32_t variant,
+                                           const struct AkarButtonStyle *style);
+
+void akar_badge_styled(struct AkarCtx *ctx,
+                       uint64_t node_id,
+                       const char *text,
+                       uint32_t variant,
+                       const struct AkarBadgeStyle *style);
+
+void akar_separator_styled(struct AkarCtx *ctx,
+                           uint64_t node_id,
+                           const struct AkarSeparatorStyle *style);
+
+void akar_stat_styled(struct AkarCtx *ctx,
+                      uint64_t node_id,
+                      const char *title,
+                      const char *value,
+                      const char *description,
+                      const struct AkarStatStyle *style);
+
+struct AkarTabBarResponse akar_tab_bar_styled(struct AkarCtx *ctx,
+                                              uint64_t node_id,
+                                              const char *const *tabs,
+                                              uint32_t tab_count,
+                                              uint32_t active_tab,
+                                              uint32_t variant,
+                                              const struct AkarTabBarStyle *style);
 
 #endif  /* AKAR_H */

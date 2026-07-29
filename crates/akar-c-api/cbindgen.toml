@@ -5,7 +5,7 @@ tab_width = 4
 documentation = true
 
 [export]
-include = ["AkarCtx", "AkarButtonResult", "AkarRect", "AkarBoxStyle", "AkarDataItemStyle", "AkarDataItemResponse", "AkarDataListState", "AkarDataListResponse"]
+include = ["AkarCtx", "AkarButtonResult", "AkarRect", "AkarBoxStyle", "AkarDataItemStyle", "AkarDataItemResponse", "AkarDataListState", "AkarDataListResponse", "AkarFontFamily", "AkarFontWeight", "AkarTextAlign", "AkarTextStyle", "AkarHeadingLevel", "AkarCardLayout", "AkarCardStyle", "AkarCardSlots", "AkarLinkResult", "AkarButtonStyle", "AkarBadgeStyle", "AkarSeparatorStyle", "AkarStatStyle", "AkarNavbarStyle", "AkarTabBarStyle", "AkarNavbarSlots", "AkarTabBarResponse"]
 
 [enum]
 rename_variants = "ScreamingSnakeCase"

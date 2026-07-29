@@ -9,6 +9,10 @@ use akar_core::{
 };
 use akar_layout::Layout;
 
+const SENTINEL_F32: f32 = 0.0;
+const SENTINEL_U8: u8 = 0xFF;
+const SENTINEL_U32: u32 = 0xFF;
+
 pub struct AkarCtx {
     core: AkarCore,
     layout: Layout,
@@ -19,6 +23,128 @@ pub struct AkarCtx {
 
 unsafe impl Send for AkarCtx {}
 unsafe impl Sync for AkarCtx {}
+
+// ---- Typography C types ----
+
+#[repr(C)]
+pub struct AkarFontFamily {
+    pub value: u32,
+}
+
+#[repr(C)]
+pub struct AkarFontWeight {
+    pub value: u32,
+}
+
+#[repr(C)]
+pub struct AkarTextAlign {
+    pub value: u32,
+}
+
+#[repr(C)]
+pub struct AkarTextStyle {
+    pub font_size: f32,
+    pub line_height: f32,
+    pub color: u32,
+    pub font_weight: u32,
+    pub font_family: u32,
+    pub align: u32,
+    pub wrap: u8,
+}
+
+#[repr(C)]
+pub struct AkarHeadingLevel {
+    pub value: u32,
+}
+
+// ---- Component style C types ----
+
+#[repr(C)]
+pub struct AkarCardLayout {
+    pub direction: u32,
+    pub gap: f32,
+    pub padding: f32,
+    pub has_header: u8,
+    pub has_footer: u8,
+}
+
+#[repr(C)]
+pub struct AkarCardStyle {
+    pub background: u32,
+    pub border_color: u32,
+    pub border_width: f32,
+    pub corner_radii: [f32; 4],
+    pub shadow_blur: f32,
+    pub shadow_spread: f32,
+    pub shadow_color: u32,
+    pub shadow_offset: [f32; 2],
+    pub separator_color: u32,
+}
+
+#[repr(C)]
+pub struct AkarCardSlots {
+    pub header: u64,
+    pub body: u64,
+    pub footer: u64,
+}
+
+#[repr(C)]
+pub struct AkarLinkResult {
+    pub clicked: bool,
+    pub hovered: bool,
+    pub pressed: bool,
+}
+
+#[repr(C)]
+pub struct AkarButtonStyle {
+    pub fill: u32,
+    pub hover_fill: u32,
+    pub pressed_fill: u32,
+    pub border_color: u32,
+    pub content_color: u32,
+    pub text_style: AkarTextStyle,
+}
+
+#[repr(C)]
+pub struct AkarBadgeStyle {
+    pub fill: u32,
+    pub border_color: u32,
+    pub content_color: u32,
+    pub text_style: AkarTextStyle,
+}
+
+#[repr(C)]
+pub struct AkarSeparatorStyle {
+    pub color: u32,
+    pub thickness: f32,
+}
+
+#[repr(C)]
+pub struct AkarStatStyle {
+    pub title_color: u32,
+    pub value_color: u32,
+    pub description_color: u32,
+    pub title_text_style: AkarTextStyle,
+    pub value_text_style: AkarTextStyle,
+    pub description_text_style: AkarTextStyle,
+}
+
+#[repr(C)]
+pub struct AkarNavbarStyle {
+    pub background: u32,
+    pub border_color: u32,
+    pub border_width: f32,
+    pub corner_radii: [f32; 4],
+}
+
+#[repr(C)]
+pub struct AkarTabBarStyle {
+    pub active_color: u32,
+    pub inactive_color: u32,
+    pub indicator_color: u32,
+}
+
+// ---- Existing result types ----
 
 #[repr(C)]
 pub struct AkarButtonResult {
@@ -56,6 +182,104 @@ pub struct AkarTextEditKeybindings {
 pub struct AkarTextEditState {
     pub cursor: u32,
     pub anchor: u32,
+}
+
+fn c_text_style_to_rust(ptr: *const AkarTextStyle) -> Option<akar_components::TextStyle> {
+    if ptr.is_null() {
+        return None;
+    }
+    let s = unsafe { &*ptr };
+    let mut style = akar_components::TextStyle::empty();
+    let mut any = false;
+    if s.font_size > SENTINEL_F32 {
+        style.font_size = Some(s.font_size);
+        any = true;
+    }
+    if s.line_height > SENTINEL_F32 {
+        style.line_height = Some(s.line_height);
+        any = true;
+    }
+    if s.color != 0 {
+        style.color = Some(s.color);
+        any = true;
+    }
+    if s.font_weight != SENTINEL_U32 {
+        style.font_weight = Some(match s.font_weight {
+            0 => akar_components::FontWeight::Normal,
+            1 => akar_components::FontWeight::Medium,
+            2 => akar_components::FontWeight::Semibold,
+            3 => akar_components::FontWeight::Bold,
+            _ => return Some(style),
+        });
+        any = true;
+    }
+    if s.font_family != SENTINEL_U32 {
+        style.font_family = Some(match s.font_family {
+            0 => akar_components::FontFamily::SansSerif,
+            1 => akar_components::FontFamily::Serif,
+            2 => akar_components::FontFamily::Monospace,
+            _ => return Some(style),
+        });
+        any = true;
+    }
+    if s.align != SENTINEL_U32 {
+        style.align = Some(match s.align {
+            0 => akar_components::TextAlign::Start,
+            1 => akar_components::TextAlign::Center,
+            2 => akar_components::TextAlign::End,
+            _ => return Some(style),
+        });
+        any = true;
+    }
+    if s.wrap != SENTINEL_U8 {
+        style.wrap = Some(s.wrap != 0);
+        any = true;
+    }
+    if any {
+        Some(style)
+    } else {
+        None
+    }
+}
+
+fn c_heading_level_to_rust(value: u32) -> akar_components::HeadingLevel {
+    match value {
+        0 => akar_components::HeadingLevel::H1,
+        1 => akar_components::HeadingLevel::H2,
+        2 => akar_components::HeadingLevel::H3,
+        3 => akar_components::HeadingLevel::H4,
+        _ => akar_components::HeadingLevel::H1,
+    }
+}
+
+fn c_button_variant_to_rust(value: u32) -> akar_components::ButtonVariant {
+    match value {
+        0 => akar_components::ButtonVariant::Solid,
+        1 => akar_components::ButtonVariant::Outline,
+        2 => akar_components::ButtonVariant::Ghost,
+        _ => akar_components::ButtonVariant::Solid,
+    }
+}
+
+fn c_badge_variant_to_rust(value: u32) -> akar_components::BadgeVariant {
+    match value {
+        0 => akar_components::BadgeVariant::Default,
+        1 => akar_components::BadgeVariant::Primary,
+        2 => akar_components::BadgeVariant::Success,
+        3 => akar_components::BadgeVariant::Warning,
+        4 => akar_components::BadgeVariant::Error,
+        5 => akar_components::BadgeVariant::Info,
+        _ => akar_components::BadgeVariant::Default,
+    }
+}
+
+fn c_tab_variant_to_rust(value: u32) -> akar_components::TabVariant {
+    match value {
+        1 => akar_components::TabVariant::Lifted,
+        2 => akar_components::TabVariant::Pills,
+        3 => akar_components::TabVariant::Underline,
+        _ => akar_components::TabVariant::Boxed,
+    }
 }
 
 fn texture_format_from_raw(raw: u32) -> Option<wgpu::TextureFormat> {
@@ -735,7 +959,8 @@ pub struct AkarNavbarSlots {
 pub unsafe extern "C" fn akar_navbar(ctx: *mut AkarCtx, node_id: u64) -> AkarNavbarSlots {
     let ctx = unsafe { &mut *ctx };
     let nid: akar_layout::NodeId = node_id.into();
-    let slots = akar_components::akar_navbar(&mut ctx.core, &mut ctx.layout, nid, &ctx.theme);
+    let slots =
+        akar_components::akar_navbar_combined(&mut ctx.core, &mut ctx.layout, nid, &ctx.theme);
     AkarNavbarSlots {
         start: slots.start.into(),
         center: slots.center.into(),
@@ -1844,6 +2069,524 @@ pub unsafe extern "C" fn akar_textarea(
     }
 }
 
+// ---- New component C API (Tasks 3-7) ----
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_heading(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    level: u32,
+    style: *const AkarTextStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if text.is_null() {
+        return;
+    }
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let overrides = c_text_style_to_rust(style);
+    akar_components::akar_heading(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        c_heading_level_to_rust(level),
+        overrides,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_paragraph(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    style: *const AkarTextStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if text.is_null() {
+        return;
+    }
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let overrides = c_text_style_to_rust(style);
+    akar_components::akar_paragraph(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        overrides,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_link(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    style: *const AkarTextStyle,
+) -> AkarLinkResult {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarLinkResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    };
+    if text.is_null() {
+        return AkarLinkResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    }
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return AkarLinkResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let overrides = c_text_style_to_rust(style);
+    let result = akar_components::akar_link(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        overrides,
+        &ctx.theme,
+    );
+    AkarLinkResult {
+        clicked: result.clicked,
+        hovered: result.hovered,
+        pressed: result.pressed,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_card_layout(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    options: *const AkarCardLayout,
+) -> AkarCardSlots {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarCardSlots {
+            header: 0,
+            body: 0,
+            footer: 0,
+        };
+    };
+    let opts = if options.is_null() {
+        akar_components::CardLayout::body_only(&ctx.theme)
+    } else {
+        let o = unsafe { &*options };
+        akar_components::CardLayout {
+            direction: if o.direction == 1 {
+                akar_layout::FlexDirection::Row
+            } else {
+                akar_layout::FlexDirection::Column
+            },
+            gap: o.gap,
+            padding: o.padding,
+            has_header: o.has_header != 0,
+            has_footer: o.has_footer != 0,
+        }
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let slots = akar_components::akar_card_layout(&mut ctx.layout, nid, &opts);
+    AkarCardSlots {
+        header: slots.header.map(|n| n.into()).unwrap_or(0),
+        body: slots.body.into(),
+        footer: slots.footer.map(|n| n.into()).unwrap_or(0),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_card(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    slots: *const AkarCardSlots,
+    style: *const AkarCardStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if slots.is_null() {
+        return;
+    }
+    let s = unsafe { &*slots };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_slots = akar_components::CardSlots {
+        header: if s.header != 0 {
+            Some(s.header.into())
+        } else {
+            None
+        },
+        body: s.body.into(),
+        footer: if s.footer != 0 {
+            Some(s.footer.into())
+        } else {
+            None
+        },
+    };
+    let rust_style = if style.is_null() {
+        akar_components::CardStyle::default(&ctx.theme)
+    } else {
+        let cs = unsafe { &*style };
+        akar_components::CardStyle {
+            background: cs.background,
+            border_color: cs.border_color,
+            border_width: cs.border_width,
+            corner_radii: cs.corner_radii,
+            shadow_blur: cs.shadow_blur,
+            shadow_spread: cs.shadow_spread,
+            shadow_color: cs.shadow_color,
+            shadow_offset: cs.shadow_offset,
+            separator_color: cs.separator_color,
+        }
+    };
+    akar_components::akar_card(&mut ctx.core, &ctx.layout, nid, &rust_slots, &rust_style);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_navbar_layout(ctx: *mut AkarCtx, node_id: u64) -> AkarNavbarSlots {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarNavbarSlots {
+            start: 0,
+            center: 0,
+            end: 0,
+        };
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let slots = akar_components::akar_navbar_layout(&mut ctx.layout, nid, &ctx.theme);
+    AkarNavbarSlots {
+        start: slots.start.into(),
+        center: slots.center.into(),
+        end: slots.end.into(),
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_navbar_painted(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    style: *const AkarNavbarStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::NavbarStyle::default(&ctx.theme)
+    } else {
+        let ns = unsafe { &*style };
+        akar_components::NavbarStyle {
+            background: ns.background,
+            border_color: ns.border_color,
+            border_width: ns.border_width,
+            corner_radii: ns.corner_radii,
+        }
+    };
+    akar_components::akar_navbar(&mut ctx.core, &ctx.layout, nid, &rust_style);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_button_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    variant: u32,
+    style: *const AkarButtonStyle,
+) -> AkarButtonResult {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarButtonResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    };
+    if text.is_null() {
+        return AkarButtonResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    }
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return AkarButtonResult {
+            clicked: false,
+            hovered: false,
+            pressed: false,
+        };
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::ButtonStyle::empty()
+    } else {
+        let bs = unsafe { &*style };
+        akar_components::ButtonStyle {
+            fill: if bs.fill != 0 { Some(bs.fill) } else { None },
+            hover_fill: if bs.hover_fill != 0 {
+                Some(bs.hover_fill)
+            } else {
+                None
+            },
+            pressed_fill: if bs.pressed_fill != 0 {
+                Some(bs.pressed_fill)
+            } else {
+                None
+            },
+            border_color: if bs.border_color != 0 {
+                Some(bs.border_color)
+            } else {
+                None
+            },
+            content_color: if bs.content_color != 0 {
+                Some(bs.content_color)
+            } else {
+                None
+            },
+            text_style: c_text_style_to_rust(&bs.text_style),
+        }
+    };
+    let result = akar_components::akar_button_styled(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        c_button_variant_to_rust(variant),
+        &rust_style,
+        &ctx.theme,
+    );
+    AkarButtonResult {
+        clicked: result.clicked,
+        hovered: result.hovered,
+        pressed: result.pressed,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_badge_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    text: *const c_char,
+    variant: u32,
+    style: *const AkarBadgeStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if text.is_null() {
+        return;
+    }
+    let Ok(text_str) = unsafe { std::ffi::CStr::from_ptr(text) }.to_str() else {
+        return;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::BadgeStyle::empty()
+    } else {
+        let bs = unsafe { &*style };
+        akar_components::BadgeStyle {
+            fill: if bs.fill != 0 { Some(bs.fill) } else { None },
+            border_color: if bs.border_color != 0 {
+                Some(bs.border_color)
+            } else {
+                None
+            },
+            content_color: if bs.content_color != 0 {
+                Some(bs.content_color)
+            } else {
+                None
+            },
+            text_style: c_text_style_to_rust(&bs.text_style),
+        }
+    };
+    akar_components::akar_badge_styled(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        text_str,
+        c_badge_variant_to_rust(variant),
+        &rust_style,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_separator_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    style: *const AkarSeparatorStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::SeparatorStyle::empty()
+    } else {
+        let ss = unsafe { &*style };
+        akar_components::SeparatorStyle {
+            color: if ss.color != 0 { Some(ss.color) } else { None },
+            thickness: if ss.thickness > 0.0 {
+                Some(ss.thickness)
+            } else {
+                None
+            },
+        }
+    };
+    akar_components::akar_separator_styled(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &rust_style,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_stat_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    title: *const c_char,
+    value: *const c_char,
+    description: *const c_char,
+    style: *const AkarStatStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if title.is_null() || value.is_null() {
+        return;
+    }
+    let Ok(title_str) = unsafe { std::ffi::CStr::from_ptr(title) }.to_str() else {
+        return;
+    };
+    let Ok(value_str) = unsafe { std::ffi::CStr::from_ptr(value) }.to_str() else {
+        return;
+    };
+    let desc_str = if description.is_null() {
+        None
+    } else {
+        unsafe { std::ffi::CStr::from_ptr(description) }
+            .to_str()
+            .ok()
+    };
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::StatStyle::empty()
+    } else {
+        let ss = unsafe { &*style };
+        akar_components::StatStyle {
+            title_color: if ss.title_color != 0 {
+                Some(ss.title_color)
+            } else {
+                None
+            },
+            value_color: if ss.value_color != 0 {
+                Some(ss.value_color)
+            } else {
+                None
+            },
+            description_color: if ss.description_color != 0 {
+                Some(ss.description_color)
+            } else {
+                None
+            },
+            title_text_style: c_text_style_to_rust(&ss.title_text_style),
+            value_text_style: c_text_style_to_rust(&ss.value_text_style),
+            description_text_style: c_text_style_to_rust(&ss.description_text_style),
+        }
+    };
+    akar_components::akar_stat_styled(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        title_str,
+        value_str,
+        desc_str,
+        &rust_style,
+        &ctx.theme,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_tab_bar_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    tabs: *const *const c_char,
+    tab_count: u32,
+    active_tab: u32,
+    variant: u32,
+    style: *const AkarTabBarStyle,
+) -> AkarTabBarResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarTabBarResponse { clicked_index: -1 };
+    };
+    if tabs.is_null() || tab_count == 0 {
+        return AkarTabBarResponse { clicked_index: -1 };
+    }
+    let mut tab_strs: Vec<&str> = Vec::with_capacity(tab_count as usize);
+    for i in 0..tab_count as usize {
+        let ptr = unsafe { *tabs.add(i) };
+        if ptr.is_null() {
+            return AkarTabBarResponse { clicked_index: -1 };
+        }
+        match unsafe { std::ffi::CStr::from_ptr(ptr) }.to_str() {
+            Ok(s) => tab_strs.push(s),
+            Err(_) => return AkarTabBarResponse { clicked_index: -1 },
+        }
+    }
+    let nid: akar_layout::NodeId = node_id.into();
+    let rust_style = if style.is_null() {
+        akar_components::TabBarStyle::empty()
+    } else {
+        let ts = unsafe { &*style };
+        akar_components::TabBarStyle {
+            active_color: if ts.active_color != 0 {
+                Some(ts.active_color)
+            } else {
+                None
+            },
+            inactive_color: if ts.inactive_color != 0 {
+                Some(ts.inactive_color)
+            } else {
+                None
+            },
+            indicator_color: if ts.indicator_color != 0 {
+                Some(ts.indicator_color)
+            } else {
+                None
+            },
+        }
+    };
+    let result = akar_components::akar_tab_bar_styled(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &tab_strs,
+        active_tab as usize,
+        c_tab_variant_to_rust(variant),
+        &rust_style,
+        &ctx.theme,
+    );
+    AkarTabBarResponse {
+        clicked_index: result.clicked.map(|i| i as i32).unwrap_or(-1),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{utf8_prefix_len, write_copy_to_ffi, write_value_to_ffi};
@@ -1885,5 +2628,496 @@ mod tests {
         let result = unsafe { write_copy_to_ffi(None, buffer.as_mut_ptr(), 4) };
         assert_eq!(result, (0, 0));
         assert_eq!(buffer, [0x55; 4]);
+    }
+}
+
+#[cfg(test)]
+mod component_c_api_tests {
+    use super::*;
+    use std::ffi::CString;
+
+    fn sized_node(ctx: *mut AkarCtx, w: f32, h: f32) -> u64 {
+        unsafe {
+            let root = akar_new_flex_col(ctx);
+            let node = akar_new_fixed_leaf(ctx, w, h);
+            akar_add_child(ctx, root, node);
+            akar_layout_compute(ctx, root, 800.0, 600.0);
+            node
+        }
+    }
+
+    #[test]
+    fn heading_null_style_uses_defaults() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 400.0, 60.0);
+        let text = CString::new("Hello").unwrap();
+        unsafe {
+            akar_heading(ctx, node, text.as_ptr(), 0, std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn heading_with_style_override() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 400.0, 60.0);
+        let text = CString::new("Styled").unwrap();
+        let style = AkarTextStyle {
+            font_size: 48.0,
+            color: 0xff0000ff,
+            ..default_c_text_style_for_test()
+        };
+        unsafe {
+            akar_heading(ctx, node, text.as_ptr(), 1, &style);
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn heading_levels_all_work() {
+        let ctx = unsafe { akar_ctx_mock() };
+        let text = CString::new("Level").unwrap();
+        for level in 0..=3 {
+            unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+            let node = sized_node(ctx, 400.0, 60.0);
+            unsafe {
+                akar_heading(ctx, node, text.as_ptr(), level, std::ptr::null());
+            }
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn paragraph_null_style_uses_defaults() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 300.0, 200.0);
+        let text = CString::new("A paragraph.").unwrap();
+        unsafe {
+            akar_paragraph(ctx, node, text.as_ptr(), std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn paragraph_with_style_override() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 300.0, 200.0);
+        let text = CString::new("Styled paragraph").unwrap();
+        let style = AkarTextStyle {
+            color: 0x00ff00ff,
+            ..default_c_text_style_for_test()
+        };
+        unsafe {
+            akar_paragraph(ctx, node, text.as_ptr(), &style);
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn link_returns_hit_state() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe {
+            akar_begin_frame(ctx, 800, 600, 1.0);
+            akar_input_begin(ctx);
+            akar_set_mouse_pos(ctx, 500.0, 500.0);
+            akar_input_end(ctx);
+        };
+        let node = sized_node(ctx, 400.0, 60.0);
+        let text = CString::new("Click").unwrap();
+        let result = unsafe { akar_link(ctx, node, text.as_ptr(), std::ptr::null()) };
+        assert!(!result.clicked);
+        assert!(!result.hovered);
+        assert!(!result.pressed);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn link_null_text_returns_all_false() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 400.0, 60.0);
+        let result = unsafe { akar_link(ctx, node, std::ptr::null(), std::ptr::null()) };
+        assert!(!result.clicked);
+        assert!(!result.hovered);
+        assert!(!result.pressed);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn card_layout_body_only() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 300.0, 200.0);
+        let result = unsafe { akar_card_layout(ctx, node, std::ptr::null()) };
+        assert_eq!(result.header, 0, "body-only should have no header");
+        assert!(result.body != 0, "body should be non-zero");
+        assert_eq!(result.footer, 0, "body-only should have no footer");
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn card_layout_header_body_footer() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 300.0, 200.0);
+        let opts = AkarCardLayout {
+            direction: 0,
+            gap: 0.0,
+            padding: 12.0,
+            has_header: 1,
+            has_footer: 1,
+        };
+        let result = unsafe { akar_card_layout(ctx, node, &opts) };
+        assert!(result.header != 0, "header should be non-zero");
+        assert!(result.body != 0, "body should be non-zero");
+        assert!(result.footer != 0, "footer should be non-zero");
+        assert_ne!(result.header, result.body);
+        assert_ne!(result.body, result.footer);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn card_paint_with_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 300.0, 200.0);
+        let slots = unsafe { akar_card_layout(ctx, node, std::ptr::null()) };
+        unsafe {
+            akar_card(ctx, node, &slots, std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn navbar_layout_returns_three_distinct_slots() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 800.0, 60.0);
+        let slots = unsafe { akar_navbar_layout(ctx, node) };
+        assert!(slots.start != 0);
+        assert!(slots.center != 0);
+        assert!(slots.end != 0);
+        assert_ne!(slots.start, slots.center);
+        assert_ne!(slots.center, slots.end);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn navbar_painted_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 800.0, 60.0);
+        unsafe {
+            akar_navbar_painted(ctx, node, std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn button_styled_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 120.0, 40.0);
+        let text = CString::new("Click").unwrap();
+        let result = unsafe { akar_button_styled(ctx, node, text.as_ptr(), 0, std::ptr::null()) };
+        assert!(!result.clicked);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn button_styled_with_custom_fill() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 120.0, 40.0);
+        let text = CString::new("Click").unwrap();
+        let style = AkarButtonStyle {
+            fill: 0xFF0000FF,
+            hover_fill: 0,
+            pressed_fill: 0,
+            border_color: 0,
+            content_color: 0,
+            text_style: default_c_text_style_for_test(),
+        };
+        let result = unsafe { akar_button_styled(ctx, node, text.as_ptr(), 0, &style) };
+        assert!(!result.clicked);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn badge_styled_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 100.0, 30.0);
+        let text = CString::new("Badge").unwrap();
+        unsafe {
+            akar_badge_styled(ctx, node, text.as_ptr(), 1, std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn badge_styled_with_custom_fill() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 100.0, 30.0);
+        let text = CString::new("Badge").unwrap();
+        let style = AkarBadgeStyle {
+            fill: 0xFF0000FF,
+            border_color: 0,
+            content_color: 0,
+            text_style: default_c_text_style_for_test(),
+        };
+        unsafe {
+            akar_badge_styled(ctx, node, text.as_ptr(), 1, &style);
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn separator_styled_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 200.0, 4.0);
+        unsafe {
+            akar_separator_styled(ctx, node, std::ptr::null());
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn separator_styled_with_custom_color() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 200.0, 4.0);
+        let style = AkarSeparatorStyle {
+            color: 0xFF0000FF,
+            thickness: 2.0,
+        };
+        unsafe {
+            akar_separator_styled(ctx, node, &style);
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn stat_styled_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 200.0, 120.0);
+        let title = CString::new("Revenue").unwrap();
+        let value = CString::new("$12,345").unwrap();
+        let desc = CString::new("vs last month").unwrap();
+        unsafe {
+            akar_stat_styled(
+                ctx,
+                node,
+                title.as_ptr(),
+                value.as_ptr(),
+                desc.as_ptr(),
+                std::ptr::null(),
+            );
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn stat_styled_without_description() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 200.0, 120.0);
+        let title = CString::new("Revenue").unwrap();
+        let value = CString::new("$12,345").unwrap();
+        unsafe {
+            akar_stat_styled(
+                ctx,
+                node,
+                title.as_ptr(),
+                value.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+            );
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn stat_styled_with_custom_colors() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 200.0, 120.0);
+        let title = CString::new("Revenue").unwrap();
+        let value = CString::new("$12,345").unwrap();
+        let style = AkarStatStyle {
+            title_color: 0xFF0000FF,
+            value_color: 0x00FF00FF,
+            description_color: 0,
+            title_text_style: default_c_text_style_for_test(),
+            value_text_style: default_c_text_style_for_test(),
+            description_text_style: default_c_text_style_for_test(),
+        };
+        unsafe {
+            akar_stat_styled(
+                ctx,
+                node,
+                title.as_ptr(),
+                value.as_ptr(),
+                std::ptr::null(),
+                &style,
+            );
+        }
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn tab_bar_styled_null_style() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 400.0, 40.0);
+        let tab1 = CString::new("Tab A").unwrap();
+        let tab2 = CString::new("Tab B").unwrap();
+        let tabs = [tab1.as_ptr(), tab2.as_ptr()];
+        let result =
+            unsafe { akar_tab_bar_styled(ctx, node, tabs.as_ptr(), 2, 0, 0, std::ptr::null()) };
+        assert_eq!(result.clicked_index, -1);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn tab_bar_styled_with_custom_colors() {
+        let ctx = unsafe { akar_ctx_mock() };
+        unsafe { akar_begin_frame(ctx, 800, 600, 1.0) };
+        let node = sized_node(ctx, 400.0, 40.0);
+        let tab1 = CString::new("Tab A").unwrap();
+        let tab2 = CString::new("Tab B").unwrap();
+        let tabs = [tab1.as_ptr(), tab2.as_ptr()];
+        let style = AkarTabBarStyle {
+            active_color: 0xFF0000FF,
+            inactive_color: 0x333333FF,
+            indicator_color: 0x00FF00FF,
+        };
+        let result = unsafe { akar_tab_bar_styled(ctx, node, tabs.as_ptr(), 2, 0, 0, &style) };
+        assert_eq!(result.clicked_index, -1);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn c_text_style_sentinel_values_produce_none() {
+        let style = AkarTextStyle {
+            font_size: 0.0,
+            line_height: 0.0,
+            color: 0,
+            font_weight: 0xFF,
+            font_family: 0xFF,
+            align: 0xFF,
+            wrap: 0xFF,
+        };
+        let result = c_text_style_to_rust(&style);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn c_text_style_overrides_produce_some() {
+        let style = AkarTextStyle {
+            font_size: 24.0,
+            line_height: 0.0,
+            color: 0xff0000ff,
+            font_weight: 3,
+            font_family: 1,
+            align: 1,
+            wrap: 1,
+        };
+        let result = c_text_style_to_rust(&style);
+        assert!(result.is_some());
+        let s = result.unwrap();
+        assert_eq!(s.font_size, Some(24.0));
+        assert_eq!(s.color, Some(0xff0000ff));
+        assert_eq!(s.font_weight, Some(akar_components::FontWeight::Bold));
+        assert_eq!(s.font_family, Some(akar_components::FontFamily::Serif));
+        assert_eq!(s.align, Some(akar_components::TextAlign::Center));
+        assert_eq!(s.wrap, Some(true));
+    }
+
+    #[test]
+    fn heading_level_mapping() {
+        assert!(matches!(
+            c_heading_level_to_rust(0),
+            akar_components::HeadingLevel::H1
+        ));
+        assert!(matches!(
+            c_heading_level_to_rust(1),
+            akar_components::HeadingLevel::H2
+        ));
+        assert!(matches!(
+            c_heading_level_to_rust(2),
+            akar_components::HeadingLevel::H3
+        ));
+        assert!(matches!(
+            c_heading_level_to_rust(3),
+            akar_components::HeadingLevel::H4
+        ));
+        assert!(matches!(
+            c_heading_level_to_rust(99),
+            akar_components::HeadingLevel::H1
+        ));
+    }
+
+    #[test]
+    fn button_variant_mapping() {
+        assert!(matches!(
+            c_button_variant_to_rust(0),
+            akar_components::ButtonVariant::Solid
+        ));
+        assert!(matches!(
+            c_button_variant_to_rust(1),
+            akar_components::ButtonVariant::Outline
+        ));
+        assert!(matches!(
+            c_button_variant_to_rust(2),
+            akar_components::ButtonVariant::Ghost
+        ));
+    }
+
+    #[test]
+    fn badge_variant_mapping() {
+        assert!(matches!(
+            c_badge_variant_to_rust(0),
+            akar_components::BadgeVariant::Default
+        ));
+        assert!(matches!(
+            c_badge_variant_to_rust(1),
+            akar_components::BadgeVariant::Primary
+        ));
+        assert!(matches!(
+            c_badge_variant_to_rust(2),
+            akar_components::BadgeVariant::Success
+        ));
+        assert!(matches!(
+            c_badge_variant_to_rust(3),
+            akar_components::BadgeVariant::Warning
+        ));
+        assert!(matches!(
+            c_badge_variant_to_rust(4),
+            akar_components::BadgeVariant::Error
+        ));
+        assert!(matches!(
+            c_badge_variant_to_rust(5),
+            akar_components::BadgeVariant::Info
+        ));
+    }
+
+    fn default_c_text_style_for_test() -> AkarTextStyle {
+        AkarTextStyle {
+            font_size: 0.0,
+            line_height: 0.0,
+            color: 0,
+            font_weight: 0xFF,
+            font_family: 0xFF,
+            align: 0xFF,
+            wrap: 0xFF,
+        }
     }
 }

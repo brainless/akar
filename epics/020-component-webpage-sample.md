@@ -13,6 +13,7 @@
 - [x] Task 5 — Card lifecycle and composition
 - [x] Task 6 — Navbar lifecycle correction
 - [x] Task 7 — Styled button, badge, separator, stat, and tab bar APIs
+- [x] Task 8 — C ABI coverage
 
 ---
 
@@ -273,7 +274,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 8 — C ABI coverage
 
-**Status:** Not Started
+**Status:** Done
 
 - Add C-compatible representations for font family, font weight, text alignment, text style, heading level, and component style/options types.
 - Define explicit presence semantics for optional C fields; do not expose Rust `Option` layout directly.

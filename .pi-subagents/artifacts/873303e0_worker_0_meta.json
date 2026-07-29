@@ -1,0 +1,214 @@
+{
+  "runId": "873303e0",
+  "agent": "worker",
+  "task": "## Task 8 — C ABI Coverage\n\n**Epic:** epics/020-component-webpage-sample.md (read it fully for context)\n**Key references:** DEVELOP.md, AGENTS.md, README.md\n\n### What to implement\n\nAdd C-compatible representations and functions for the new components and styled APIs added in Tasks 3-7. The C API crate is `crates/akar-c-api/src/lib.rs`.\n\n### Pattern to follow\n\nRead the existing C API in `crates/akar-c-api/src/lib.rs` to understand the pattern:\n- `#[repr(C)]` structs for all C-visible types\n- `extern \"C\" fn` functions that take `*mut AkarCtx` and raw C parameters\n- Node IDs are `u64` on the C side\n- Strings are `*const c_char`, converted with `CStr::from_ptr` + `.to_str()`\n- Enum variants are `u32` with const values\n- Return structs are `#[repr(C)]`\n- Null style pointers mean \"use defaults\"\n\n### Types to add\n\n#### Font/Text types (from Task 2)\n\n```rust\n#[repr(C)]\npub struct AkarFontFamily { pub value: u32 }  // 0=SansSerif, 1=Serif, 2=Monospace\n#[repr(C)]\npub struct AkarFontWeight { pub value: u32 }  // 0=Normal, 1=Medium, 2=Semibold, 3=Bold\n#[repr(C)]\npub struct AkarTextAlign { pub value: u32 }   // 0=Start, 1=Center, 2=End\n```\n\n#### TextStyle (C-compatible)\n\n```rust\n#[repr(C)]\npub struct AkarTextStyle {\n    pub font_size: f32,          // 0.0 = use default\n    pub line_height: f32,        // 0.0 = use default\n    pub color: u32,              // 0 = use default\n    pub font_weight: u32,        // 0xFF = use default\n    pub font_family: u32,        // 0xFF = use default\n    pub align: u32,              // 0xFF = use default\n    pub wrap: u8,                // 0xFF = use default, 0 = no wrap, 1 = wrap\n}\n```\n\nUse sentinel values (0.0 for floats, 0xFF for ints, 0xFF for wrap byte) to indicate \"not set\" since we can't use Option in C.\n\n#### HeadingLevel\n\n```rust\n#[repr(C)]\npub struct AkarHeadingLevel { pub value: u32 }  // 0=H1, 1=H2, 2=H3, 3=H4\n```\n\n#### Component style types\n\n```rust\n#[repr(C)]\npub struct AkarCardLayout {\n    pub direction: u32,    // 0=Column, 1=Row\n    pub gap: f32,\n    pub padding: f32,\n    pub has_header: u8,\n    pub has_footer: u8,\n}\n\n#[repr(C)]\npub struct AkarCardStyle {\n    pub background: u32,\n    pub border_color: u32,\n    pub border_width: f32,\n    pub corner_radii: [f32; 4],\n    pub shadow_blur: f32,\n    pub shadow_spread: f32,\n    pub shadow_color: u32,\n    pub shadow_offset: [f32; 2],\n    pub separator_color: u32,\n}\n\n#[repr(C)]\npub struct AkarCardSlots {\n    pub header: u64,  // 0 if no header\n    pub body: u64,\n    pub footer: u64,  // 0 if no footer\n}\n\n#[repr(C)]\npub struct AkarLinkResult {\n    pub clicked: bool,\n    pub hovered: bool,\n    pub pressed: bool,\n}\n\n#[repr(C)]\npub struct AkarButtonStyle {\n    pub fill: u32,              // 0 = use default\n    pub hover_fill: u32,        // 0 = use default\n    pub pressed_fill: u32,      // 0 = use default\n    pub border_color: u32,      // 0 = use default\n    pub content_color: u32,     // 0 = use default\n    pub text_style: AkarTextStyle,\n}\n\n#[repr(C)]\npub struct AkarBadgeStyle {\n    pub fill: u32,\n    pub border_color: u32,\n    pub content_color: u32,\n    pub text_style: AkarTextStyle,\n}\n\n#[repr(C)]\npub struct AkarSeparatorStyle {\n    pub color: u32,        // 0 = use default\n    pub thickness: f32,    // 0.0 = use default\n}\n\n#[repr(C)]\npub struct AkarStatStyle {\n    pub title_color: u32,\n    pub value_color: u32,\n    pub description_color: u32,\n    pub title_text_style: AkarTextStyle,\n    pub value_text_style: AkarTextStyle,\n    pub description_text_style: AkarTextStyle,\n}\n\n#[repr(C)]\npub struct AkarNavbarStyle {\n    pub background: u32,\n    pub border_color: u32,\n    pub border_width: f32,\n    pub corner_radii: [f32; 4],\n}\n\n#[repr(C)]\npub struct AkarTabBarStyle {\n    pub active_color: u32,\n    pub inactive_color: u32,\n    pub indicator_color: u32,\n}\n```\n\n### Functions to add\n\nFor each component, add C functions. Null style pointer = defaults.\n\n```rust\n// Heading\npub unsafe extern \"C\" fn akar_heading(\n    ctx: *mut AkarCtx, node_id: u64, text: *const c_char,\n    level: u32, style: *const AkarTextStyle\n)\n\n// Paragraph\npub unsafe extern \"C\" fn akar_paragraph(\n    ctx: *mut AkarCtx, node_id: u64, text: *const c_char,\n    style: *const AkarTextStyle\n)\n\n// Link\npub unsafe extern \"C\" fn akar_link(\n    ctx: *mut AkarCtx, node_id: u64, text: *const c_char,\n    style: *const AkarTextStyle\n) -> AkarLinkResult\n\n// Card layout\npub unsafe extern \"C\" fn akar_card_layout(\n    ctx: *mut AkarCtx, node_id: u64, options: *const AkarCardLayout\n) -> AkarCardSlots\n\n// Card paint\npub unsafe extern \"C\" fn akar_card(\n    ctx: *mut AkarCtx, node_id: u64,\n    slots: *const AkarCardSlots, style: *const AkarCardStyle\n)\n\n// Navbar layout\npub unsafe extern \"C\" fn akar_navbar_layout(\n    ctx: *mut AkarCtx, node_id: u64\n) -> AkarNavbarSlots\n\n// Navbar paint\npub unsafe extern \"C\" fn akar_navbar_painted(\n    ctx: *mut AkarCtx, node_id: u64, style: *const AkarNavbarStyle\n)\n\n// Button styled\npub unsafe extern \"C\" fn akar_button_styled(\n    ctx: *mut AkarCtx, node_id: u64, text: *const c_char,\n    variant: u32, style: *const AkarButtonStyle\n) -> AkarButtonResult\n\n// Badge styled\npub unsafe extern \"C\" fn akar_badge_styled(\n    ctx: *mut AkarCtx, node_id: u64, text: *const c_char,\n    variant: u32, style: *const AkarBadgeStyle\n)\n\n// Separator styled\npub unsafe extern \"C\" fn akar_separator_styled(\n    ctx: *mut AkarCtx, node_id: u64, style: *const AkarSeparatorStyle\n)\n\n// Stat styled\npub unsafe extern \"C\" fn akar_stat_styled(\n    ctx: *mut AkarCtx, node_id: u64,\n    title: *const c_char, value: *const c_char,\n    description: *const c_char, style: *const AkarStatStyle\n)\n\n// Tab bar styled\npub unsafe extern \"C\" fn akar_tab_bar_styled(\n    ctx: *mut AkarCtx, node_id: u64,\n    tabs: *const *const c_char, tab_count: u32,\n    active_tab: u32, style: *const AkarTabBarStyle\n) -> AkarTabBarResponse\n```\n\n### Helper functions\n\nAdd a helper to convert a nullable `*const AkarTextStyle` to `Option<akar_components::TextStyle>`:\n\n```rust\nfn c_text_style_to_rust(ptr: *const AkarTextStyle) -> Option<akar_components::TextStyle> {\n    if ptr.is_null() { return None; }\n    let s = unsafe { &*ptr };\n    let mut style = akar_components::TextStyle::empty();\n    let mut any = false;\n    if s.font_size > 0.0 { style.font_size = Some(s.font_size); any = true; }\n    // ... etc for each field using sentinel checks\n    if any { Some(style) } else { None }\n}\n```\n\n### Existing navbar C API\n\nThe current `akar_navbar` in the C API calls `akar_components::akar_navbar` which is now the old combined function. It should be updated to use `akar_navbar_layout` + paint separately, or keep using `akar_navbar_combined`. Check what's currently exported.\n\nActually, looking at lib.rs exports: `akar_navbar` is the paint-only function, `akar_navbar_combined` is the backward-compat one, and `akar_navbar_layout` is the constructor. The C API's `akar_navbar` should probably call `akar_navbar_combined` to maintain the same behavior.\n\n### Tests\n\nAdd C integration tests in `crates/akar-c-api/tests/` if that directory exists, or add unit tests in the lib.rs. The tests should verify:\n- Null style pointer produces default behavior\n- Non-null style with overrides applies them\n- Heading levels map correctly\n- Card layout returns valid slot IDs\n\n### Regenerate akar.h\n\nAfter adding all C functions, regenerate `akar.h` with cbindgen:\n```bash\ncd crates/akar-c-api && cbindgen --config cbindgen.toml --crate akar-c-api --output ../../akar.h\n```\n\nCheck if cbindgen.toml exists first. If not, check how akar.h was previously generated.\n\n### Coding conventions\n- Edition 2021, no emojis, no unnecessary comments\n- All `unsafe` blocks should have clear safety invariants\n\nAfter implementing, run `cargo test --workspace` and `cargo fmt` to verify.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/brainless/Projects/akar/.pi-subagents/artifacts/outputs/873303e0/inline\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 93493,
+    "output": 22876,
+    "cacheRead": 2881152,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 42
+  },
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+  "attemptedModels": [
+    "xiaomi-token-plan-sgp/mimo-v2.5:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 93493,
+        "output": 22876,
+        "cacheRead": 2881152,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 42
+      }
+    }
+  ],
+  "durationMs": 556119,
+  "toolCount": 57,
+  "launchContractDigest": "c2e897c1bce229eaf20bd9e22db03acd58f05b95aef8dc54d6f1d0ab8658600f",
+  "acceptance": {
+    "status": "checked",
+    "evidenceStatus": "checked",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": false,
+      "inferredReason": [
+        "write-capable worker/task"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Implement the requested change without widening scope",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "stopRules": []
+    },
+    "inferredReason": [
+      "write-capable worker/task"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Implement the requested change without widening scope",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "criterion:criterion-1",
+        "status": "passed",
+        "message": "Required criterion 'criterion-1' satisfied."
+      },
+      {
+        "id": "evidence:changed-files",
+        "status": "passed",
+        "message": "changed-files evidence present."
+      },
+      {
+        "id": "evidence:tests-added",
+        "status": "passed",
+        "message": "tests-added evidence present."
+      },
+      {
+        "id": "evidence:commands-run",
+        "status": "passed",
+        "message": "commands-run evidence present."
+      },
+      {
+        "id": "evidence:residual-risks",
+        "status": "passed",
+        "message": "residual-risks evidence present."
+      },
+      {
+        "id": "evidence:no-staged-files",
+        "status": "passed",
+        "message": "no-staged-files evidence present."
+      },
+      {
+        "id": "no-staged-files",
+        "status": "passed",
+        "message": "No staged files detected."
+      }
+    ],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Added 15 repr(C) types, 12 C functions, 5 helpers, and 28 tests covering null-style defaults, custom overrides, heading/card/navbar/button/badge/separator/stat/tab-bar components. Fixed pre-existing akar_navbar breakage. Regenerated akar.h. All 44 c-api tests pass, full workspace tests pass."
+        }
+      ],
+      "changedFiles": [
+        "crates/akar-c-api/src/lib.rs",
+        "crates/akar-c-api/cbindgen.toml",
+        "akar.h"
+      ],
+      "testsAddedOrUpdated": [
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::heading_null_style_uses_defaults",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::heading_with_style_override",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::heading_levels_all_work",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::paragraph_null_style_uses_defaults",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::paragraph_with_style_override",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::link_returns_hit_state",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::link_null_text_returns_all_false",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::card_layout_body_only",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::card_layout_header_body_footer",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::card_paint_with_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::navbar_layout_returns_three_distinct_slots",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::navbar_painted_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::button_styled_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::button_styled_with_custom_fill",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::badge_styled_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::badge_styled_with_custom_fill",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::separator_styled_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::separator_styled_with_custom_color",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::stat_styled_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::stat_styled_without_description",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::stat_styled_with_custom_colors",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::tab_bar_styled_null_style",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::tab_bar_styled_with_custom_colors",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::c_text_style_sentinel_values_produce_none",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::c_text_style_overrides_produce_some",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::heading_level_mapping",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::button_variant_mapping",
+        "crates/akar-c-api/src/lib.rs::component_c_api_tests::badge_variant_mapping"
+      ],
+      "commandsRun": [
+        {
+          "command": "cargo fmt --check",
+          "result": "passed",
+          "summary": "No formatting issues"
+        },
+        {
+          "command": "cargo test -p akar-c-api",
+          "result": "passed",
+          "summary": "44 tests passed (32 unit + 11 integration + 1 C)"
+        },
+        {
+          "command": "cargo test --workspace",
+          "result": "passed",
+          "summary": "All workspace tests pass"
+        },
+        {
+          "command": "cargo build -p akar-c-api",
+          "result": "passed",
+          "summary": "Header regenerated via build.rs/cbindgen"
+        }
+      ],
+      "validationOutput": [
+        "akar.h contains all new types (AkarTextStyle, AkarCardLayout, AkarButtonStyle, etc.) and functions (akar_heading, akar_paragraph, akar_link, akar_card_layout, akar_card, akar_navbar_layout, akar_navbar_painted, akar_button_styled, akar_badge_styled, akar_separator_styled, akar_stat_styled, akar_tab_bar_styled)"
+      ],
+      "residualRisks": [
+        "stat_styled and badge_styled pass TextStyle through c_text_style_to_rust but Rust components don't consume those fields yet (forward-compatible)",
+        "Pre-existing clippy warnings in akar-core (chunks_exact_to_as_chunks) and akar-layout (type_complexity) are unrelated to this change"
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "Added 15 repr(C) types, 5 helpers, 12 C functions (11 new + 1 fixed akar_navbar), 28 tests to akar-c-api. Updated cbindgen.toml exports. Regenerated akar.h. Fixed pre-existing akar_navbar compile error.",
+      "reviewFindings": [
+        "no blockers"
+      ],
+      "manualNotes": "The existing akar_navbar C function was broken before this change (called akar_navbar which now takes &NavbarStyle not &AkarTheme). Fixed to use akar_navbar_combined. Pre-existing clippy failures in akar-core and akar-layout were not introduced by this change."
+    }
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "observed",
+      "expected": true,
+      "attempted": true
+    }
+  },
+  "transcriptPath": "/Users/brainless/Projects/akar/.pi-subagents/artifacts/873303e0_worker_0_transcript.jsonl",
+  "timestamp": 1785326562424
+}
