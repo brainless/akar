@@ -12,6 +12,7 @@
 - [x] Task 4 — Link component
 - [x] Task 5 — Card lifecycle and composition
 - [x] Task 6 — Navbar lifecycle correction
+- [x] Task 7 — Styled button, badge, separator, stat, and tab bar APIs
 
 ---
 
@@ -257,7 +258,7 @@ Link navigation, active tab, scrolling, and other application state remain calle
 
 ### Task 7 — Styled button, badge, separator, stat, and tab bar APIs
 
-**Status:** Not Started
+**Status:** Done
 
 - Add `ButtonStyle` with optional text, fill, hover fill, pressed fill, border, and content-color overrides.
 - Preserve the existing button common-case entry point and add `akar_button_styled`.

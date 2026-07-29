@@ -22,3 +22,34 @@ pub(crate) fn f32_to_color(c: [f32; 4]) -> u32 {
     let a = (c[3] * 255.0).clamp(0.0, 255.0) as u32;
     (r << 24) | (g << 16) | (b << 8) | a
 }
+
+pub fn contrast_color(bg: u32) -> u32 {
+    let r = ((bg >> 24) & 0xFF) as f32 / 255.0;
+    let g = ((bg >> 16) & 0xFF) as f32 / 255.0;
+    let b = ((bg >> 8) & 0xFF) as f32 / 255.0;
+    let luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    if luminance > 0.5 {
+        0x000000FF
+    } else {
+        0xFFFFFFFF
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contrast_color_dark_bg_returns_white() {
+        assert_eq!(contrast_color(0x000000FF), 0xFFFFFFFF);
+        assert_eq!(contrast_color(0x1a1a2eFF), 0xFFFFFFFF);
+        assert_eq!(contrast_color(0x333333FF), 0xFFFFFFFF);
+    }
+
+    #[test]
+    fn contrast_color_light_bg_returns_black() {
+        assert_eq!(contrast_color(0xFFFFFFFF), 0x000000FF);
+        assert_eq!(contrast_color(0xf0f0f0FF), 0x000000FF);
+        assert_eq!(contrast_color(0xDDDDDDFF), 0x000000FF);
+    }
+}

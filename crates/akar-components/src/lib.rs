@@ -4,13 +4,19 @@ pub use theme::{AkarTheme, AKAR_THEME_DARK, AKAR_THEME_LIGHT};
 pub mod text_style;
 pub use text_style::{FontFamily, FontWeight, TextAlign, TextStyle};
 
-pub(crate) mod color;
+pub mod color;
+pub use color::contrast_color;
 
 pub mod button;
-pub use button::{button as akar_button, ButtonResult, ButtonVariant};
+pub use button::{
+    button as akar_button, button_styled as akar_button_styled, ButtonResult, ButtonStyle,
+    ButtonVariant,
+};
 
 pub mod separator;
-pub use separator::separator as akar_separator;
+pub use separator::{
+    separator as akar_separator, separator_styled as akar_separator_styled, SeparatorStyle,
+};
 
 pub mod container;
 pub use container::container as akar_container;
@@ -31,13 +37,13 @@ pub mod avatar;
 pub use avatar::avatar as akar_avatar;
 
 pub mod badge;
-pub use badge::{badge as akar_badge, BadgeVariant};
+pub use badge::{badge as akar_badge, badge_styled as akar_badge_styled, BadgeStyle, BadgeVariant};
 
 pub mod scroll_area;
 pub use scroll_area::{scroll_area_begin, scroll_area_end, ScrollAreaResponse};
 
 pub mod stat;
-pub use stat::stat as akar_stat;
+pub use stat::{stat as akar_stat, stat_styled as akar_stat_styled, StatStyle};
 
 pub mod skeleton;
 pub use skeleton::{skeleton as akar_skeleton, SkeletonVariant};
@@ -59,7 +65,10 @@ pub use canvas::{
 };
 
 pub mod tabs;
-pub use tabs::{tab_bar as akar_tab_bar, TabBarResponse, TabVariant};
+pub use tabs::{
+    tab_bar as akar_tab_bar, tab_bar_styled as akar_tab_bar_styled, TabBarResponse, TabBarStyle,
+    TabVariant,
+};
 
 pub mod drawer;
 pub use drawer::{drawer_begin, drawer_end, DrawerEdge, DrawerResponse};

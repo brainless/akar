@@ -3,6 +3,7 @@ use akar_core::{QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
+use crate::text_style::TextStyle;
 use crate::AkarTheme;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -16,6 +17,28 @@ pub struct ButtonResult {
     pub clicked: bool,
     pub hovered: bool,
     pub pressed: bool,
+}
+
+pub struct ButtonStyle {
+    pub fill: Option<u32>,
+    pub hover_fill: Option<u32>,
+    pub pressed_fill: Option<u32>,
+    pub border_color: Option<u32>,
+    pub content_color: Option<u32>,
+    pub text_style: Option<TextStyle>,
+}
+
+impl ButtonStyle {
+    pub fn empty() -> Self {
+        Self {
+            fill: None,
+            hover_fill: None,
+            pressed_fill: None,
+            border_color: None,
+            content_color: None,
+            text_style: None,
+        }
+    }
 }
 
 fn scale_color(c: u32, factor: f32) -> u32 {
@@ -32,6 +55,19 @@ pub fn button(
     node_id: NodeId,
     label: &str,
     variant: ButtonVariant,
+    theme: &AkarTheme,
+) -> ButtonResult {
+    let style = ButtonStyle::empty();
+    button_styled(core, layout, node_id, label, variant, &style, theme)
+}
+
+pub fn button_styled(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    label: &str,
+    variant: ButtonVariant,
+    style: &ButtonStyle,
     theme: &AkarTheme,
 ) -> ButtonResult {
     let rect = layout.rect(node_id);
@@ -51,29 +87,37 @@ pub fn button(
     let (fill_color, border_color) = match variant {
         ButtonVariant::Solid => {
             let base = if pressed {
-                scale_color(theme.primary, 0.8)
+                style
+                    .pressed_fill
+                    .unwrap_or_else(|| scale_color(theme.primary, 0.8))
             } else if hovered {
-                scale_color(theme.primary, 1.1)
+                style
+                    .hover_fill
+                    .unwrap_or_else(|| scale_color(theme.primary, 1.1))
             } else {
-                theme.primary
+                style.fill.unwrap_or(theme.primary)
             };
-            (base, theme.primary)
+            (base, style.border_color.unwrap_or(theme.primary))
         }
         ButtonVariant::Outline => {
             let border = if hovered {
-                scale_color(theme.primary, 1.1)
+                style
+                    .hover_fill
+                    .unwrap_or_else(|| scale_color(theme.primary, 1.1))
             } else {
-                theme.primary
+                style.border_color.unwrap_or(theme.primary)
             };
-            (0x00000000u32, border)
+            (style.fill.unwrap_or(0x00000000u32), border)
         }
         ButtonVariant::Ghost => {
             let fill = if hovered {
-                scale_color(theme.primary, 1.1)
+                style
+                    .hover_fill
+                    .unwrap_or_else(|| scale_color(theme.primary, 1.1))
             } else {
-                0x00000000u32
+                style.fill.unwrap_or(0x00000000u32)
             };
-            (fill, 0x00000000u32)
+            (fill, style.border_color.unwrap_or(0x00000000u32))
         }
     };
 
@@ -100,17 +144,17 @@ pub fn button(
         None,
     );
 
-    let text_color = match variant {
-        ButtonVariant::Solid => color_to_f32(theme.primary_content),
-        _ => color_to_f32(theme.base_content),
-    };
+    let text_color = style.content_color.unwrap_or_else(|| match variant {
+        ButtonVariant::Solid => theme.primary_content,
+        _ => theme.base_content,
+    });
 
     core.draw_list.push_text(TextCall {
         buffer_id,
         x: rect[0] + theme.border_width + theme.padding_x,
         y: rect[1] + theme.border_width + theme.padding_y,
         clip: rect,
-        color: text_color,
+        color: color_to_f32(text_color),
         z: 0.0,
     });
 
@@ -140,6 +184,70 @@ mod tests {
             node_id,
             "Click",
             ButtonVariant::Solid,
+            &AKAR_THEME_DARK,
+        );
+
+        assert!(!result.clicked);
+        assert!(!result.hovered);
+        assert!(!result.pressed);
+    }
+
+    #[test]
+    fn styled_uses_custom_fill() {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style {
+            size: akar_layout::Size {
+                width: akar_layout::length(100.0),
+                height: akar_layout::length(40.0),
+            },
+            ..Default::default()
+        });
+        layout.compute(node_id, (Some(200.0), Some(200.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let mut core = AkarCore::mock();
+        core.input.set_mouse_pos(500.0, 500.0);
+        core.input.begin_frame();
+        core.draw_list.begin_frame(1.0);
+
+        let style = ButtonStyle {
+            fill: Some(0xFF0000FF),
+            ..ButtonStyle::empty()
+        };
+
+        button_styled(
+            &mut core,
+            &layout,
+            node_id,
+            "Click",
+            ButtonVariant::Solid,
+            &style,
+            &AKAR_THEME_DARK,
+        );
+
+        let quads = core.draw_list.sorted_quads();
+        assert!(!quads.is_empty());
+        assert_eq!(quads[0].fill, color_to_f32(0xFF0000FF));
+    }
+
+    #[test]
+    fn styled_preserves_zero_area() {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style::default());
+        let mut core = AkarCore::mock();
+
+        let style = ButtonStyle {
+            fill: Some(0xFF0000FF),
+            ..ButtonStyle::empty()
+        };
+
+        let result = button_styled(
+            &mut core,
+            &layout,
+            node_id,
+            "Click",
+            ButtonVariant::Solid,
+            &style,
             &AKAR_THEME_DARK,
         );
 

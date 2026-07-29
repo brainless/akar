@@ -17,6 +17,22 @@ pub struct TabBarResponse {
     pub clicked: Option<usize>,
 }
 
+pub struct TabBarStyle {
+    pub active_color: Option<u32>,
+    pub inactive_color: Option<u32>,
+    pub indicator_color: Option<u32>,
+}
+
+impl TabBarStyle {
+    pub fn empty() -> Self {
+        Self {
+            active_color: None,
+            inactive_color: None,
+            indicator_color: None,
+        }
+    }
+}
+
 pub fn tab_bar(
     core: &mut AkarCore,
     layout: &Layout,
@@ -24,6 +40,29 @@ pub fn tab_bar(
     labels: &[&str],
     active_index: usize,
     variant: TabVariant,
+    theme: &AkarTheme,
+) -> TabBarResponse {
+    let style = TabBarStyle::empty();
+    tab_bar_styled(
+        core,
+        layout,
+        node_id,
+        labels,
+        active_index,
+        variant,
+        &style,
+        theme,
+    )
+}
+
+pub fn tab_bar_styled(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    labels: &[&str],
+    active_index: usize,
+    variant: TabVariant,
+    style: &TabBarStyle,
     theme: &AkarTheme,
 ) -> TabBarResponse {
     let rect = layout.rect(node_id);
@@ -38,6 +77,10 @@ pub fn tab_bar(
 
     let count = labels.len();
     let tab_width = rect[2] / count as f32;
+
+    let active_color = style.active_color.unwrap_or(theme.primary);
+    let inactive_color = style.inactive_color.unwrap_or(theme.base_200);
+    let indicator_color = style.indicator_color.unwrap_or(theme.primary);
 
     let mut clicked = None;
     for i in 0..count {
@@ -57,9 +100,15 @@ pub fn tab_bar(
         match variant {
             TabVariant::Boxed => {
                 let (fill, border) = if is_active {
-                    (theme.primary, theme.primary)
+                    (active_color, active_color)
                 } else {
-                    (theme.base_200, theme.base_300)
+                    (
+                        inactive_color,
+                        style
+                            .inactive_color
+                            .map(|_| inactive_color)
+                            .unwrap_or(theme.base_300),
+                    )
                 };
                 core.draw_list.push_quad(QuadCall {
                     rect: tab_rect,
@@ -79,7 +128,7 @@ pub fn tab_bar(
                 let fill = if is_active {
                     theme.base_100
                 } else {
-                    theme.base_200
+                    inactive_color
                 };
                 core.draw_list.push_quad(QuadCall {
                     rect: tab_rect,
@@ -97,9 +146,9 @@ pub fn tab_bar(
             }
             TabVariant::Pills => {
                 let fill = if is_active {
-                    theme.primary
+                    active_color
                 } else {
-                    theme.base_200
+                    inactive_color
                 };
                 core.draw_list.push_quad(QuadCall {
                     rect: tab_rect,
@@ -125,7 +174,7 @@ pub fn tab_bar(
                     ];
                     core.draw_list.push_quad(QuadCall {
                         rect: underline_rect,
-                        fill: color_to_f32(theme.primary),
+                        fill: color_to_f32(indicator_color),
                         border_color: [0.0; 4],
                         corner_radii: [0.0; 4],
                         border_width: 0.0,
@@ -152,7 +201,7 @@ pub fn tab_bar(
         let text_color = match (variant, is_active) {
             (TabVariant::Pills, true) => color_to_f32(theme.primary_content),
             (TabVariant::Boxed, true) => color_to_f32(theme.primary_content),
-            (TabVariant::Underline, true) => color_to_f32(theme.primary),
+            (TabVariant::Underline, true) => color_to_f32(active_color),
             _ => color_to_f32(theme.base_content),
         };
 
@@ -297,5 +346,59 @@ mod tests {
                 variant,
             );
         }
+    }
+
+    #[test]
+    fn styled_uses_custom_fill() {
+        let mut layout = Layout::new();
+        let node = node_400x40(&mut layout);
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+
+        let style = TabBarStyle {
+            active_color: Some(0xFF0000FF),
+            ..TabBarStyle::empty()
+        };
+
+        tab_bar_styled(
+            &mut core,
+            &layout,
+            node,
+            &["A", "B"],
+            0,
+            TabVariant::Boxed,
+            &style,
+            &AKAR_THEME_DARK,
+        );
+
+        let quads = core.draw_list.sorted_quads();
+        assert!(!quads.is_empty());
+        assert_eq!(quads[0].fill, color_to_f32(0xFF0000FF));
+    }
+
+    #[test]
+    fn styled_preserves_zero_area() {
+        let mut layout = Layout::new();
+        let node = node_400x40(&mut layout);
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+
+        let style = TabBarStyle {
+            active_color: Some(0xFF0000FF),
+            ..TabBarStyle::empty()
+        };
+
+        let result = tab_bar_styled(
+            &mut core,
+            &layout,
+            node,
+            &[],
+            0,
+            TabVariant::Boxed,
+            &style,
+            &AKAR_THEME_DARK,
+        );
+
+        assert_eq!(result.clicked, None);
     }
 }

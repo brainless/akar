@@ -4,7 +4,30 @@ use akar_layout::{Layout, NodeId};
 use crate::box_style::BoxStyle;
 use crate::color::color_to_f32;
 use crate::container::container;
+use crate::text_style::TextStyle;
 use crate::AkarTheme;
+
+pub struct StatStyle {
+    pub title_color: Option<u32>,
+    pub value_color: Option<u32>,
+    pub description_color: Option<u32>,
+    pub title_text_style: Option<TextStyle>,
+    pub value_text_style: Option<TextStyle>,
+    pub description_text_style: Option<TextStyle>,
+}
+
+impl StatStyle {
+    pub fn empty() -> Self {
+        Self {
+            title_color: None,
+            value_color: None,
+            description_color: None,
+            title_text_style: None,
+            value_text_style: None,
+            description_text_style: None,
+        }
+    }
+}
 
 pub fn stat(
     core: &mut AkarCore,
@@ -13,6 +36,29 @@ pub fn stat(
     title: &str,
     value: &str,
     description: Option<&str>,
+    theme: &AkarTheme,
+) {
+    let style = StatStyle::empty();
+    stat_styled(
+        core,
+        layout,
+        node_id,
+        title,
+        value,
+        description,
+        &style,
+        theme,
+    )
+}
+
+pub fn stat_styled(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    title: &str,
+    value: &str,
+    description: Option<&str>,
+    style: &StatStyle,
     theme: &AkarTheme,
 ) {
     let rect = layout.rect(node_id);
@@ -49,7 +95,7 @@ pub fn stat(
         x: x + theme.padding_x,
         y: title_y,
         clip: [x, y, w, h],
-        color: color_to_f32(theme.base_content),
+        color: color_to_f32(style.title_color.unwrap_or(theme.base_content)),
         z: 0.0,
     });
 
@@ -67,7 +113,7 @@ pub fn stat(
         x: x + theme.padding_x,
         y: value_y,
         clip: [x, y, w, h],
-        color: color_to_f32(theme.base_content),
+        color: color_to_f32(style.value_color.unwrap_or(theme.base_content)),
         z: 0.0,
     });
 
@@ -86,7 +132,7 @@ pub fn stat(
             x: x + theme.padding_x,
             y: desc_y,
             clip: [x, y, w, h],
-            color: color_to_f32(theme.secondary_content),
+            color: color_to_f32(style.description_color.unwrap_or(theme.secondary_content)),
             z: 0.0,
         });
     }
@@ -169,5 +215,64 @@ mod tests {
         );
 
         assert_eq!(core.draw_list.len(), 3);
+    }
+
+    #[test]
+    fn styled_uses_custom_fill() {
+        let mut layout = akar_layout::Layout::new();
+        let node = sized_node(&mut layout);
+        let mut core = AkarCore::mock();
+
+        let style = StatStyle {
+            value_color: Some(0xFF0000FF),
+            ..StatStyle::empty()
+        };
+
+        stat_styled(
+            &mut core,
+            &layout,
+            node,
+            "Revenue",
+            "$12,345",
+            None,
+            &style,
+            &crate::AKAR_THEME_DARK,
+        );
+
+        let calls = core.draw_list.text_calls();
+        let text_calls: Vec<_> = calls
+            .iter()
+            .filter_map(|c| match c {
+                akar_core::DrawCall::Text(t) => Some(t),
+                _ => None,
+            })
+            .collect();
+        assert!(text_calls.len() >= 2);
+        assert_eq!(text_calls[1].color, color_to_f32(0xFF0000FF));
+    }
+
+    #[test]
+    fn styled_preserves_zero_area() {
+        let mut layout = akar_layout::Layout::new();
+        let node_id = layout.new_leaf(akar_layout::Style::default());
+        let mut core = AkarCore::mock();
+
+        let style = StatStyle {
+            value_color: Some(0xFF0000FF),
+            ..StatStyle::empty()
+        };
+
+        stat_styled(
+            &mut core,
+            &layout,
+            node_id,
+            "Revenue",
+            "$12,345",
+            None,
+            &style,
+            &crate::AKAR_THEME_DARK,
+        );
+
+        assert_eq!(core.draw_list.len(), 0);
     }
 }
