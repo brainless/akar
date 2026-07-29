@@ -2,13 +2,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use akar_components::{
-    akar_alert, akar_avatar, akar_badge, akar_button, akar_checkbox, akar_container, akar_label,
-    akar_navbar_layout, akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat,
-    akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip,
-    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
-    toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, DrawerEdge, NavbarSlots,
-    ProgressStyle, SkeletonVariant, TabVariant, ToastItem, ToastVariant, TooltipSide,
-    AKAR_THEME_DARK,
+    akar_alert, akar_avatar, akar_badge, akar_button, akar_card, akar_card_layout, akar_checkbox,
+    akar_container, akar_heading, akar_label, akar_link, akar_navbar_layout, akar_paragraph,
+    akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat, akar_steps, akar_switch,
+    akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip, drawer_begin, drawer_end,
+    dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts, AlertVariant,
+    BadgeVariant, BoxStyle, ButtonVariant, CardLayout, CardSlots, CardStyle, DrawerEdge,
+    FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant,
+    TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -83,6 +84,15 @@ fn input_snapshot(input: &akar_core::InputState) -> InputSnapshot {
 }
 
 struct AppState {
+    heading_node: akar_layout::NodeId,
+    paragraph_node: akar_layout::NodeId,
+    link_node: akar_layout::NodeId,
+    card_root: akar_layout::NodeId,
+    card_header: akar_layout::NodeId,
+    card_body: akar_layout::NodeId,
+    card_footer: akar_layout::NodeId,
+    card_slots: CardSlots,
+    link_result: LinkResult,
     window: Arc<Window>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -1079,6 +1089,10 @@ enum Component {
     Modal,
     Toasts,
     Dropdown,
+    Heading,
+    Paragraph,
+    Link,
+    Card,
 }
 
 fn ensure_navbar_slots(state: &mut AppState) {
@@ -1279,6 +1293,105 @@ impl Component {
                     ..Default::default()
                 },
             ),
+            Self::Heading => (
+                state.heading_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(600.0),
+                        height: length(60.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Paragraph => (
+                state.paragraph_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(600.0),
+                        height: length(120.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Link => (
+                state.link_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(300.0),
+                        height: length(32.0),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Card => {
+                state.layout.set_style(
+                    state.card_root,
+                    Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Column,
+                        size: Size {
+                            width: length(400.0),
+                            height: length(280.0),
+                        },
+                        padding: taffy::geometry::Rect {
+                            left: length(16.0),
+                            right: length(16.0),
+                            top: length(16.0),
+                            bottom: length(16.0),
+                        },
+                        gap: taffy::geometry::Size {
+                            width: length(0.0),
+                            height: length(8.0),
+                        },
+                        ..Default::default()
+                    },
+                );
+                state.layout.set_style(
+                    state.card_header,
+                    Style {
+                        flex_shrink: 0.0,
+                        size: Size {
+                            width: Dimension::percent(1.0),
+                            height: length(32.0),
+                        },
+                        ..Default::default()
+                    },
+                );
+                state.layout.set_style(
+                    state.card_body,
+                    Style {
+                        flex_grow: 1.0,
+                        size: Size {
+                            width: Dimension::percent(1.0),
+                            height: length(120.0),
+                        },
+                        ..Default::default()
+                    },
+                );
+                state.layout.set_style(
+                    state.card_footer,
+                    Style {
+                        flex_shrink: 0.0,
+                        size: Size {
+                            width: Dimension::percent(1.0),
+                            height: length(28.0),
+                        },
+                        ..Default::default()
+                    },
+                );
+                state.layout.compute(
+                    state.card_root,
+                    (
+                        Some(size.width as f32 / scale),
+                        Some(size.height as f32 / scale),
+                    ),
+                    |_, _, _, _, _| Size::ZERO,
+                );
+                return;
+            }
             Self::Drawer | Self::Modal | Self::Toasts => return,
         };
 
@@ -1306,14 +1419,31 @@ impl Component {
             "modal" => Some(Self::Modal),
             "toasts" => Some(Self::Toasts),
             "dropdown" => Some(Self::Dropdown),
+            "heading" => Some(Self::Heading),
+            "paragraph" => Some(Self::Paragraph),
+            "link" => Some(Self::Link),
+            "card" => Some(Self::Card),
             _ => None,
         }
     }
 
     fn names() -> &'static [&'static str] {
         &[
-            "navbar", "alert", "tab_bar", "list", "canvas", "stats", "form", "drawer", "modal",
-            "toasts", "dropdown",
+            "navbar",
+            "alert",
+            "tab_bar",
+            "list",
+            "canvas",
+            "stats",
+            "form",
+            "drawer",
+            "modal",
+            "toasts",
+            "dropdown",
+            "heading",
+            "paragraph",
+            "link",
+            "card",
         ]
     }
 
@@ -1330,6 +1460,76 @@ impl Component {
             Self::Modal => render_modal(state, viewport_rect),
             Self::Toasts => render_toasts(state, viewport_rect),
             Self::Dropdown => render_isolated_dropdown(state, viewport_rect),
+            Self::Heading => {
+                akar_heading(
+                    &mut state.core,
+                    &state.layout,
+                    state.heading_node,
+                    "Heading Level 1",
+                    HeadingLevel::H1,
+                    Some(TextStyle {
+                        font_family: Some(FontFamily::Serif),
+                        ..TextStyle::empty()
+                    }),
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Paragraph => {
+                akar_paragraph(
+                    &mut state.core,
+                    &state.layout,
+                    state.paragraph_node,
+                    "This is a paragraph component with automatic text wrapping. It demonstrates how akar handles multi-line text layout with intrinsic measurement.",
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Link => {
+                let result = akar_link(
+                    &mut state.core,
+                    &state.layout,
+                    state.link_node,
+                    "Visit akar docs",
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+                state.link_result = result;
+            }
+            Self::Card => {
+                akar_card(
+                    &mut state.core,
+                    &state.layout,
+                    state.card_root,
+                    &state.card_slots,
+                    &CardStyle::default(&AKAR_THEME_DARK),
+                );
+                akar_heading(
+                    &mut state.core,
+                    &state.layout,
+                    state.card_header,
+                    "Card Header",
+                    HeadingLevel::H3,
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+                akar_paragraph(
+                    &mut state.core,
+                    &state.layout,
+                    state.card_body,
+                    "Card body content with a heading, paragraph, and footer slot.",
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+                akar_heading(
+                    &mut state.core,
+                    &state.layout,
+                    state.card_footer,
+                    "Card Footer",
+                    HeadingLevel::H4,
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+            }
         }
     }
 
@@ -1373,7 +1573,12 @@ impl Component {
                     });
                 }
             }
-            Self::Navbar | Self::TabBar => {}
+            Self::Heading
+            | Self::Paragraph
+            | Self::Link
+            | Self::Card
+            | Self::Navbar
+            | Self::TabBar => {}
         }
     }
 }
@@ -1802,6 +2007,54 @@ impl ApplicationHandler for App {
 
         let form_radio_nodes = [form_radio_dark, form_radio_light];
 
+        let heading_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(600.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        let paragraph_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(600.0),
+                height: length(120.0),
+            },
+            ..Default::default()
+        });
+        let link_node = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(300.0),
+                height: length(32.0),
+            },
+            ..Default::default()
+        });
+        let card_root = layout.new_leaf(Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: length(400.0),
+                height: length(280.0),
+            },
+            padding: taffy::geometry::Rect {
+                left: length(16.0),
+                right: length(16.0),
+                top: length(16.0),
+                bottom: length(16.0),
+            },
+            gap: taffy::geometry::Size {
+                width: length(0.0),
+                height: length(8.0),
+            },
+            ..Default::default()
+        });
+        let card_layout_opts = CardLayout::with_header_footer(&AKAR_THEME_DARK);
+        let card_slots = akar_card_layout(&mut layout, card_root, &card_layout_opts);
+        let card_header = card_slots.header.unwrap();
+        let card_body = card_slots.body;
+        let card_footer = card_slots.footer.unwrap();
+
         layout.register_label("navbar_btn", navbar_btn_node);
         layout.register_label("navbar_new_btn", navbar_new_btn_node);
         layout.register_label("navbar_dropdown", navbar_dropdown_btn_node);
@@ -1824,6 +2077,10 @@ impl ApplicationHandler for App {
         layout.register_label("form_font_size", form_font_size_node);
         layout.register_label("form_language", form_language_node);
         layout.register_label("form_submit", form_submit_node);
+        layout.register_label("heading", heading_node);
+        layout.register_label("paragraph", paragraph_node);
+        layout.register_label("link", link_node);
+        layout.register_label("card", card_root);
 
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
@@ -1885,6 +2142,19 @@ impl ApplicationHandler for App {
             form_font_size_node,
             form_language_node,
             form_submit_node,
+            heading_node,
+            paragraph_node,
+            link_node,
+            card_root,
+            card_header,
+            card_body,
+            card_footer,
+            card_slots,
+            link_result: LinkResult {
+                clicked: false,
+                hovered: false,
+                pressed: false,
+            },
             needs_repaint: false,
         });
     }

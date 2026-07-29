@@ -667,6 +667,32 @@ impl Site for AkarSite {
         self.footer_col_headings = footer_col_headings;
         self.footer_link_nodes = footer_link_nodes;
         self.copyright_label = copyright_label;
+
+        layout.register_label("navbar_logo", logo_node);
+        layout.register_label("nav_features", feat_link);
+        layout.register_label("nav_components", comp_link);
+        layout.register_label("nav_github", github_link);
+        layout.register_label("hero_h1", h1_node);
+        layout.register_label("hero_subtitle", subtitle_node);
+        layout.register_label("cta_solid", cta_solid);
+        layout.register_label("cta_outline", cta_outline);
+        for i in 0..3 {
+            layout.register_label(&format!("stat_{}", i), stat_nodes[i]);
+            layout.register_label(&format!("card_{}", i), card_roots[i]);
+        }
+        layout.register_label("why_h2", why_h2);
+        for i in 0..4 {
+            layout.register_label(&format!("why_h4_{}", i), why_h4s[i]);
+        }
+        for i in 0..7 {
+            layout.register_label(&format!("badge_{}", i), badge_nodes[i]);
+        }
+        layout.register_label("btn_solid", btn_solid);
+        layout.register_label("btn_outline", btn_outline);
+        layout.register_label("btn_ghost", btn_ghost);
+        layout.register_label("tab_bar", tab_bar_node);
+        layout.register_label("footer_separator", separator_node);
+        layout.register_label("copyright", copyright_label);
     }
 
     fn render(&mut self, core: &mut AkarCore, layout: &mut Layout, _viewport_rect: [f32; 4]) {

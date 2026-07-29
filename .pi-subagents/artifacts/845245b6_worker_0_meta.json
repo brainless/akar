@@ -1,0 +1,232 @@
+{
+  "runId": "845245b6",
+  "agent": "worker",
+  "task": "## Task 11 — Demo Isolation and Verification\n\n**Epic:** epics/020-component-webpage-sample.md (read it fully for context)\n**Key references:** DEVELOP.md, AGENTS.md, README.md\n\n### What to implement\n\nThis is the verification task. Register new components with demo-rust component isolation, run tests, and capture screenshots.\n\n### Sub-tasks\n\n#### 1. Register new components with demo-rust isolation\n\nRead `examples/demo-rust/src/main.rs` to understand how components are registered with `--list-components` and `--component`. Add registration for:\n- `heading` (force H1 level)\n- `paragraph` (force with some text)\n- `link` (force hover state via script)\n- `card` (force with header/footer)\n\nCheck how existing components like `button`, `badge`, `navbar` are registered and follow the same pattern.\n\n#### 2. Add labels for scripted interactive verification\n\nRegister stable labels for interactive elements in the Akar page that can be targeted by `--script`. Check how mimo.rs registers labels and follow the pattern.\n\n#### 3. Run tests and verify compilation\n\n```bash\ncargo fmt --check\ncargo test --workspace\ncargo clippy --workspace -- -D warnings  # note: pre-existing warnings in akar-core/akar-diff\ncargo check --bin webpage-rust\ncargo check --bin demo-rust\n```\n\n#### 4. Document screenshot commands\n\nAdd comments or documentation showing how to capture the Akar page at fixed viewports:\n\n```bash\n# Desktop viewport\ncargo run --release --bin webpage-rust -- --site akar --width 1280 --height 900 --screenshot /tmp/akar-page.png --exit\n\n# Narrower viewport\ncargo run --release --bin webpage-rust -- --site akar --width 768 --height 900 --screenshot /tmp/akar-narrow.png --exit\n\n# MiMo baseline (for comparison)\ncargo run --release --bin webpage-rust -- --site mimo --width 1280 --height 900 --screenshot /tmp/mimo-page.png --exit\n```\n\nNote: Actual screenshot capture requires a GPU/display environment. In this task, we verify that the code compiles and tests pass. The visual verification will happen when the code is run in an environment with GPU access.\n\n### Files to read first\n\n1. `examples/demo-rust/src/main.rs` — component isolation registration\n2. `examples/webpage-rust/src/sites/akar.rs` — the Akar page implementation\n3. `examples/webpage-rust/src/sites/mimo.rs` — reference for label registration\n\n### What to verify\n\n- `cargo test --workspace` passes\n- `cargo fmt --check` passes  \n- `cargo check --bin webpage-rust` passes\n- `cargo check --bin demo-rust` passes\n- New components are registered with demo-rust isolation\n- Stable labels exist for interactive elements\n\n### Coding conventions\n- Edition 2021, no emojis, no unnecessary comments\n\nAfter implementing, run all the verification commands listed above.\n\n---\n**Output:**\nWrite your findings to exactly this path: /Users/brainless/Projects/akar/.pi-subagents/artifacts/outputs/845245b6/inline\nThis path is authoritative for this run.\nIgnore any other output filename or output path mentioned elsewhere, including output destinations in the base agent prompt, system prompt, or task instructions.",
+  "exitCode": 0,
+  "usage": {
+    "input": 93912,
+    "output": 11439,
+    "cacheRead": 1943488,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 33
+  },
+  "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+  "attemptedModels": [
+    "xiaomi-token-plan-sgp/mimo-v2.5:high"
+  ],
+  "modelAttempts": [
+    {
+      "model": "xiaomi-token-plan-sgp/mimo-v2.5:high",
+      "success": true,
+      "exitCode": 0,
+      "usage": {
+        "input": 93912,
+        "output": 11439,
+        "cacheRead": 1943488,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 33
+      }
+    }
+  ],
+  "durationMs": 634848,
+  "toolCount": 47,
+  "launchContractDigest": "f3abe7f56d58f13bef865dc8e7bc1e2d75ce5593c5c993093cbc387413f344e2",
+  "acceptance": {
+    "status": "review-required",
+    "evidenceStatus": "checked",
+    "explicit": false,
+    "effectiveAcceptance": {
+      "level": "checked",
+      "explicit": false,
+      "inferredReason": [
+        "risky write-capable run"
+      ],
+      "criteria": [
+        {
+          "id": "criterion-1",
+          "must": "Implement the requested change without widening scope",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        },
+        {
+          "id": "criterion-2",
+          "must": "Return evidence sufficient for an independent acceptance review",
+          "evidence": [
+            "changed-files",
+            "tests-added",
+            "commands-run",
+            "residual-risks",
+            "no-staged-files"
+          ],
+          "severity": "required"
+        }
+      ],
+      "evidence": [
+        "changed-files",
+        "tests-added",
+        "commands-run",
+        "residual-risks",
+        "no-staged-files"
+      ],
+      "verify": [],
+      "review": {
+        "agent": "reviewer",
+        "required": true
+      },
+      "stopRules": []
+    },
+    "inferredReason": [
+      "risky write-capable run"
+    ],
+    "criteria": [
+      {
+        "id": "criterion-1",
+        "must": "Implement the requested change without widening scope",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      },
+      {
+        "id": "criterion-2",
+        "must": "Return evidence sufficient for an independent acceptance review",
+        "evidence": [
+          "changed-files",
+          "tests-added",
+          "commands-run",
+          "residual-risks",
+          "no-staged-files"
+        ],
+        "severity": "required"
+      }
+    ],
+    "runtimeChecks": [
+      {
+        "id": "criterion:criterion-1",
+        "status": "passed",
+        "message": "Required criterion 'criterion-1' satisfied."
+      },
+      {
+        "id": "criterion:criterion-2",
+        "status": "passed",
+        "message": "Required criterion 'criterion-2' satisfied."
+      },
+      {
+        "id": "evidence:changed-files",
+        "status": "passed",
+        "message": "changed-files evidence present."
+      },
+      {
+        "id": "evidence:tests-added",
+        "status": "not-applicable",
+        "message": "tests-added evidence explicitly reported as not applicable."
+      },
+      {
+        "id": "evidence:commands-run",
+        "status": "passed",
+        "message": "commands-run evidence present."
+      },
+      {
+        "id": "evidence:residual-risks",
+        "status": "passed",
+        "message": "residual-risks evidence present."
+      },
+      {
+        "id": "evidence:no-staged-files",
+        "status": "passed",
+        "message": "no-staged-files evidence present."
+      },
+      {
+        "id": "no-staged-files",
+        "status": "passed",
+        "message": "No staged files detected."
+      }
+    ],
+    "verifyRuns": [],
+    "childReport": {
+      "criteriaSatisfied": [
+        {
+          "id": "criterion-1",
+          "status": "satisfied",
+          "evidence": "Added heading, paragraph, link, and card component isolation to demo-rust. Added interactive element labels to both demo-rust and webpage-rust akar site. All verification commands pass."
+        },
+        {
+          "id": "criterion-2",
+          "status": "satisfied",
+          "evidence": "Changed files: examples/demo-rust/src/main.rs (+290/-10), examples/webpage-rust/src/sites/akar.rs (+26). Tests added: 0 new tests (this is a registration/label task, not logic). Commands run: cargo fmt --check (passed), cargo test --workspace (342 passed), cargo check --bin demo-rust (passed), cargo check --bin webpage-rust (passed)."
+        }
+      ],
+      "changedFiles": [
+        "examples/demo-rust/src/main.rs",
+        "examples/webpage-rust/src/sites/akar.rs"
+      ],
+      "testsAddedOrUpdated": [],
+      "commandsRun": [
+        {
+          "command": "cargo fmt --check",
+          "result": "passed",
+          "summary": "All source files properly formatted"
+        },
+        {
+          "command": "cargo test --workspace",
+          "result": "passed",
+          "summary": "342 tests passed, 0 failures across all crates"
+        },
+        {
+          "command": "cargo check --bin demo-rust",
+          "result": "passed",
+          "summary": "Compiled with pre-existing float literal warnings only"
+        },
+        {
+          "command": "cargo check --bin webpage-rust",
+          "result": "passed",
+          "summary": "Compiled with pre-existing dead_code warning on Site::name only"
+        }
+      ],
+      "validationOutput": [
+        "All compilation and test commands pass. No new warnings introduced. Pre-existing warnings (float literal fallback in demo-rust, dead_code in webpage-rust) are unchanged."
+      ],
+      "residualRisks": [
+        "Actual screenshot capture requires GPU/display environment not available in CI",
+        "Pre-existing float literal fallback warnings in demo-rust (121 warnings) are not from this change"
+      ],
+      "noStagedFiles": true,
+      "diffSummary": "Registered heading, paragraph, link, and card components with demo-rust --component isolation (full prepare_isolated_layout/render/force_state_initial support). Created card layout with header/body/footer slots using akar_card_layout. Added labels for all new components in demo-rust and comprehensive interactive element labels in the webpage-rust akar site for scripted verification.",
+      "reviewFindings": [
+        "no blockers"
+      ],
+      "manualNotes": "The card component isolation creates card layout slots during resumed() and uses akar_card_layout/card APIs. The heading isolation forces an H1 with serif font. All components use the AKAR_THEME_DARK theme consistent with existing demo-rust components. Labels are registered for --script targeting: heading, paragraph, link, card in demo-rust; navbar_logo, nav_*, hero_*, cta_*, stat_*, card_*, why_*, badge_*, btn_*, tab_bar, footer_separator, copyright in webpage-rust."
+    },
+    "reviewResult": {
+      "status": "review-required",
+      "findings": [
+        {
+          "severity": "non-blocking",
+          "issue": "Independent review has not been supplied.",
+          "rationale": "The run cannot be marked reviewed from child evidence alone."
+        }
+      ]
+    }
+  },
+  "effects": {
+    "fileMutation": {
+      "status": "observed",
+      "expected": true,
+      "attempted": true
+    }
+  },
+  "transcriptPath": "/Users/brainless/Projects/akar/.pi-subagents/artifacts/845245b6_worker_0_transcript.jsonl",
+  "timestamp": 1785328565468
+}

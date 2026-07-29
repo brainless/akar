@@ -16,6 +16,7 @@
 - [x] Task 8 — C ABI coverage
 - [x] Task 9 — Modularize webpage-rust
 - [x] Task 10 — Akar marketing page
+- [x] Task 11 — Demo isolation and verification
 
 ---
 
@@ -334,7 +335,7 @@ Page structure:
 
 ### Task 11 — Demo isolation and verification
 
-**Status:** Not Started
+**Status:** Done
 
 - Register heading, paragraph, link, and card with demo-rust component isolation.
 - Capture idle isolation screenshots for all new components.
