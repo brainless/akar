@@ -1,0 +1,210 @@
+---
+import { render } from 'astro:content';
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/common/Header.astro';
+import Footer from '@/components/common/Footer.astro';
+import GlassPanel from '@/components/common/GlassPanel.astro';
+import Tag from '@/components/ui/Tag.astro';
+import { withBase } from '@/lib/url';
+import { formatDate } from '@/lib/date';
+import { getPublishedPosts, readingTime } from '@/lib/posts';
+import siteConfig from '@/site.config';
+
+export const getStaticPaths = (async () => {
+  const posts = await getPublishedPosts();
+  return posts.map((post) => ({
+    params: { slug: post.id },
+    props: { post },
+  }));
+}) satisfies GetStaticPaths;
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+
+const minutes = readingTime(post.body);
+const formattedDate = formatDate(post.data.pubDate);
+const updatedDate = post.data.updatedDate
+  ? formatDate(post.data.updatedDate)
+  : undefined;
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  ogImage={post.data.heroImage?.src}
+  article={{
+    publishedTime: post.data.pubDate.toISOString(),
+    modifiedTime: post.data.updatedDate?.toISOString(),
+    author: post.data.author,
+    tags: post.data.tags,
+  }}
+>
+  <Header />
+
+  <main id="main" tabindex="-1" class="main-content">
+    <article class="blog-post">
+      <div class="container">
+        <GlassPanel variant="solid" padding="xl" className="post-header">
+          <a href={withBase('/blog/')} class="post-back">← Back to blog</a>
+          <h1 class="post-title">{post.data.title}</h1>
+
+          <div class="post-meta">
+            <time datetime={post.data.pubDate.toISOString()}>
+              {formattedDate}
+            </time>
+            {
+              updatedDate && (
+                <>
+                  <span class="separator" aria-hidden="true">·</span>
+                  <span>Updated {updatedDate}</span>
+                </>
+              )
+            }
+            {
+              siteConfig.blog.showReadingTime && minutes > 0 && (
+                <>
+                  <span class="separator" aria-hidden="true">·</span>
+                  <span>{minutes} min read</span>
+                </>
+              )
+            }
+            {
+              post.data.author && (
+                <>
+                  <span class="separator" aria-hidden="true">·</span>
+                  <span>By {post.data.author}</span>
+                </>
+              )
+            }
+          </div>
+
+          {
+            post.data.tags.length > 0 && (
+              <div class="post-tags">
+                {post.data.tags.map((tag) => (
+                  <Tag name={tag} />
+                ))}
+              </div>
+            )
+          }
+        </GlassPanel>
+
+        <div class="post-body">
+          <GlassPanel variant="solid" padding="xl" className="post-content">
+            <div class="prose">
+              <Content />
+            </div>
+          </GlassPanel>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .main-content {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .blog-post {
+    padding: var(--space-2xl) 0;
+  }
+
+  .blog-post .container {
+    max-width: var(--container-5xl);
+    margin-inline: auto;
+    padding-inline: var(--space-lg);
+  }
+
+  .post-back {
+    display: inline-block;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-md);
+    transition: color var(--transition-fast);
+  }
+  .post-back:hover {
+    color: var(--color-accent);
+  }
+
+  .post-header {
+    text-align: center;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .post-title {
+    font-size: var(--text-4xl);
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: var(--space-lg);
+    background: linear-gradient(
+      135deg,
+      var(--color-text),
+      var(--color-accent-dark)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    .post-title {
+      background: none;
+      -webkit-text-fill-color: currentColor;
+      color: var(--color-text);
+    }
+  }
+
+  .post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-md);
+  }
+
+  .separator {
+    opacity: 0.5;
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+  }
+
+  .post-body {
+    margin-bottom: var(--space-2xl);
+  }
+
+  .prose {
+    font-size: var(--text-base);
+    line-height: 1.8;
+  }
+
+  .prose :global(:is(h2, h3, h4)) {
+    scroll-margin-top: var(--space-3xl);
+  }
+
+  @media (max-width: 768px) {
+    .post-title {
+      font-size: var(--text-3xl);
+    }
+    .post-meta {
+      font-size: var(--text-xs);
+    }
+    .blog-post {
+      padding: var(--space-lg) 0;
+    }
+  }
+</style>

@@ -1,80 +1,88 @@
 # akar
 
-A GPU-accelerated, language-neutral UI component library built on [wgpu](https://github.com/gfx-rs/wgpu) and [glyphon](https://github.com/grovesNL/glyphon). Provides ready-to-use components — buttons, cards, inputs, tables, overlays — styled out of the box and arranged with a flexbox layout engine.
+GPU-accelerated UI components for agents and developers.
 
-## Why
+![Full demo screenshot](images/akar-full.png)
 
-Building a desktop or embedded UI with wgpu today means writing your own rect renderer, text shaping pipeline, layout engine, hover/focus state machine, and component primitives from scratch — every time. akar collapses that boilerplate into a single library with a stable C ABI, so you focus on your application, not the rendering plumbing.
+## What is akar
 
-The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-styled, composable primitives that cover 90% of real UIs without fighting a framework.
+akar is an immediate-mode, GPU-rendered UI component library with a C ABI. It ships 30+ ready-to-use components — buttons, cards, inputs, tables, modals, drawers, sliders, toggles, and more — styled out of the box and arranged with a flexbox layout engine. The rendering stack is [wgpu](https://github.com/gfx-rs/wgpu) 29 + [glyphon](https://github.com/grovesNL/glyphon) (cosmic-text backed, GPU atlas), and layout is resolved by [taffy](https://github.com/DioxusLabs/taffy) to pixel coordinates before any draw calls.
 
-## Design philosophy
+The public API is a C ABI (`libakar` + `akar.h`). Rust is the implementation detail; any language that can call C can use akar. No Rust toolchain is required on the consumer side.
 
-- **Immediate mode.** You call draw functions; the library draws. No retained widget tree, no diffing, no ownership puzzles. State lives where you put it.
-- **Language neutral.** The public API is a C ABI (a `.dylib`/`.so`/`.dll` + `akar.h`). Any language that can call C can use akar. Rust is the implementation detail.
-- **Zero framework opinions.** No event loop, no async runtime, no message-passing model imposed. You feed input; you drive the frame. Wire it to winit, SDL2, GLFW, or a test harness — your choice.
-- **Batteries-included components.** Buttons, badges, labels, cards, inputs, checkboxes, toggles, selects, sliders, modals, drawers, tables, progress bars, toasts — pre-styled, themeable via a flat token struct.
-- **Layout via Flexbox.** Built on [taffy](https://github.com/DioxusLabs/taffy): the same CSS Flexbox model you already know, resolved to pixel coordinates before draw calls.
-- **Virtualization first.** Infinite scroll and large data grids are first-class via a list-clipper API. The library never renders what is off-screen.
-- **Built by agents, debuggable by agents.** akar is primarily written by coding agents, and is designed to be used by other projects that need a cross-platform UI framework which works and debugs well for agents — especially multi-modal LLMs. The `demo-rust` binary ships with a complete visual debug toolchain (screenshot capture, scripted input injection, layout/frame inspection, component isolation, and a diff tool) so an agent can see, isolate, and iterate on its UI with no human in the loop.
-- **Canvas LOD with component portals.** The canvas supports overview-to-detail rendering: objects show progressively richer representations (dot, outline, summary, preview) as their projected screen size increases. At sufficient detail, an object promotes to a normal screen-space portal where standard akar components (buttons, inputs, selects) work unchanged. See `DEVELOP.md` and `examples/canvas-basic-rust/` for details.
+The component catalog is inspired by shadcn/ui and daisyUI: a small set of well-styled, composable primitives that cover the vast majority of real desktop UIs without fighting a framework.
 
-## For whom
+## Why akar
 
-- **Rust developers** who want an ImGui-class productivity boost without giving up wgpu's rendering power.
-- **Non-Rust developers** (Go, Python, Zig, Swift, C#, Odin...) who want a native GPU UI without a Rust toolchain in their build.
-- **Game and simulation developers** who need UI panels that coexist with a wgpu render pass.
-- **Tool authors** — CLI tools with a GUI escape hatch, data viewers, dev-tool overlays.
+Building a desktop or embedded UI with wgpu today means writing your own rect renderer, text shaping pipeline, layout engine, hover/focus state machine, and component primitives from scratch — every time. akar collapses that into a single library with a stable C ABI so you focus on your application, not the rendering plumbing.
+
+**For Rust developers** who want an ImGui-class productivity boost without giving up wgpu's rendering power. **For non-Rust developers** (Go, Python, Zig, Swift, C#, Odin) who want a native GPU UI without a Rust toolchain in their build. **For game and simulation developers** who need UI panels that coexist with a wgpu render pass. **For tool authors** — CLI tools with a GUI escape hatch, data viewers, dev-tool overlays.
+
+## Built by agents, debuggable by agents
+
+akar is primarily built by [opencode](https://opencode.ai) using MiMo v2.5 (multimodal) on the Standard token plan ($16/month). Many of the recent epics — the last 10+ — were tackled almost entirely by the agent, with minimal input from the lead engineer. The approach is straightforward: the agent makes a change, captures a screenshot of the result, analyzes what it sees, and iterates. This feedback loop is working remarkably well.
+
+The `demo-rust` binary ships with a complete visual debug toolchain purpose-built for this workflow. It captures exactly what akar rendered — no OS chrome, no overlapping windows — via wgpu intermediate-texture readback, identically on macOS, Windows, and Linux:
+
+- **Screenshot capture** — `--screenshot /tmp/demo.png --exit` with configurable delay
+- **Scripted input injection** — `--script` drives the demo into non-idle states (hover, press, focus, open dropdown) and captures them frame-precisely
+- **Component isolation** — `--component <name>` renders a single component and auto-crops the PNG to its bounding box
+- **Layout and frame inspection** — `--dump-layout` and `--dump-frame` for element discovery and structured debug output
+- **Diff and regression** — `akar-diff` compares two PNGs visually and can gate CI with a changed-pixel threshold
+
+This is a proof of concept that a small team of agents can build a production-quality UI framework. There is much work to be done, but the approach is producing excellent results. See `AGENTS.md` for the full iteration loop and flag reference.
+
+## Component showcase
+
+| | | |
+|:---:|:---:|:---:|
+| ![Form controls](images/akar-form.png) | ![Card](images/akar-card.png) | ![Navbar](images/akar-navbar.png) |
+| Form | Card | Navbar |
+| ![Drawer](images/akar-drawer.png) | ![Stats](images/akar-stats.png) | ![Virtualized list](images/akar-list.png) |
+| Drawer | Stats | List |
+
+## The akar marketing page
+
+The full component catalog composes into a real marketing page, rendered entirely by akar's components:
+
+![akar website](images/akar-website.png)
+
+## Quick start
+
+```bash
+# Run the demo
+cargo run --bin demo-rust
+
+# Capture a screenshot
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
+
+# Isolate a single component
+cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
+```
 
 ## Stack
 
-- **Renderer:** wgpu 29 (quad + text pipeline)
-- **Text:** glyphon (cosmic-text backed, GPU atlas)
-- **Layout:** taffy (CSS Flexbox / Grid)
-- **Math:** glam
-- **C ABI:** Rust `extern "C"` + `cbindgen`-generated `akar.h`
-- **Optional windowing integration:** winit (in a separate `akar-winit` crate)
+| Layer | Technology |
+|---|---|
+| Renderer | wgpu 29 (quad + text pipeline) |
+| Text | glyphon (cosmic-text backed, GPU atlas) |
+| Layout | taffy (CSS Flexbox / Grid) |
+| Math | glam |
+| C ABI | Rust `extern "C"` + `cbindgen`-generated `akar.h` |
+| Windowing (optional) | winit (in `akar-winit` crate) |
 
 ## Status
 
-**Pre-alpha.** The API is functional but may change as development continues. See `epics/` for the design roadmap and completion status.
+**Pre-alpha.** The API is functional but will change as development continues. See `epics/` for the design roadmap and completion status.
 
-## Screenshot workflow
+## Documentation
 
-akar's `demo-rust` binary ships with a visual debug toolchain purpose-built for agent-led development (especially multi-modal LLMs). It captures exactly what akar rendered — no OS chrome — via wgpu intermediate-texture readback, identically on macOS, Windows, and Linux.
-
-```bash
-# Basic capture after default 5s delay, then exit
-cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
-
-# Configurable delay (float seconds; 0 = first frame)
-cargo run --bin demo-rust -- --screenshot /tmp/demo.png --delay 0.5 --exit
-```
-
-Beyond the basic capture, the toolchain includes:
-
-- `--script <FILE>` — line-based input injection (`hover`, `press`, `release`, `click`, `scroll`, `key`, `type`, `delay`, `screenshot`) with `@label` element addressing, for capturing non-idle and interactive states frame-precisely.
-- `--dump-layout` — prints `name x y w h` for every labeled layout node and exits (element discovery for `@label` addressing and coordinate fallback).
-- `--dump-frame <PATH>` — structured JSON dump for the captured frame: every draw call (including culled ones, with z-order and scissor), labeled layout rects, and an input snapshot.
-- `--component <name>` / `--list-components` — isolate a single component, force its interesting state once (open drawer/dropdown/modal), and **auto-crop** the PNG to its bounding box, removing unrelated UI as visual noise.
-- `akar-diff` — standalone binary (no GPU/akar deps). `--diff BASE CUR -o OUT.png` draws a visual diff (changed pixels red); `--compare BASE CUR --threshold PCT` exits non-zero when the changed-pixel ratio exceeds a threshold for CI regression gates.
-
-See `AGENTS.md` → "Debug toolchain" for the recommended iteration loop and full flag reference. Design and history: `epics/013-screenshot-utility.md`, `epics/014-screenshot-enhancements.md`, `epics/015-component-isolation.md`.
-
-## Text editing and clipboard integration
-
-Text selection is caller-owned through `akar_components::TextEditState { cursor, anchor }`; both fields are UTF-8 byte positions, and a collapsed selection has equal positions. Pass the same state and `String` to `akar_text_input` or `akar_textarea` every frame. The widgets normalize invalid external positions, draw the selection and caret from shaped text geometry, and return `copy_text` and `request_paste` in their response.
-
-Select All, Copy, and Paste use platform defaults (`Cmd` on macOS, `Ctrl` on Windows/Linux). Configure all editors in a context once with `AkarCore::set_text_edit_keybindings(TextEditKeybindings { ... })`; per-widget overrides are not supported. Clipboard access remains host-owned:
-
-1. When a focused widget returns `copy_text`, write that selected text to the platform clipboard.
-2. When it returns `request_paste`, read the clipboard and retain the response's widget identity (`layout.widget_id(node)` in Rust, `widget_id` in C).
-3. Before the next frame, call `core.input.push_paste(widget_id, text)`. The target prevents delayed clipboard data from reaching a different focused editor.
-
-The C ABI mirrors this flow with `AkarTextEditState`, `AkarTextEditKeybindings`, `akar_set_text_edit_keybindings`, and `akar_push_paste`. Text buffers use separate logical `value_len` and allocation `value_capacity` arguments. Copy responses write into the caller-provided copy buffer and report both `copy_len` and `copy_required_len`; no Rust-owned pointer escapes the call.
-
-Demo scripts support modifier-aware keys such as `key Primary+a`, `key Control+c`, and `key Alt+v`; `paste @form_name "text"` injects a targeted payload. `text-bindings Alt+a Alt+c Alt+v` replaces the demo context's Select All, Copy, and Paste bindings. See `examples/demo-rust/scripts/text_edit_*.txt` for focused Form scenarios.
+Full documentation and component catalog at [akar.dev](https://akar.dev) (coming soon).
 
 ## License
 
 MIT
+
+---
+
+https://github.com/brainless/akar

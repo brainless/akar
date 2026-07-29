@@ -1,0 +1,130 @@
+---
+title: "Canvas LOD: from overview to interactive detail"
+description: "How akar's canvas provides continuous level-of-detail rendering with projections and portals."
+pubDate: 2026-07-28
+tags: ["canvas", "architecture"]
+author: "akar"
+draft: false
+featured: false
+---
+
+## The LOD problem
+
+Most UI frameworks treat every element equally. A button gets the same rendering pipeline whether it's filling the screen or hidden in a corner. This is wasteful for complex interfaces with hundreds of elements.
+
+akar's canvas component solves this with continuous level-of-detail (LOD) rendering. Elements render differently based on their screen size, providing more detail when zoomed in and less when zoomed out.
+
+## The LOD hierarchy
+
+akar defines four LOD levels:
+
+### Dots (LOD 0)
+
+When elements are very small — less than 8px on screen — they render as simple dots. This is the overview level, where you see the forest instead of the trees.
+
+```rust
+if screen_size < 8.0 {
+    draw_dot(ctx, position, color);
+    return;
+}
+```
+
+### Outlines (LOD 1)
+
+Between 8px and 32px, elements render as outlines. You can see the shape and position, but not the internal details.
+
+```rust
+if screen_size < 32.0 {
+    draw_outline(ctx, bounds, color);
+    return;
+}
+```
+
+### Previews (LOD 2)
+
+Between 32px and 128px, elements render as previews. This is where you see content — text, icons, basic styling — but not interactive elements.
+
+```rust
+if screen_size < 128.0 {
+    draw_preview(ctx, bounds, content);
+    return;
+}
+```
+
+### Full detail (LOD 3)
+
+Above 128px, elements render at full detail with interactive widgets, hover states, and click handling.
+
+```rust
+draw_full(ctx, bounds, content);
+```
+
+## The projection system
+
+LOD rendering requires knowing the screen size of each element. akar uses a projection system that transforms world coordinates to screen coordinates.
+
+```rust
+let screen_rect = projection.world_to_screen(world_rect);
+let screen_size = screen_rect.width().min(screen_rect.height());
+```
+
+The projection handles:
+
+- **Zoom**: Scale factor from world to screen
+- **Pan**: Offset from world origin to screen origin
+- **Rotation**: Optional rotation transformation
+- **DPI**: Device pixel ratio for high-DPI displays
+
+When the user zooms in, elements get larger and render at higher LOD. When they zoom out, elements shrink and render at lower LOD.
+
+## Portals: interactive detail
+
+The challenge with LOD is that LOD 3 (full detail) requires interactive widgets — buttons, inputs, text fields. But these can't be rendered as part of the canvas texture because they need to respond to input.
+
+akar solves this with portals. A portal is a region of the canvas that renders normal component APIs — not canvas quads, but actual akar components.
+
+```rust
+canvas_portal_begin(ctx, bounds, namespace_id);
+button(ctx, "Click me");
+input(ctx, &mut text_state);
+canvas_portal_end(ctx);
+```
+
+Portals:
+
+1. Push a scissor rect to clip content to the portal bounds
+2. Render the component subtree through normal component APIs
+3. Pop the scissor rect when done
+4. Handle input events within the portal bounds
+
+The portal renders at the component's full resolution, regardless of the canvas zoom level. This means you can zoom into a canvas element and get a fully interactive widget.
+
+## Practical example: node graph
+
+Consider a node graph with 100 nodes:
+
+- **Zoomed out (LOD 0)**: Each node is a dot. You see the overall structure.
+- **Slightly zoomed (LOD 1)**: Nodes render as outlines. You can see connections.
+- **Medium zoom (LOD 2)**: Nodes show titles and icons. You can identify what each node does.
+- **Zoomed in (LOD 3)**: One node renders as a full interactive component with inputs, outputs, and a configuration panel.
+
+The transition between levels is smooth — there's no popping or snapping. As you zoom in, detail fades in. As you zoom out, detail fades out.
+
+## Canvas text rendering
+
+Canvas text is display-only. It never creates focus, widget state, or text-buffer IDs. Use portal mode for interactive text inputs.
+
+Text rendering in the canvas uses the same glyphon pipeline as regular components, but with one key difference: the text is rendered to the canvas texture, not directly to the screen. This means text quality degrades gracefully with zoom — at LOD 0, you don't see individual characters, just the overall shape of the text block.
+
+## The performance benefit
+
+LOD rendering dramatically reduces GPU load for complex interfaces:
+
+- **100 nodes at LOD 0**: 100 dot draw calls
+- **100 nodes at LOD 1**: 100 outline draw calls
+- **100 nodes at LOD 2**: 100 preview draw calls
+- **1 node at LOD 3**: 1 interactive portal
+
+Instead of rendering 100 full-detail nodes every frame, you render 99 simple shapes and 1 complex portal. The GPU load scales with visible complexity, not total complexity.
+
+This is the core insight of akar's canvas: render what matters, skip what doesn't.

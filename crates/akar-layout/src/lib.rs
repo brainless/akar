@@ -240,6 +240,7 @@ fn mix_widget_id(mut value: u64) -> u64 {
 /// `AvailableSpace` semantics: `Definite` yields the exact width, `MinContent`
 /// constrains to `0.0` (forcing wrap at every break opportunity), and
 /// `MaxContent` leaves the buffer unconstrained.
+#[allow(clippy::type_complexity)]
 pub fn default_measure_fn<'a>(
     text_pipeline: &'a mut akar_core::TextPipeline,
 ) -> impl FnMut(

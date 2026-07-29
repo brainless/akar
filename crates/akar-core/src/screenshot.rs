@@ -233,7 +233,7 @@ impl ScreenshotCapture {
         if format == wgpu::TextureFormat::Bgra8Unorm
             || format == wgpu::TextureFormat::Bgra8UnormSrgb
         {
-            for pixel in rgba.chunks_exact_mut(4) {
+            for pixel in rgba.as_chunks_mut::<4>().0.iter_mut() {
                 pixel.swap(0, 2);
             }
         }

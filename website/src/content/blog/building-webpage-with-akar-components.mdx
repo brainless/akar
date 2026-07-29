@@ -1,0 +1,171 @@
+---
+title: "Building a webpage with akar components"
+description: "The journey from raw push_quad/push_text to component-based marketing pages with proper typography."
+pubDate: 2026-07-25
+tags: ["components", "layout"]
+author: "akar"
+draft: false
+featured: false
+---
+
+## From primitives to components
+
+In the early days of akar, building a webpage meant calling `push_quad` and `push_text` directly. Every rectangle, every text label, every padding calculation was manual. It worked, but it was tedious.
+
+The evolution to component-based UI changed everything. Instead of thinking in quads and text runs, you think in cards, buttons, navbars, and forms.
+
+## Before: raw primitives
+
+A simple card with a title and description:
+
+```rust
+// Background quad
+ctx.push_quad(
+    WorldRect::new(x, y, width, height),
+    QuadStyle {
+        color: Srgba::new(0.1, 0.1, 0.15, 0.8),
+        border_radius: 12.0.into(),
+        border: Some(BorderStyle {
+            color: Srgba::new(1.0, 1.0, 1.0, 0.1),
+            width: 1.0,
+        }),
+        ..Default::default()
+    },
+);
+
+// Title text
+ctx.push_text(
+    TextRun::new("Card Title")
+        .at(x + 16.0, y + 16.0)
+        .font_size(18.0)
+        .weight(700)
+        .color(Srgba::WHITE),
+);
+
+// Description text
+ctx.push_text(
+    TextRun::new("This is a description.")
+        .at(x + 16.0, y + 44.0)
+        .font_size(14.0)
+        .color(Srgba::new(0.6, 0.6, 0.7, 1.0)),
+);
+```
+
+That's a lot of code for a simple card. And it doesn't handle hover states, focus, clicks, or responsive layout.
+
+## After: components
+
+The same card with akar components:
+
+```rust
+card(ctx, |ctx| {
+    heading(ctx, "Card Title", HeadingLevel::H3);
+    paragraph(ctx, "This is a description.");
+});
+```
+
+The component handles:
+
+- Background rendering with glassmorphism
+- Border radius and shadows
+- Hover and focus states
+- Click handling
+- Responsive sizing
+- Text measurement and typography
+
+## Component lifecycle
+
+Every akar component follows the same lifecycle:
+
+### 1. Construct
+
+The component is called with a context and parameters. It registers its node ID with the layout system.
+
+```rust
+pub fn button(ctx: &mut AkarCtx, label: &str) -> ButtonResult {
+    let node_id = ctx.register_node("button");
+    // ...
+}
+```
+
+### 2. Compute
+
+The layout system resolves pixel bounds for the node. The component queries these bounds to know where to draw.
+
+```rust
+let bounds = ctx.layout_bounds(node_id);
+```
+
+### 3. Paint
+
+The component submits draw calls to the render pipeline. Background, border, text, icons — all submitted through the draw list.
+
+```rust
+ctx.push_quad(bounds.into(), style);
+ctx.push_text(text_run);
+```
+
+### 4. Interact
+
+The component checks hit-test from the input state to determine hover, active, focus, and click.
+
+```rust
+let state = ctx.input_state();
+if state.is_hovered(node_id) { /* hover style */ }
+if state.is_clicked(node_id) { /* handle click */ }
+```
+
+### 5. Return
+
+The component returns a result enum indicating its state or the value the user selected.
+
+```rust
+enum ButtonResult { Clicked, Idle }
+```
+
+## Text measurement and typography
+
+Text in akar is measured using glyphon, a GPU text renderer. When you call `push_text`, the component:
+
+1. Shapes the text using cosmic-text (font parsing, line breaking, bidirectional text)
+2. Measures the resulting glyph runs
+3. Lays out text within the available bounds
+4. Submits GPU-ready text instances to the draw list
+
+Typography is handled through a token system:
+
+```rust
+pub struct TextStyle {
+    pub font_size: f32,
+    pub line_height: f32,
+    pub weight: FontWeight,
+    pub color: Srgba,
+}
+```
+
+Components use semantic text styles — `heading_style()`, `body_style()`, `caption_style()` — that resolve to pixel values based on the current DPI.
+
+## Building this website
+
+This website itself is built with akar components. The homepage uses:
+
+- `GlassCard` for the glassmorphism containers
+- `Button` for the CTA actions
+- `Section` for the major content blocks
+- `Badge` for status indicators
+- `Container` for responsive width constraints
+
+The component grid on the components page shows 30+ components, each in its own `GlassCard` with a screenshot and status badge.
+
+The blog uses the existing astro-haze blog infrastructure, adapted for akar's simpler needs — no featured posts, no share buttons, no related posts. Just title, date, tags, and content.
+
+## What's next
+
+The component library is growing. Planned additions include:
+
+- **Accordion/Collapse**: Expandable content sections
+- **Command Palette**: Keyboard-driven command interface
+- **DatePicker**: Calendar-based date selection
+- **Split Pane**: Resizable two-panel layout
+
+Each new component follows the same lifecycle pattern, making it predictable for both human and agent contributors.

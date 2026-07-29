@@ -1,0 +1,115 @@
+---
+title: "Screenshot-driven development: akar's debug toolchain"
+description: "How the screenshot utility evolved from basic capture to scripted input, component isolation, and visual diff."
+pubDate: 2026-07-20
+tags: ["tooling", "debug"]
+author: "akar"
+draft: false
+featured: false
+---
+
+## The problem with UI development
+
+UI development has always had a feedback gap. You write code, compile, run, and then... you have to look at the screen. For agents, this gap is a wall. A language model can't look at a monitor. It needs a way to see what it rendered.
+
+akar's debug toolchain was built to solve this problem. It evolved through three epics (013, 014, 015) into a complete visual feedback system.
+
+## Epic 013: Basic capture
+
+The first version was simple: capture the wgpu render target to a PNG file.
+
+```bash
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
+```
+
+The key insight was using wgpu's intermediate-texture readback instead of platform screen capture. This means:
+
+- No OS chrome in the screenshot
+- Identical behavior on macOS, Windows, and Linux
+- No dependency on screen recording software
+- Works in headless environments
+
+The implementation reads the final texture from the GPU, converts it to PNG using the `image` crate, and writes it to disk. The `--exit` flag tells the demo to quit after capture, making it suitable for CI and automated workflows.
+
+## Epic 014: Scripted input
+
+A static screenshot isn't enough. UI components have states — hover, press, focus, open dropdown, open modal. To capture these states, the agent needs to drive the demo into them.
+
+`--script` provides a line-based input sequence:
+
+```bash
+cargo run --bin demo-rust -- --script /tmp/hover.txt --screenshot /tmp/after.png --exit
+```
+
+The script format is one command per line:
+
+```
+hover @submit_button      # Hover over an element by label
+delay 0.1                 # Wait for animation
+click @submit_button      # Press and release
+screenshot /tmp/after.png  # Capture on this frame
+```
+
+Elements are addressed by labels (registered as `NodeId` in akar-layout) or by coordinates. The demo registers about 20 labeled interaction nodes — `@navbar_dropdown`, `@form_submit`, `@drawer_open`, and so on.
+
+Multiple screenshots can be captured in one run:
+
+```
+screenshot /tmp/before.png
+hover @button
+screenshot /tmp/hovered.png
+press left
+screenshot /tmp/pressed.png
+release left
+```
+
+This lets the agent see before/after states without running the demo twice.
+
+## Epic 015: Component isolation
+
+When you're debugging a specific component, the rest of the UI is noise. `--component` renders a single component, forces its interesting state, and auto-crops the screenshot to its bounding box.
+
+```bash
+# List available components
+cargo run --bin demo-rust -- --list-components
+
+# Isolate the drawer (forced open), auto-cropped
+cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
+```
+
+The implementation:
+
+1. Reads the layout tree to find the component's bounding box
+2. Forces the component into its most interesting state (open drawer, open dropdown, etc.)
+3. Renders the full frame
+4. Crops the texture to the component's bounds + padding
+5. Writes the cropped PNG
+
+This gives the agent a tight, noise-free image of exactly what it's working on.
+
+## Visual diff with akar-diff
+
+The standalone `akar-diff` binary compares two PNGs:
+
+```bash
+# Visual diff: changed pixels in red, unchanged dimmed to 30%
+akar-diff --diff /tmp/baseline.png /tmp/current.png -o /tmp/diff.png
+
+# CI gate: exit non-zero when changed-pixel ratio exceeds threshold
+akar-diff --compare /tmp/baseline.png /tmp/current.png --threshold 0.5
+```
+
+This enables regression testing: capture a baseline, make a change, diff against the baseline, and verify that only the expected pixels changed.
+
+## The recommended loop
+
+The full workflow:
+
+1. Make your change
+2. `--list-components` / `--dump-layout` to find what to capture
+3. `--component <name> --screenshot ...` for a tight image
+4. `--script` when the issue is in an interactive state
+5. `--dump-frame` when the visual alone isn't enough
+6. `akar-diff --compare` against a baseline to verify no regressions
+
+This loop runs entirely without human intervention. The agent can make a change, see the result, and iterate — closing the feedback gap that has traditionally separated agents from UI work.

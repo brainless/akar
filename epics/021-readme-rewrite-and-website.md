@@ -1,6 +1,6 @@
 # Epic 021: README Rewrite and Project Website
 
-**Status:** Draft
+**Status:** Done
 **Goal:** Rewrite README.md as a semi-technical introduction that showcases the project's current state and vision, and ship a project website based on Astro + Tailwind (astro-haze theme) with homepage, components page, and blog. Both README and website share screenshots and cross-link to each other.
 
 **Prerequisite:** Epic 020 is `Status: Done`.

@@ -36,7 +36,7 @@ fn encode_png(path: &str, img: &Image) -> Result<()> {
 
 fn build_diff(base: &Image, cur: &Image) -> Vec<u8> {
     let mut out = Vec::with_capacity(base.rgba.len());
-    for px in base.rgba.chunks_exact(4).zip(cur.rgba.chunks_exact(4)) {
+    for px in base.rgba.as_chunks::<4>().0.iter().zip(cur.rgba.as_chunks::<4>().0.iter()) {
         if px.0 != px.1 {
             out.extend_from_slice(&[255, 0, 0, 255]);
         } else {
@@ -49,8 +49,10 @@ fn build_diff(base: &Image, cur: &Image) -> Vec<u8> {
 
 fn changed_count(base: &Image, cur: &Image) -> usize {
     base.rgba
-        .chunks_exact(4)
-        .zip(cur.rgba.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(cur.rgba.as_chunks::<4>().0.iter())
         .filter(|px| px.0 != px.1)
         .count()
 }

@@ -1,0 +1,85 @@
+---
+title: "How akar is built by agents"
+description: "The vision of agent-built UI frameworks, how MiMo v2.5 was used via opencode, and the development loop that makes it possible."
+pubDate: 2026-07-15
+tags: ["agents", "development"]
+author: "akar"
+draft: false
+featured: false
+---
+
+## The agent-built UI framework
+
+akar is a GPU-accelerated immediate-mode UI component library with a C ABI. But what makes it unique isn't just the architecture — it's how it's being built. The majority of akar's codebase has been written by MiMo v2.5, a large language model running through opencode, with minimal human input from Sumit.
+
+This isn't a proof of concept. It's a production development workflow.
+
+## The development loop
+
+The core loop is simple:
+
+1. **Change**: The agent modifies a component, layout, or rendering primitive.
+2. **Screenshot**: The demo-rust binary captures the result using wgpu intermediate-texture readback.
+3. **Analyze**: The agent examines the screenshot to verify the change.
+4. **Iterate**: If something's wrong, the agent fixes it and captures again.
+
+This loop runs without human intervention. The agent can drive the demo into specific states — hover, press, focus, open dropdown — using scripted input sequences, then capture exactly what it needs to see.
+
+## The debug toolchain
+
+akar ships with a complete visual debug toolchain built into the demo-rust binary:
+
+```bash
+# Basic screenshot
+cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
+
+# Component isolation
+cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
+
+# Scripted interaction
+cargo run --bin demo-rust -- --script /tmp/hover.txt --screenshot /tmp/after.png --exit
+
+# Layout inspection
+cargo run --bin demo-rust -- --dump-layout
+```
+
+The screenshot captures exactly what akar rendered — no OS chrome, no window decorations. It works identically on macOS, Windows, and Linux because it uses wgpu's GPU readback, not platform screen capture.
+
+## How recent epics were tackled
+
+Recent epics have been completed with minimal human input. The agent reads the epic file, cross-references DEVELOP.md for architectural constraints, reads relevant source files from local dependency checkouts (glyphon, wgpu, taffy, glam), and then implements the changes.
+
+For example, Epic 015 (component isolation) involved:
+
+- Adding a `--component` flag to demo-rust
+- Implementing auto-cropping of screenshots to component bounding boxes
+- Forcing interesting states (open drawer, open dropdown)
+- Registering labeled layout nodes for element addressing
+
+The agent completed this by reading the existing screenshot infrastructure, understanding the wgpu texture readback pipeline, and extending it — all while maintaining the existing API surface.
+
+## The Standard $16/month MiMo Token Plan
+
+The entire akar development has been done on the Standard $16/month MiMo Token Plan. This isn't a massive cloud GPU cluster or a team of engineers — it's a single developer (Sumit) with a language model that can read code, understand architecture, and write implementation.
+
+The agent handles:
+
+- Rust code generation with proper error handling
+- C ABI design and cbindgen integration
+- GPU pipeline work (wgpu 29 internals)
+- Layout engine integration (taffy wrapper)
+- Component lifecycle management
+- Documentation and epic planning
+
+## What this means for UI frameworks
+
+Traditional UI frameworks are built by teams of humans over months or years. akar demonstrates that a well-scoped project with clear architectural constraints can be built primarily by agents.
+
+The key insights:
+
+1. **Clear boundaries matter**: The crate responsibility boundaries in akar (core, layout, components, c-api, winit) give the agent clear guardrails.
+2. **Visual feedback is essential**: Without the screenshot toolchain, the agent would be flying blind.
+3. **Local source access**: Having wgpu, taffy, glyphon, and other dependencies cloned locally means the agent can read implementation details, not just documentation.
+4. **Immediate mode is agent-friendly**: No retained state means no complex diffing algorithms to reason about. Draw every frame, check the result.
+
+The future of UI framework development might look a lot like this — agents handling the implementation while humans focus on architecture, design, and product decisions.

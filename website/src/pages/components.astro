@@ -1,0 +1,294 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/common/Header.astro';
+import Footer from '@/components/common/Footer.astro';
+import Container from '@/components/ui/Container.astro';
+import GlassCard from '@/components/ui/GlassCard.astro';
+import Badge from '@/components/ui/Badge.astro';
+import Section from '@/components/ui/Section.astro';
+
+interface Component {
+  name: string;
+  category: string;
+  status: 'implemented' | 'planned';
+  description: string;
+  screenshot?: string;
+}
+
+const implemented: Component[] = [
+  { name: 'Button', category: 'Primitives', status: 'implemented', description: 'Primary action element with glass, solid, outline, and ghost variants.' },
+  { name: 'Badge', category: 'Primitives', status: 'implemented', description: 'Status indicators and labels with accent, success, warning, and error variants.' },
+  { name: 'Label', category: 'Primitives', status: 'implemented', description: 'Text labels for form fields and UI elements.' },
+  { name: 'Link', category: 'Primitives', status: 'implemented', description: 'Navigation links with hover states and external link support.' },
+  { name: 'Separator', category: 'Primitives', status: 'implemented', description: 'Visual dividers between content sections.' },
+  { name: 'Spinner', category: 'Primitives', status: 'implemented', description: 'Loading indicators for async operations.' },
+  { name: 'Kbd', category: 'Primitives', status: 'implemented', description: 'Keyboard shortcut display elements.' },
+  { name: 'Input', category: 'Inputs', status: 'implemented', description: 'Text input fields with validation states.' },
+  { name: 'Textarea', category: 'Inputs', status: 'implemented', description: 'Multi-line text input for longer content.' },
+  { name: 'Checkbox', category: 'Inputs', status: 'implemented', description: 'Binary toggle for multi-select options.' },
+  { name: 'Radio', category: 'Inputs', status: 'implemented', description: 'Single-select from a group of options.' },
+  { name: 'Switch', category: 'Inputs', status: 'implemented', description: 'Toggle between two states with smooth animation.' },
+  { name: 'Slider', category: 'Inputs', status: 'implemented', description: 'Range input for numeric values within bounds.' },
+  { name: 'Select', category: 'Inputs', status: 'implemented', description: 'Dropdown selection from a list of options.' },
+  { name: 'Alert', category: 'Feedback', status: 'implemented', description: 'Status messages for success, warning, error, and info states.', screenshot: '/screenshots/akar-form.png' },
+  { name: 'Tooltip', category: 'Feedback', status: 'implemented', description: 'Contextual information on hover or focus.' },
+  { name: 'Toast', category: 'Feedback', status: 'implemented', description: 'Non-blocking notifications that auto-dismiss.', screenshot: '/screenshots/akar-toasts.png' },
+  { name: 'Card', category: 'Layout', status: 'implemented', description: 'Container for grouping related content.', screenshot: '/screenshots/akar-card.png' },
+  { name: 'Table', category: 'Layout', status: 'implemented', description: 'Structured data display with rows and columns.' },
+  { name: 'Tab Bar', category: 'Layout', status: 'implemented', description: 'Navigation between content panels.' },
+  { name: 'Tab Panel', category: 'Layout', status: 'implemented', description: 'Content area switched by tab selection.' },
+  { name: 'Scroll Area', category: 'Layout', status: 'implemented', description: 'Custom scrollbar for overflow content.' },
+  { name: 'Data List', category: 'Layout', status: 'implemented', description: 'Key-value pair display.', screenshot: '/screenshots/akar-stats.png' },
+  { name: 'Modal', category: 'Overlay/Navigation', status: 'implemented', description: 'Dialog overlay for focused interactions.', screenshot: '/screenshots/akar-modal.png' },
+  { name: 'Drawer', category: 'Overlay/Navigation', status: 'implemented', description: 'Slide-in panel from screen edges.', screenshot: '/screenshots/akar-drawer.png' },
+  { name: 'Dropdown', category: 'Overlay/Navigation', status: 'implemented', description: 'Context menu or action list.', screenshot: '/screenshots/akar-dropdown.png' },
+  { name: 'Navbar', category: 'Overlay/Navigation', status: 'implemented', description: 'Top navigation bar with responsive menu.', screenshot: '/screenshots/akar-navbar.png' },
+  { name: 'Heading', category: 'Typography', status: 'implemented', description: 'Section headings with consistent hierarchy.', screenshot: '/screenshots/akar-heading.png' },
+  { name: 'Paragraph', category: 'Typography', status: 'implemented', description: 'Body text with proper line height and spacing.' },
+  { name: 'Canvas', category: 'Special', status: 'implemented', description: 'LOD rendering with portals for interactive detail.' },
+  { name: 'Data Item', category: 'Special', status: 'implemented', description: 'Individual data point display.' },
+];
+
+const planned: Component[] = [
+  { name: 'Accordion/Collapse', category: 'Layout', status: 'planned', description: 'Expandable content sections.' },
+  { name: 'Breadcrumb', category: 'Navigation', status: 'planned', description: 'Hierarchical navigation trail.' },
+  { name: 'Pagination', category: 'Navigation', status: 'planned', description: 'Page navigation for lists.' },
+  { name: 'Command Palette', category: 'Overlay', status: 'planned', description: 'Keyboard-driven command interface.' },
+  { name: 'Popover', category: 'Overlay', status: 'planned', description: 'Floating content triggered by a button.' },
+  { name: 'Skeleton', category: 'Feedback', status: 'planned', description: 'Loading placeholder content.' },
+  { name: 'Avatar', category: 'Primitives', status: 'planned', description: 'User profile image display.' },
+  { name: 'Calendar', category: 'Inputs', status: 'planned', description: 'Date picker with month view.' },
+  { name: 'DatePicker', category: 'Inputs', status: 'planned', description: 'Date selection with calendar popup.' },
+  { name: 'Toast Stack', category: 'Feedback', status: 'planned', description: 'Stacked notification queue.' },
+  { name: 'Snackbar', category: 'Feedback', status: 'planned', description: 'Bottom-aligned notification.' },
+  { name: 'Bottom Sheet', category: 'Overlay', status: 'planned', description: 'Mobile-friendly slide-up panel.' },
+  { name: 'Split Pane', category: 'Layout', status: 'planned', description: 'Resizable two-panel layout.' },
+  { name: 'Resizable Panels', category: 'Layout', status: 'planned', description: 'Multi-panel adjustable layout.' },
+  { name: 'Combobox', category: 'Inputs', status: 'planned', description: 'Searchable dropdown with filtering.' },
+  { name: 'Date Range Picker', category: 'Inputs', status: 'planned', description: 'Start and end date selection.' },
+  { name: 'File Input', category: 'Inputs', status: 'planned', description: 'File upload with drag and drop.' },
+];
+
+const categories = [...new Set(implemented.map(c => c.category))];
+---
+
+<BaseLayout
+  title="Components - akar"
+  description="30+ GPU-accelerated UI components ready to use"
+>
+  <Header />
+
+  <main id="main" tabindex="-1" class="main-content">
+    <section class="components-hero">
+      <Container size="xl">
+        <div class="hero-content">
+          <h1 class="hero-title">Components</h1>
+          <p class="hero-description">
+            30+ components ready to use. Targeting parity with shadcn/ui and daisyUI.
+          </p>
+        </div>
+      </Container>
+    </section>
+
+    {categories.map((category) => (
+      <Section
+        eyebrow={category}
+        container="xl"
+      >
+        <div class="components-grid">
+          {implemented.filter(c => c.category === category).map((component) => (
+            <GlassCard padding="none" radius="lg" class="component-card">
+              {component.screenshot && (
+                <div class="component-preview">
+                  <img
+                    src={component.screenshot}
+                    alt={`${component.name} preview`}
+                    class="component-image"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+              <div class="component-info">
+                <div class="component-header">
+                  <h3 class="component-name">{component.name}</h3>
+                  <Badge variant="success" size="sm">Implemented</Badge>
+                </div>
+                <p class="component-description">{component.description}</p>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      </Section>
+    ))}
+
+    <Section
+      eyebrow="Roadmap"
+      title="Coming next."
+      subtitle="These components are planned and will be added to the library."
+      container="xl"
+    >
+      <div class="components-grid">
+        {planned.map((component) => (
+          <GlassCard padding="lg" radius="lg" class="component-card component-card--compact">
+            <div class="component-header">
+              <h3 class="component-name">{component.name}</h3>
+              <Badge variant="neutral" size="sm">Planned</Badge>
+            </div>
+            <p class="component-description">{component.description}</p>
+          </GlassCard>
+        ))}
+      </div>
+    </Section>
+
+    <section class="components-cta">
+      <Container size="xl">
+        <GlassCard padding="xl" radius="lg">
+          <h2>Contributing</h2>
+          <p>
+            akar is open source. Contributions are welcome — whether it's implementing
+            a planned component, fixing a bug, or improving documentation.
+          </p>
+          <div class="cta-actions">
+            <a
+              href="https://github.com/brainless/akar"
+              class="cta-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View on GitHub
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </GlassCard>
+      </Container>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .main-content {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .components-hero {
+    padding-top: clamp(5rem, 12vw, 10rem);
+    padding-bottom: clamp(3rem, 8vw, 6rem);
+  }
+
+  .hero-content {
+    text-align: center;
+    max-width: 48rem;
+    margin: 0 auto;
+  }
+
+  .hero-title {
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 800;
+    line-height: 0.9;
+    letter-spacing: -0.06em;
+    margin-bottom: var(--space-lg);
+  }
+
+  .hero-description {
+    font-size: var(--text-xl);
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .components-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: var(--space-lg);
+  }
+
+  .component-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .component-card--compact {
+    overflow: visible;
+  }
+
+  .component-preview {
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    background: var(--glass-bg);
+  }
+
+  .component-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .component-info {
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .component-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  .component-name {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .component-description {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .components-cta {
+    padding-block: clamp(4rem, 10vw, 8rem);
+  }
+
+  .components-cta h2 {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    margin-bottom: var(--space-md);
+  }
+
+  .components-cta p {
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin-bottom: var(--space-xl);
+    max-width: 40rem;
+  }
+
+  .cta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    color: var(--color-accent-text);
+    font-weight: 600;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .cta-link:hover {
+    color: var(--color-accent);
+  }
+
+  @media (max-width: 768px) {
+    .components-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

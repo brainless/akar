@@ -1,0 +1,357 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import siteConfig from '@/site.config';
+import Header from '@/components/common/Header.astro';
+import Footer from '@/components/common/Footer.astro';
+import Badge from '@/components/ui/Badge.astro';
+import Button from '@/components/ui/Button.astro';
+import Container from '@/components/ui/Container.astro';
+import GlassCard from '@/components/ui/GlassCard.astro';
+import Section from '@/components/ui/Section.astro';
+
+const features = [
+  {
+    icon: '30+',
+    title: '30+ Components',
+    description: 'Primitives, inputs, feedback, layout, and navigation components ready to use.',
+  },
+  {
+    icon: 'C',
+    title: 'Language Neutral',
+    description: 'C ABI for seamless integration with any language — Rust, Python, Go, or beyond.',
+  },
+  {
+    icon: '!',
+    title: 'Immediate Mode',
+    description: 'No retained state, no diffing. Draw every frame. Simple, predictable, fast.',
+  },
+  {
+    icon: 'AI',
+    title: 'Built by Agents',
+    description: 'Developed by MiMo v2.5 via opencode. Designed for agent-first workflows.',
+  },
+];
+
+const componentPreviews = [
+  { name: 'Form', screenshot: '/screenshots/akar-form.png' },
+  { name: 'Card', screenshot: '/screenshots/akar-card.png' },
+  { name: 'Navbar', screenshot: '/screenshots/akar-navbar.png' },
+  { name: 'Stats', screenshot: '/screenshots/akar-stats.png' },
+];
+---
+
+<BaseLayout
+  title="akar - GPU-Accelerated UI Components"
+  description="A GPU-accelerated, language-neutral UI component library for agents and developers"
+>
+  <Header />
+
+  <main id="main" tabindex="-1">
+    <section class="home-hero">
+      <Container size="xl">
+        <div class="home-hero__content">
+          <Badge variant="accent" size="sm">Open Source</Badge>
+          <h1>akar</h1>
+          <p class="home-hero__tagline">
+            GPU-accelerated UI components for agents and developers
+          </p>
+          <div class="home-hero__actions">
+            <Button href={siteConfig.social.github} external variant="solid" size="lg">
+              View on GitHub
+            </Button>
+            <Button href="/components/" variant="outline" size="lg">
+              Components
+            </Button>
+          </div>
+        </div>
+      </Container>
+    </section>
+
+    <section class="home-demo">
+      <Container size="xl">
+        <GlassCard padding="none" radius="xl" class="demo-card">
+          <img
+            src="/screenshots/akar-full.png"
+            alt="akar full demo screenshot"
+            class="demo-image"
+            loading="eager"
+          />
+        </GlassCard>
+      </Container>
+    </section>
+
+    <Section
+      id="features"
+      eyebrow="Why akar"
+      title="Built for the agent era."
+      subtitle="A UI library designed from the ground up for GPU acceleration, language interoperability, and agent-driven development."
+      container="xl"
+    >
+      <div class="features-grid">
+        {features.map((feature) => (
+          <GlassCard padding="lg" radius="lg" class="feature-card">
+            <span class="feature-icon">{feature.icon}</span>
+            <h3 class="feature-title">{feature.title}</h3>
+            <p class="feature-description">{feature.description}</p>
+          </GlassCard>
+        ))}
+      </div>
+    </Section>
+
+    <Section
+      id="preview"
+      eyebrow="Component Library"
+      title="Ready to use."
+      subtitle="From form inputs to complex overlays, akar provides a complete set of GPU-accelerated components."
+      container="xl"
+    >
+      <div class="previews-grid">
+        {componentPreviews.map((preview) => (
+          <GlassCard padding="none" radius="lg" class="preview-card">
+            <div class="preview-image-wrapper">
+              <img
+                src={preview.screenshot}
+                alt={`${preview.name} component preview`}
+                class="preview-image"
+                loading="lazy"
+              />
+            </div>
+            <div class="preview-label">
+              <span>{preview.name}</span>
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+    </Section>
+
+    <Section
+      id="composition"
+      eyebrow="Real World"
+      title="Composed by agents."
+      subtitle="This website itself is proof of composition — a real-world page built with akar components."
+      container="xl"
+    >
+      <GlassCard padding="none" radius="xl" class="demo-card">
+        <img
+          src="/screenshots/akar-website.png"
+          alt="akar website screenshot"
+          class="demo-image"
+          loading="lazy"
+        />
+      </GlassCard>
+    </Section>
+
+    <section class="home-cta">
+      <Container size="xl">
+        <Badge variant="neutral" size="sm">Docs coming soon</Badge>
+        <h2>Start building with akar today.</h2>
+        <p class="home-cta__description">
+          The C API is stable. The component set is growing. The documentation is next.
+        </p>
+        <div class="home-cta__actions">
+          <Button href={siteConfig.social.github} external variant="solid" size="lg">
+            View on GitHub
+          </Button>
+          <Button href="/blog/" variant="outline" size="lg">
+            Read the Blog
+          </Button>
+        </div>
+      </Container>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  main {
+    overflow: clip;
+  }
+
+  .home-hero {
+    position: relative;
+    min-height: min(54rem, calc(100vh - 5rem));
+    min-height: min(54rem, calc(100dvh - 5rem));
+    display: grid;
+    align-items: center;
+    padding-block: clamp(5rem, 12vw, 10rem);
+  }
+
+  .home-hero__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    max-width: 56rem;
+  }
+
+  .home-hero h1 {
+    position: relative;
+    z-index: 1;
+    font-size: clamp(4.5rem, 12vw, 11rem);
+    line-height: 0.84;
+    letter-spacing: -0.075em;
+    font-weight: 800;
+    background: linear-gradient(
+      135deg,
+      var(--color-accent),
+      var(--color-accent-light)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  @supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+    .home-hero h1 {
+      background: none;
+      -webkit-text-fill-color: currentColor;
+      color: var(--color-text);
+    }
+  }
+
+  .home-hero__tagline {
+    font-size: var(--text-2xl);
+    color: var(--color-text-muted);
+    max-width: 38rem;
+    line-height: 1.4;
+    margin: 0;
+  }
+
+  .home-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .home-demo {
+    padding-bottom: clamp(4rem, 10vw, 8rem);
+  }
+
+  .demo-card {
+    overflow: hidden;
+  }
+
+  .demo-image {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .feature-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-md);
+    background: var(--color-accent-glass);
+    color: var(--color-accent);
+    font-weight: 700;
+    font-size: var(--text-lg);
+    font-family: var(--font-mono);
+  }
+
+  .feature-title {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .feature-description {
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .previews-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-lg);
+  }
+
+  .preview-card {
+    overflow: hidden;
+  }
+
+  .preview-image-wrapper {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: var(--glass-bg);
+  }
+
+  .preview-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .preview-label {
+    padding: var(--space-md);
+    text-align: center;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .home-cta {
+    padding-block: clamp(5rem, 12vw, 10rem);
+    text-align: center;
+  }
+
+  .home-cta h2 {
+    margin-block: var(--space-lg) var(--space-md);
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 0.92;
+    letter-spacing: -0.065em;
+  }
+
+  .home-cta__description {
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    max-width: 40rem;
+    margin: 0 auto var(--space-2xl);
+  }
+
+  .home-cta__actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  @media (max-width: 768px) {
+    .features-grid,
+    .previews-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .home-hero h1 {
+      font-size: clamp(3.5rem, 14vw, 8rem);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .previews-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .home-hero__orbit {
+      animation: none;
+    }
+  }
+</style>

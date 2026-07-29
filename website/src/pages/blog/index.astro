@@ -1,0 +1,176 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/common/Header.astro';
+import Footer from '@/components/common/Footer.astro';
+import Container from '@/components/ui/Container.astro';
+import GlassCard from '@/components/ui/GlassCard.astro';
+import Badge from '@/components/ui/Badge.astro';
+import { getPublishedPosts } from '@/lib/posts';
+import { formatDate } from '@/lib/date';
+import siteConfig from '@/site.config';
+
+const allPosts = await getPublishedPosts();
+---
+
+<BaseLayout
+  title="Blog"
+  description="Insights, tutorials, and updates from the akar project"
+>
+  <Header />
+
+  <main id="main" tabindex="-1" class="main-content">
+    <section class="blog-hero">
+      <Container size="xl">
+        <div class="hero-content">
+          <h1 class="hero-title">Blog</h1>
+          <p class="hero-description">
+            Insights, tutorials, and updates about GPU-accelerated UI development.
+          </p>
+        </div>
+      </Container>
+    </section>
+
+    <section class="blog-list">
+      <Container size="xl">
+        {allPosts.length === 0 ? (
+          <GlassCard padding="xl" radius="lg" class="empty-state">
+            <p>No blog posts yet. Check back soon!</p>
+          </GlassCard>
+        ) : (
+          <div class="posts-list">
+            {allPosts.map((post) => (
+              <GlassCard
+                href={`/blog/${post.id}/`}
+                padding="lg"
+                radius="lg"
+                interactive
+                class="post-card"
+              >
+                <div class="post-meta">
+                  <time datetime={post.data.pubDate.toISOString()}>
+                    {formatDate(post.data.pubDate)}
+                  </time>
+                  {siteConfig.blog.showReadingTime && (
+                    <>
+                      <span class="separator" aria-hidden="true">·</span>
+                      <span>{post.data.author}</span>
+                    </>
+                  )}
+                </div>
+                <h2 class="post-title">{post.data.title}</h2>
+                <p class="post-excerpt">{post.data.description}</p>
+                {post.data.tags.length > 0 && (
+                  <div class="post-tags">
+                    {post.data.tags.map((tag) => (
+                      <Badge variant="neutral" size="sm">{tag}</Badge>
+                    ))}
+                  </div>
+                )}
+              </GlassCard>
+            ))}
+          </div>
+        )}
+      </Container>
+    </section>
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .main-content {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .blog-hero {
+    padding-top: clamp(5rem, 12vw, 10rem);
+    padding-bottom: clamp(3rem, 8vw, 6rem);
+  }
+
+  .hero-content {
+    text-align: center;
+    max-width: 48rem;
+    margin: 0 auto;
+  }
+
+  .hero-title {
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 800;
+    line-height: 0.9;
+    letter-spacing: -0.06em;
+    margin-bottom: var(--space-lg);
+  }
+
+  .hero-description {
+    font-size: var(--text-xl);
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .blog-list {
+    padding-bottom: clamp(4rem, 10vw, 8rem);
+  }
+
+  .posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .post-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .post-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .separator {
+    opacity: 0.5;
+  }
+
+  .post-title {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .post-excerpt {
+    color: var(--color-text-muted);
+    line-height: 1.6;
+    margin: 0;
+  }
+
+  .post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .empty-state {
+    text-align: center;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .empty-state p {
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: clamp(2.5rem, 10vw, 4rem);
+    }
+  }
+</style>

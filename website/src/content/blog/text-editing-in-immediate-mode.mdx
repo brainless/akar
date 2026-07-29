@@ -1,0 +1,200 @@
+---
+title: "Text editing in immediate mode"
+description: "Text selection, cursor management, and keybinding configuration in an immediate-mode UI framework."
+pubDate: 2026-07-29
+tags: ["text", "input"]
+author: "akar"
+draft: false
+featured: false
+---
+
+## The immediate-mode challenge
+
+Text editing is one of the hardest problems in UI frameworks. In retained-mode systems like React or SwiftUI, the framework manages a text buffer, selection state, cursor position, and input method context. You just bind a value and let the framework handle the rest.
+
+In immediate mode, there's no retained state. Every frame, you draw the text field and handle input. But text editing requires state — the cursor position, the selection range, the undo history. How do you reconcile these two models?
+
+akar's answer: explicit state that the caller owns, passed to the component every frame.
+
+## TextEditState design
+
+Every text field in akar is backed by a `TextEditState` struct:
+
+```rust
+pub struct TextEditState {
+    pub text: String,
+    pub cursor: usize,
+    pub anchor: usize,
+    pub scroll_x: f32,
+    pub scroll_y: f32,
+    pub focused: bool,
+}
+```
+
+The caller owns this struct. It persists across frames. The text field component reads from it and writes to it.
+
+```rust
+let mut state = TextEditState::new("Hello, world!");
+text_edit(ctx, &mut state);
+// state.cursor, state.text, etc. are updated after the call
+```
+
+This design has several advantages:
+
+- **No hidden state**: The caller can inspect every field
+- **Easy serialization**: Just serialize the struct
+- **Simple undo**: Push previous state to a stack before each edit
+- **Thread safe**: No interior mutability or RefCell gymnastics
+
+## Cursor and anchor
+
+The cursor is the insertion point — where new text appears when you type. The anchor is the other end of the selection. Together, they define the selection range.
+
+```rust
+// No selection: cursor == anchor
+state.cursor = 5;
+state.anchor = 5;
+
+// Selection from 3 to 7
+state.cursor = 7;
+state.anchor = 3;
+```
+
+When the user types, the text between cursor and anchor is deleted, and the new text is inserted at the cursor position. The cursor advances by the length of the inserted text.
+
+Movement operations:
+
+```rust
+// Move cursor left
+state.cursor = state.cursor.saturating_sub(1);
+
+// Move cursor to end of line
+state.cursor = find_end_of_line(&state.text, state.cursor);
+
+// Extend selection to the right
+state.cursor += 1;
+// anchor stays where it was
+```
+
+## Keybinding configuration
+
+akar doesn't impose keybindings. The text field component accepts a keybinding configuration:
+
+```rust
+pub struct Keybindings {
+    pub move_left: KeyBinding,
+    pub move_right: KeyBinding,
+    pub select_left: KeyBinding,
+    pub select_right: KeyBinding,
+    pub delete_forward: KeyBinding,
+    pub delete_backward: KeyBinding,
+    pub move_to_start: KeyBinding,
+    pub move_to_end: KeyBinding,
+    pub select_all: KeyBinding,
+    pub copy: KeyBinding,
+    pub paste: KeyBinding,
+    pub undo: KeyBinding,
+    pub redo: KeyBinding,
+}
+```
+
+Defaults follow platform conventions:
+
+```rust
+impl Default for Keybindings {
+    fn default() -> Self {
+        Self {
+            move_left: KeyBinding::key(KeyCode::ArrowLeft),
+            move_right: KeyBinding::key(KeyCode::ArrowRight),
+            select_left: KeyBinding::shift(KeyCode::ArrowLeft),
+            select_right: KeyBinding::shift(KeyCode::ArrowRight),
+            delete_forward: KeyBinding::key(KeyCode::Delete),
+            delete_backward: KeyBinding::key(KeyCode::Backspace),
+            move_to_start: KeyBinding::platform(KeyCode::Home, KeyCode::ArrowLeft),
+            move_to_end: KeyBinding::platform(KeyCode::End, KeyCode::ArrowRight),
+            select_all: KeyBinding::platform_mod(KeyCode::KeyA, Modifiers::CONTROL),
+            copy: KeyBinding::platform_mod(KeyCode::KeyC, Modifiers::CONTROL),
+            paste: KeyBinding::platform_mod(KeyCode::KeyV, Modifiers::CONTROL),
+            undo: KeyBinding::platform_mod(KeyCode::KeyZ, Modifiers::CONTROL),
+            redo: KeyBinding::platform_shift_mod(KeyCode::KeyZ, Modifiers::CONTROL),
+        }
+    }
+}
+```
+
+On macOS, `move_to_start` uses Cmd+Left. On Linux/Windows, it uses Home. The `platform` helper handles this automatically.
+
+## Clipboard boundary
+
+akar doesn't own the clipboard. The clipboard is a platform resource — it requires window handles, OS permissions, and platform-specific APIs.
+
+Instead, akar defines a trait:
+
+```rust
+pub trait Clipboard {
+    fn read(&self) -> Option<String>;
+    fn write(&mut self, text: &str);
+}
+```
+
+The caller provides an implementation that bridges to the platform clipboard:
+
+```rust
+struct WinitClipboard;
+impl Clipboard for WinitClipboard {
+    fn read(&self) -> Option<String> {
+        // Platform-specific clipboard read
+    }
+    fn write(&mut self, text: &str) {
+        // Platform-specific clipboard write
+    }
+}
+```
+
+This keeps akar core platform-neutral while enabling clipboard functionality in windowed applications.
+
+## Text measurement
+
+Before rendering text, akar needs to measure it. How wide is "Hello"? How tall is a multi-line paragraph? This is handled by glyphon, which wraps cosmic-text for shaping and layout.
+
+```rust
+let metrics = ctx.measure_text("Hello, world!", TextStyle::body());
+// metrics.width: f32
+// metrics.height: f32
+// metrics.lines: Vec<LineMetrics>
+```
+
+The text field uses these measurements to:
+
+- Position the cursor at the correct character
+- Scroll the view when the cursor moves past the visible area
+- Wrap text at the correct word boundaries
+- Handle bidirectional text (left-to-right and right-to-left)
+
+## Input method context
+
+For languages that use input method editors (IME) — Chinese, Japanese, Korean — akar provides an IME context:
+
+```rust
+pub struct ImeContext {
+    pub composing: Option<String>,
+    pub cursor: usize,
+    pub candidates: Vec<String>,
+}
+```
+
+The text field renders the composing text differently from committed text, showing the IME candidates in a popup near the cursor.
+
+This is one area where immediate mode has a natural advantage: the IME state is explicit and visible, not hidden behind framework abstractions.
+
+## The practical result
+
+akar's text editing system gives you:
+
+- Full control over state and keybindings
+- Platform-neutral clipboard via trait objects
+- Proper IME support for CJK input
+- Accurate text measurement via cosmic-text and glyphon
+- Selection, cursor, and undo/redo — all explicit and inspectable
+
+It's more work than a retained-mode text field, but it's also more predictable. There's no magic, no hidden state, no framework-imposed assumptions. Just a struct, a component, and the input events that drive them.
