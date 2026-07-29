@@ -1,0 +1,48 @@
+# Task 10 — Akar Marketing Page: Implementation Summary
+
+## What was implemented
+
+Replaced the stub `examples/webpage-rust/src/sites/akar.rs` with a full Akar marketing page using only akar component APIs. No raw `push_quad` or `push_text` calls exist in the module.
+
+## Files changed
+
+1. **`examples/webpage-rust/src/sites/akar.rs`** — Full rewrite from stub to marketing page (1005 lines)
+2. **`examples/webpage-rust/src/site.rs`** — Changed `render` trait method from `&Layout` to `&mut Layout` to enable `set_screen_origin` for scroll offsetting
+3. **`examples/webpage-rust/src/sites/mimo.rs`** — Updated `render` signature to match new trait (no logic change)
+4. **`examples/webpage-rust/src/app.rs`** — Changed `&state.layout` to `&mut state.layout` in the render call
+
+## Page structure
+
+1. **Navbar** — akar_container for root background, akar_navbar for navbar background, akar_heading (logo), akar_link (Features, Components, GitHub)
+2. **Hero** — akar_heading (H1 "akar" with serif override font_size=48), akar_paragraph (subtitle), akar_button (Get Started/Solid, View on GitHub/Outline)
+3. **Stats** — akar_stat x3: "Components"/"30+", "Language Neutral"/"C ABI", "No Framework Opinions"/"Immediate Mode"
+4. **Feature cards** — akar_card x3 with CardSlots/CardStyle, each containing akar_heading (H3) + akar_paragraph
+5. **Why akar** — akar_heading (H2), akar_paragraph (body), 4x akar_heading (H4 numbered items) + akar_paragraph
+6. **Component showcase** — akar_heading (H3 labels), akar_badge x6 (Default/Primary/Success/Warning/Error/Info), akar_badge_styled x1 (Custom with indigo fill), akar_button x3 (Solid/Outline/Ghost), akar_tab_bar (3 tabs, Underline variant, interactive active_tab state)
+7. **Footer** — akar_separator, akar_heading x3 (column headings), akar_link x6 (footer links), akar_paragraph (copyright with muted color)
+
+## Scroll handling
+
+Uses `layout.set_screen_origin([0.0, offset_y])` to shift all component rect positions within the scroll area. This allows component functions (which call `layout.rect()` internally) to render at correctly offset positions without manual rect rewriting. The screen_origin is reset to `[0.0, 0.0]` after the scroll area ends.
+
+## Component APIs used
+
+akar_container, akar_navbar, akar_heading, akar_paragraph, akar_link, akar_button, akar_card, akar_badge, akar_badge_styled, akar_stat, akar_separator, akar_tab_bar, scroll_area_begin, scroll_area_end
+
+## Validation
+
+- `cargo check --bin webpage-rust` — passed (no errors, only pre-existing warnings)
+- `cargo check --workspace` — passed
+- `cargo fmt --check` — passed
+- `cargo test --workspace` — 354 tests passed, 0 failed
+- No raw `push_quad` or `push_text` in akar.rs — verified
+
+## Open risks/questions
+
+- The trait change (`&Layout` to `&mut Layout`) is a small breaking change to the Site trait. The mimo site was updated accordingly with no logic change.
+- The page layout uses fixed pixel sizes for sections. Responsive behavior at narrower viewports may need adjustment in Task 11.
+- The `card_body` nodes inside card roots use `body: self.card_roots[i]` in CardSlots since body_only cards don't use the body field during paint.
+
+## Recommended next step
+
+Task 11 — Demo isolation and verification: register components with demo-rust, capture screenshots, verify visual output at multiple viewports.

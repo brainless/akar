@@ -719,7 +719,7 @@ impl Site for MimoSite {
         self.paper_section = paper_section;
     }
 
-    fn render(&mut self, core: &mut AkarCore, layout: &Layout, viewport_rect: [f32; 4]) {
+    fn render(&mut self, core: &mut AkarCore, layout: &mut Layout, viewport_rect: [f32; 4]) {
         let bg = hex_to_f4(THEME_BG);
         core.draw_list.push_quad(akar_core::QuadCall {
             rect: [0.0, 0.0, viewport_rect[2], viewport_rect[3]],

@@ -15,6 +15,7 @@
 - [x] Task 7 — Styled button, badge, separator, stat, and tab bar APIs
 - [x] Task 8 — C ABI coverage
 - [x] Task 9 — Modularize webpage-rust
+- [x] Task 10 — Akar marketing page
 
 ---
 
@@ -311,7 +312,7 @@ src/
 
 ### Task 10 — Akar marketing page
 
-**Status:** Not Started
+**Status:** Done
 
 - Implement `--site akar` using component functions only. Raw `push_quad` and `push_text` are forbidden in the Akar site module.
 - Use a dedicated scrollable content layout or a single scoped scroll transform so components can query `layout.rect(node)` directly. Do not manually rewrite every component rectangle.

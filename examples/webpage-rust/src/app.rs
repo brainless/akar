@@ -168,7 +168,7 @@ impl ApplicationHandler for App {
 
                 state
                     .site
-                    .render(&mut state.core, &state.layout, viewport_rect);
+                    .render(&mut state.core, &mut state.layout, viewport_rect);
 
                 let normal_capture = !self.screenshot_taken
                     && self.screenshot_path.is_some()
