@@ -1,6 +1,6 @@
 # Epic 022: Font Support
 
-**Status:** Not Started
+**Status:** Research Complete — Implementation Not Started (Tasks 1-4 researched below via source analysis, no live render/build verification performed in this pass; implementation Tasks 5-9 are written and ready for a future coding agent, none implemented)
 **Goal:** Give applications control over which fonts akar loads and falls back to, so text renders correctly for scripts beyond the current default font's coverage (CJK, Arabic, Devanagari, emoji, etc.).
 
 **Prerequisite:** Epic 021 is `Status: Done`.
@@ -19,7 +19,7 @@ This epic is investigation-first. The tasks below are for a coding agent to esta
 
 ## Research
 
-Initial inputs, to be expanded by the coding agent doing the investigation:
+Initial inputs (pre-investigation hypotheses, kept for context):
 
 - **cosmic-text/fontdb already do the hard part.** Font matching, family fallback chains, and system font discovery are `fontdb` features. akar likely does not need to reimplement matching logic — it needs an API surface that configures `fontdb`'s font source (bundled bytes vs. system scan) and exposes family/fallback selection to callers.
 - **Local source of truth**: `~/Projects/glyphon` for how akar's `TextPipeline` currently constructs its `FontSystem`, and whether system font scanning is enabled today (this has portability and cold-start-time implications — system font scanning is slow and non-deterministic across machines, which cuts against akar's "identical screenshot on macOS/Windows/Linux" design goal in `DEVELOP.md`).
@@ -28,44 +28,290 @@ Initial inputs, to be expanded by the coding agent doing the investigation:
 - **Fallback chains are string-directed today in most cosmic-text-based apps** — an ordered list of family names with a terminal fallback. Whatever akar exposes should probably mirror that rather than inventing a new configuration model.
 - **This epic is a soft prerequisite for [[023]] and [[024]]** — RTL and CJK/complex-script rendering are meaningless without the right fonts loaded and falling back correctly.
 
+### Confirmed findings (this investigation)
+
+All findings below are from reading the actual pinned dependency source (extracted from the cached `.crate` archives at `~/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/{cosmic-text-0.18.2,fontdb-0.23.0}.crate`, since neither crate has a `~/Projects/` checkout — only `glyphon` does, and glyphon itself does no font-system work; see below) plus akar's own source. `cargo check --workspace` was run read-only and succeeds against these exact pinned versions (see `Cargo.lock` lines 514-517 `cosmic-text 0.18.2` name/version/checksum, dependency list continuing to line 533; 725-728 `fontdb 0.23.0` name/version/checksum, dependency list continuing to line 733), confirming the source read matches what's actually compiled into akar today.
+
+1. **`glyphon` does not own font loading at all — it is a thin wgpu-rendering wrapper.** `~/Projects/glyphon/src/lib.rs:23-31` re-exports `cosmic_text`'s public API wholesale, including `fontdb` itself (`pub use cosmic_text::{self, fontdb, ..., FontSystem, ...}`). `glyphon::TextRenderer`/`TextAtlas` (`~/Projects/glyphon/src/text_render.rs`, `text_atlas.rs`) take `&mut FontSystem` as a parameter to `prepare()`/rasterization calls but never construct one. All font loading, matching, and fallback logic lives in `cosmic-text`, and beneath it, `fontdb`. This confirms the epic's hypothesis: akar does not need to reimplement font matching, only decide how `FontSystem`/`fontdb::Database` get populated and exposed.
+
+2. **akar constructs exactly one `FontSystem`, via the zero-config constructor, with no override point.** `crates/akar-core/src/text_pipeline.rs:41` — `TextPipeline::new()` calls `glyphon::FontSystem::new()` unconditionally. The only other call site is a test helper at `text_pipeline.rs:386` (same pattern). There is no parameter, builder, env var, or feature flag anywhere in `akar-core`, `akar-components`, or `akar-c-api` that changes this. `AkarCore::new` (`crates/akar-core/src/context.rs:24-42`) calls `TextPipeline::new(device, queue, surface_format)` directly at line 35, and `akar_ctx_new` (`crates/akar-c-api/src/lib.rs:368-395`) calls `AkarCore::new` at line 384 with no font-related parameters. There is no bytes-loading, path-loading, or fallback-chain API today, in Rust or C.
+
+3. **`cosmic_text::FontSystem::new()` performs a full, unconditional system font scan — every time a `TextPipeline` is constructed.** From `cosmic-text-0.18.2/src/font/system.rs:181-200`:
+   ```rust
+   pub fn new() -> Self {
+       Self::new_with_fonts(core::iter::empty())
+   }
+   pub fn new_with_fonts(fonts: impl IntoIterator<Item = fontdb::Source>) -> Self {
+       let mut db = fontdb::Database::new();
+       Self::load_fonts(&mut db, fonts.into_iter());   // db.load_system_fonts() + any extra sources
+       db.set_monospace_family("Noto Sans Mono");
+       db.set_sans_serif_family("Open Sans");
+       db.set_serif_family("DejaVu Serif");
+       Self::new_with_locale_and_db_and_fallback(locale, db, PlatformFallback)
+   }
+   ```
+   `load_fonts` (`system.rs:423-440`, `std` feature) calls `db.load_system_fonts()` unconditionally — there is no way to opt out short of not calling `FontSystem::new()` at all (akar would have to call `FontSystem::new_with_locale_and_db(locale, db)` with a caller-built `db` instead). cosmic-text's own doc comment on `FontSystem::new()` (`system.rs:174-180`) states: *"This function takes some time to run. On the release build, it can take up to a second, while debug builds can take up to ten times longer."* This is a real, documented cold-start cost, not speculation.
+
+4. **`fontdb::Database::load_system_fonts()` scans hardcoded, platform-specific directories** (`fontdb-0.23.0/src/lib.rs:400-476`): macOS scans `/Library/Fonts`, `/System/Library/Fonts`, `/System/Library/AssetsV2/com_apple_MobileAsset_Font*`, `/Network/Library/Fonts`, `~/Library/Fonts`; Windows scans `%SYSTEMROOT%\Fonts` plus two per-user font dirs; Linux uses `fontconfig` if the `fontconfig` cargo feature is enabled (it is — see point 6) or else scans `/usr/share/fonts`, `/usr/local/share/fonts`, `~/.fonts`, `~/.local/share/fonts`. These directory sets differ across the three OSes akar targets, and even on one OS, contents vary by machine (user-installed fonts, OS version, MDM-pushed corporate fonts, etc.).
+
+5. **The default generic-family names cosmic-text configures are not guaranteed to exist on any given machine, and when they don't, fallback silently becomes "best-scoring face across the entire scanned system font set," not "no font."** `fontdb::Database::query()` (`fontdb-0.23.0/src/lib.rs:661-679`) does an exact string match against `face.families` for the resolved generic family name (`"Open Sans"`, `"DejaVu Serif"`, `"Noto Sans Mono"` — none of which ship by default on stock macOS, and are not guaranteed on Windows or a minimal Linux install either) and returns `None` if no face has that exact family name. But `cosmic_text::FontSystem::get_font_matches` (`system.rs:349-407`) does **not** stop there: it builds `font_match_keys` by mapping **every face in the database** (`self.db.faces()`, no family filter at all) through `FontMatchKey::new(attrs, face)` (`system.rs:31-59`), which scores purely on `not_emoji`, `weight_diff`, `stretch_diff`, `style_diff`, `weight`, `stretch`, `id` — **family name is not part of this scoring at all**. It then sorts this family-agnostic list, and only tries to move the `db.query()` result (if any) to the front. In other words: if the configured generic family isn't installed, shaping falls back to "closest weight/style match among every font fontdb happened to scan," which is a function of exactly what's installed on that machine and in what `fontdb::ID` order it was discovered — not a deterministic, akar-controlled fallback chain.
+
+6. **`cosmic-text`'s `fontconfig` feature is enabled by default and pulled in transitively.** `cosmic-text`'s packaged `Cargo.toml` (`cosmic-text-0.18.2/Cargo.toml`) declares `default = ["std", "swash", "fontconfig"]`, and `fontconfig = ["fontdb/fontconfig", "std"]`. akar's `Cargo.toml` pins `cosmic-text = "0.18"` only through `glyphon` (glyphon's own `Cargo.toml` depends on `cosmic-text = "0.18"` with default features) — akar does not disable this. On Linux this means font discovery additionally depends on the local `fontconfig` installation and its config files (`fontconfig_parser` reads `FONTCONFIG_FILE`/`fontconfig.conf`), adding a third axis of machine-dependence beyond "which directories exist."
+
+7. **Bytes-based custom font loading is already a fully worked-out, straightforward API one layer down — akar just doesn't call it.** `fontdb::Database::load_font_data(&mut self, data: Vec<u8>)` (`fontdb-0.23.0/src/lib.rs:195-197`) and `load_font_source` (`lib.rs:203-229`) parse font bytes (including `.ttc`/`.otc` collections, loading every face) into the database with no filesystem or platform dependency — this is exactly the C-ABI-friendly primitive the epic's Research hypothesis called for. `cosmic_text::FontSystem::new_with_fonts(fonts: impl IntoIterator<Item = fontdb::Source>)` (`system.rs:186-200`) and `FontSystem::db_mut()` (`system.rs:281-284`, which clears the match cache on access — important for correctness after loading new fonts post-construction) are the two hook points akar would use. `cosmic_text::Family::Name(&str)` (re-exported as `glyphon::Family::Name`, confirmed via `~/Projects/glyphon/src/lib.rs:25-30`) is the mechanism for referencing an arbitrary loaded family by name in `Attrs` — akar's `FontFamily` enum (`crates/akar-components/src/text_style.rs:3-8`) only exposes the three CSS generic buckets (`SansSerif | Serif | Monospace`) and has no variant for it today.
+
+8. **akar's existing typography boundary (epic 020) is `TextStyle`/`FontFamily`/`FontWeight` in `akar-components`, not a type literally named `AkarTypography`.** (The epic's introduction used "`AkarTypography` and friends" as informal shorthand; grepping the codebase for `AkarTypography` returns zero hits outside this epic file.) The real types: `crates/akar-components/src/text_style.rs:1-122` defines `#[repr(C)] pub enum FontFamily { SansSerif, Serif, Monospace }` (line 3-8), `#[repr(C)] pub enum FontWeight { Normal, Medium, Semibold, Bold }` (line 12-18), `pub struct TextStyle { font_size, line_height, color, font_weight, font_family, align, wrap }` (all `Option<_>`, line 30-38, for override cascading), a crate-private `ResolvedTextStyle` (line 56-64), and `resolved_to_attrs`/`resolved_to_metrics` (line 104-122) which are the sole place `ResolvedTextStyle` becomes a `glyphon::Attrs`/`glyphon::Metrics`. This is the one and only seam where a font-family choice turns into a glyphon call — any new font/fallback API must plug in here (or extend it) to affect what actually renders. `heading.rs`, `link.rs`, `paragraph.rs` all consume this same `resolve_text_style`/`resolved_to_attrs` pair with component-specific defaults (e.g. `heading.rs:34` hardcodes `font_family: FontFamily::SansSerif`).
+
+9. **The C ABI mirrors this 1:1 today, with no headroom for custom families.** `crates/akar-c-api/src/lib.rs:27-52` defines `#[repr(C)] pub struct AkarFontFamily { pub value: u32 }` and `AkarFontWeight { pub value: u32 }` — **plain numeric-tag wrapper structs, not native C enums** (there is no C `enum AkarFontFamily { AKAR_FONT_FAMILY_SANS_SERIF, ... }` anywhere in the header; the `SansSerif | Serif | Monospace` variant names exist only on the Rust-side `FontFamily` enum in `akar-components`) — plus a C `AkarTextStyle`-equivalent struct with sentinel values (`SENTINEL_F32`/`SENTINEL_U32`, lines 12-14) standing in for `Option::None` across the ABI (there is no `Option<T>` in C, so this sentinel pattern is the established akar convention for "unset" — any new font-config C struct should reuse it). Lines 206-223 (`c_text_style_to_rust`) map the raw `u32` family/weight codes carried in `AkarTextStyle.font_family`/`font_weight` back to the Rust enums 0..=2 / 0..=3. There is no C entry point anywhere in this file for loading font bytes, setting a fallback chain, or registering a named family — `grep -n "load_font\|font_family.*byte\|fallback" crates/akar-c-api/src/lib.rs` returns nothing beyond the existing `FontFamily`/`FontWeight` style-resolution code.
+
+10. **No prior art in the downstream reference app.** `~/Projects/daftprompt/src/` has zero references to fonts (`grep -rl "font\|Font" ~/Projects/daftprompt/src/` returns nothing) — daftprompt has not yet needed to touch font loading, so there is no existing consumer expectation to preserve compatibility with.
+
+11. **Reproducibility impact is concrete, not hypothetical, given point 5.** akar's own design goals (`DEVELOP.md` "Screenshot Workflow": *"works identically on macOS, Windows, and Linux"*) and the CI regression gate (`epics/014-screenshot-enhancements.md`, `akar-diff --compare --threshold`) assume pixel-identical rendering across machines for the same input. Given that (a) `load_system_fonts()` scans OS- and machine-specific directories, (b) the configured generic-family names are not present on a stock macOS install (verified by reading fontdb's own macOS-default generic family names at `fontdb-0.23.0/src/lib.rs:181-188` — `Database::new()`'s own baked-in defaults are `"Arial"`/`"Times New Roman"`/`"Courier New"`, which cosmic-text then *overrides* to `"Open Sans"`/`"DejaVu Serif"`/`"Noto Sans Mono"` at `system.rs:195-197`, none of which are stock macOS fonts), and (c) the no-exact-match fallback path is family-blind best-weight-match over whatever got scanned (point 5), the specific glyph outlines akar renders today for default (unstyled) text are **not architecturally guaranteed to be the same font across two different machines**, even both running macOS, let alone across macOS/Windows/Linux. This was not empirically re-verified by deleting/hiding a font on this machine (out of scope per task instructions — no build/GPU verification required), but it follows directly and unambiguously from the constructor and matching code read above, not from speculation about behavior.
+
 ---
 
 ## Tasks
 
 ### Task 1 — Inventory Current Font Handling
 
-**Status:** Not Started
+**Status:** Done
 
-- Read `TextPipeline` and `FontSystem` construction in `akar-core` end to end.
-- Determine: is `fontdb` scanning system fonts today, or is akar bundling a fixed font? Which font(s), and where do the bytes come from?
-- Determine whether any family/fallback configuration is currently exposed to applications, in Rust or through `akar.h`.
-- Read `~/Projects/glyphon` (`text_render.rs`, `text_atlas.rs`, and its `FontSystem`/`fontdb` usage) to confirm what glyphon expects from a host application versus what it does internally.
-- Document findings in this epic's Research section.
+- Read `TextPipeline` and `FontSystem` construction in `akar-core` end to end. `crates/akar-core/src/text_pipeline.rs:36-59` (`TextPipeline::new`) and the test helper at `text_pipeline.rs:381-412`; construction call chain traced to `AkarCore::new` (`crates/akar-core/src/context.rs:24-42`) and `akar_ctx_new`/`akar_ctx_mock` (`crates/akar-c-api/src/lib.rs:368-419`).
+- **`fontdb` scans system fonts today; akar bundles nothing.** `TextPipeline::new` calls the zero-argument `glyphon::FontSystem::new()` (`text_pipeline.rs:41`), which resolves to `cosmic_text::FontSystem::new_with_fonts(core::iter::empty())` (`cosmic-text-0.18.2/src/font/system.rs:181-183`), which always calls `fontdb::Database::load_system_fonts()` (`system.rs:428`) and passes zero extra font sources. No bytes are bundled into the akar binary anywhere in `akar-core`/`akar-components`/`akar-c-api` (confirmed by grep for font-related byte literals/`include_bytes!` — none found).
+- **No family/fallback configuration is exposed today, in Rust or C.** Grepped `crates/akar-c-api/src/lib.rs` for `load_font`/`fallback`/family-registration entry points — none exist beyond the existing generic `FontFamily`/`FontWeight` style enums (`crates/akar-components/src/text_style.rs:3-18`, mirrored in C at `crates/akar-c-api/src/lib.rs:27-52`), which only select among the three CSS generic buckets, not concrete font files or family names.
+- **What glyphon expects from a host application vs. does internally**, read from `~/Projects/glyphon/src/lib.rs`, `text_render.rs`, `text_atlas.rs`: glyphon owns none of this. It re-exports `cosmic_text` (including `fontdb`) wholesale (`lib.rs:23-31`) and every glyphon entry point that touches text (`TextRenderer::prepare`, `TextAtlas` glyph rasterization) takes an already-constructed `&mut FontSystem` as a caller-supplied argument. glyphon never constructs, configures, or scans a `FontSystem`/`fontdb::Database` itself — that responsibility sits entirely with the host (here, `akar-core`), one layer below glyphon in `cosmic-text`/`fontdb`.
+- Findings documented above in "Confirmed findings" (points 1-9).
 
 ### Task 2 — Reproducibility Constraint Check
 
-**Status:** Not Started
+**Status:** Done (source-analysis basis; no live-machine A/B render comparison performed)
 
-- Run `demo-rust --screenshot` on the current default font setup and confirm whether output depends on any system-installed font (test by temporarily renaming/hiding a likely system font, if feasible, or by inspecting `fontdb` source for scan-order guarantees).
-- Assess the impact on `akar-diff --compare` CI regression gating (`epics/014`) if font resolution is not fully deterministic across machines.
-- Document a recommendation: bundle a default font, allow opt-in system scanning, or both.
+- **Did not run `demo-rust --screenshot` with a system font hidden/renamed** — that would require mutating files outside the akar repo (e.g. `/System/Library/Fonts`) on this machine, which is an invasive, side-effecting system change disproportionate to a research task and was avoided. `cargo check --workspace` was run (succeeds) purely to confirm the pinned dependency versions read match what's actually compiled.
+- Instead, the non-determinism was established by reading `fontdb`'s scan and query code directly (Research points 4-5, 11): `load_system_fonts()` (`fontdb-0.23.0/src/lib.rs:400-476`) scans OS-specific, hardcoded directory lists whose contents are inherently machine-dependent (user-installed fonts, OS version, corporate MDM font pushes), and `Database::query()` (`lib.rs:661-679`) exact-matches against generic family names (`"Open Sans"`, `"DejaVu Serif"`, `"Noto Sans Mono"`, set at `cosmic-text-0.18.2/src/font/system.rs:195-197`) that are **not** pre-installed on stock macOS (confirmed: macOS ships Helvetica/San Francisco/Times/Courier/Arial, not Open Sans/DejaVu Serif/Noto Sans Mono) and are not guaranteed on Windows or a minimal Linux install. When the exact match fails, `FontSystem::get_font_matches` (`system.rs:349-407`) falls back to scoring *every* scanned face by weight/stretch/style only (`FontMatchKey::new`, `system.rs:31-59` — no family term in the score at all), so the actual font selected becomes a function of whatever the local machine happened to have installed and in what `fontdb::ID` discovery order. This is a structural, code-level guarantee of possible divergence, not merely a suspicion — no live test was needed to establish it, though a live test would still be valuable as a regression check once the fix lands (see Task 8 below).
+- **Impact on `akar-diff --compare` CI regression gating (`epics/014`):** `akar-diff` is documented as pixel-exact for v1 (`DEVELOP.md` "Screenshot Workflow" → "Remaining limitations"). Pixel-exact diffing against a checked-in baseline PNG is only meaningful if the renderer is deterministic given the same input and akar version. Per the above, default (unstyled) text glyph outlines are not guaranteed identical across machines/OSes today, which means any screenshot baseline containing default-styled text is a latent CI flake risk the moment `akar-diff --compare` runs on a second machine — this has apparently not yet bitten the project (epics/014 itself doesn't call out fonts), likely because CI visual regression is explicitly punted as of epics/014 Task 014e (`DEVELOP.md`: *"No headless/offscreen rendering... a future epic will address it when CI visual regression is prioritized"*) — i.e. the gate isn't running on multiple machines yet, so the risk hasn't surfaced, but it is a live landmine for whenever that punt is lifted.
+- **Recommendation: bundle a default font, keep system scanning strictly opt-in.** Concretely: `TextPipeline` should construct `FontSystem` via `new_with_locale_and_db` (or equivalent) over a `fontdb::Database` seeded only with one or more bundled font(s) (`Database::load_font_data`, no `load_system_fonts()` call) unless the application explicitly opts into system scanning through the new API proposed in Task 4. This makes the *default* out-of-the-box akar behavior byte-for-byte reproducible across machines and OSes (satisfying `DEVELOP.md`'s "identical screenshot" goal and de-risking the eventual CI visual-regression gate), while still letting applications opt into system fonts for broader glyph coverage (CJK/Arabic/etc.) when reproducibility is not their priority for that surface. This does not conflict with bytes-based custom font loading (Research point 7) — both can coexist as explicit, opt-in `FontSource` variants.
 
 ### Task 3 — Prototype Non-Latin Rendering
 
-**Status:** Not Started
+**Status:** Not Started — deferred (requires writing spike/implementation code, which this research-only pass is explicitly scoped to avoid; see task instructions)
 
-- Load a CJK font (e.g., a Noto CJK subset) and an Arabic font by bytes into the current `TextPipeline`, bypassing the public API if necessary (direct `cosmic_text`/`fontdb` calls) to establish a spike.
-- Render a CJK string and an Arabic string through `push_text` or the equivalent low-level path, and capture screenshots via the debug toolchain.
-- Note any glyph, fallback, or shaping failures encountered — this establishes the actual gap between "glyphon can do this" and "akar exposes this."
+This task as written ("load a CJK font and an Arabic font by bytes... render... capture screenshots... note glyph/fallback/shaping failures") requires modifying `TextPipeline` or writing bypass code and driving `demo-rust`, which is implementation work, not investigation — out of scope for this pass per the constraints given to this research task. What follows is a source-analysis-based projection of what would happen, clearly labeled as unverified-by-execution:
+
+- **Loading would work mechanically with no code changes to `cosmic-text`/`fontdb`.** `fontdb::Database::load_font_data(Vec<u8>)` (`fontdb-0.23.0/src/lib.rs:195-197`) parses arbitrary font bytes (TTF/OTF/TTC/OTC) with no OS or filesystem dependency; a Noto Sans CJK or Noto Naskh Arabic TTF loaded this way would populate `FontSystem`'s `db` with real, queryable `FaceInfo` entries. This part is a solved problem one layer below akar and is expected to work.
+- **CJK rendering: Latin shaping path is `Shaping::Advanced` already (`text_pipeline.rs:91`), and `harfrust`/`rustybuzz`-class shapers used by cosmic-text 0.18 handle CJK shaping (mostly 1:1 codepoint-to-glyph, no complex reordering) without special akar-side logic — the risk is *font coverage*, not shaping.** If the loaded CJK font's family name is referenced via `glyphon::Family::Name("...")` in `Attrs` (confirmed to exist and be re-exported, Research point 7) it should render correctly. Since akar's public `FontFamily` enum has no `Name(&str)`-equivalent variant today (Research point 9), this can only be reached by bypassing the public component API and constructing `glyphon::Attrs` directly — exactly the "bypass the public API" caveat the task called out.
+- **Arabic rendering is the higher-risk case, structurally, not just a coverage question.** Arabic requires (a) correct RTL bidi handling and (b) correct contextual shaping (initial/medial/final/isolated glyph forms) — `cosmic-text` includes `unicode-bidi` as a dependency (seen in the extracted `Cargo.toml`) and `harfrust`, a HarfBuzz-derived shaper, both of which are exactly the components needed. `text_pipeline.rs`'s own caret/selection geometry code (`text_geometry`, `glyph_boundary_x`, `caret_x`, lines 242-379) already branches on `glyph.level.is_rtl()`, indicating akar's text-editing geometry code has *some* existing RTL awareness baked in from the `LayoutGlyph`/`LayoutRun` types cosmic-text produces — this is encouraging evidence that bidi-level info flows through today, but whether visual shaping/glyph selection is fully correct for a *loaded* Arabic font specifically was not verified by execution.
+- Epic 023 (RTL text rendering) is the more appropriate place to actually execute and screenshot-verify Arabic/RTL rendering; this epic's role, per its own framing ("soft prerequisite for 023/024"), is to make sure the *font* is loadable and selectable in the first place. Recommend Task 3 be re-scoped as an early task inside the *implementation* phase of this epic (see Task 6 below) rather than attempted again as pure research — it needs the loading API from Task 4/5 to exist before there's a supported way to do it that isn't a throwaway spike.
 
 ### Task 4 — API and Scope Proposal
 
+**Status:** Done
+
+See "Proposed API" and "Explicit Deferrals" sections below.
+
+---
+
+## Proposed API
+
+Design goals, in priority order: (1) default construction stays fully reproducible (Task 2 recommendation — no implicit system scan), (2) applications can load font bytes and reference them by family name, (3) applications can configure an ordered fallback chain, (4) opt-in system scanning remains available for apps that want broad glyph coverage over reproducibility, (5) every new type is C-ABI-flat and follows akar's existing sentinel/enum conventions (`crates/akar-c-api/src/lib.rs:12-14`, `27-52`) — no callbacks, no `Option<T>` across FFI, no glyphon/cosmic-text/fontdb types crossing the boundary (mirrors epic 020's typography-boundary rule).
+
+### Rust: `akar-core`
+
+New module `crates/akar-core/src/font_source.rs` (or inline in `text_pipeline.rs` if the team prefers fewer files — precedent for small pipeline-adjacent types living in `text_pipeline.rs` already exists):
+
+```rust
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum FontLoadError {
+    #[error("font data could not be parsed: {0}")]
+    InvalidFontData(String),
+    #[error("no faces found in font data")]
+    EmptyFontSource,
+}
+
+/// How TextPipeline populates its fontdb::Database at construction time.
+/// Default is Bundled — see Task 2 recommendation for why system scanning
+/// is opt-in rather than automatic.
+#[derive(Clone, Debug, Default)]
+pub enum FontSource {
+    /// Load only the given font bytes (TTF/OTF/TTC/OTC). Deterministic,
+    /// reproducible across machines. Empty Vec means "no fonts at all" —
+    /// text with no matching face renders as tofu/empty, same as today's
+    /// implicit fontdb behavior when nothing matches.
+    #[default]
+    Bundled,
+    /// Bundled bytes plus a full system font scan (fontdb::Database::load_system_fonts).
+    /// Not reproducible across machines/OSes — see Task 2. Opt-in only.
+    BundledPlusSystemScan,
+}
+
+pub struct TextPipelineConfig {
+    pub font_source: FontSource,
+    /// Font file bytes to load before any text is shaped. Each entry may
+    /// contain multiple faces (TTC/OTC) — all are loaded.
+    pub fonts: Vec<Vec<u8>>,
+    /// Ordered family-name fallback chain consulted after the resolved
+    /// FontFamily/explicit family name fails to cover a codepoint.
+    /// Mirrors cosmic-text's own family-name-directed fallback model
+    /// (Research: "Fallback chains are string-directed").
+    pub fallback_families: Vec<String>,
+}
+```
+
+`TextPipeline::new` (`text_pipeline.rs:36-59`) gains a config parameter — proposed as `TextPipeline::new(device, queue, surface_format, config: TextPipelineConfig)`, with a `TextPipeline::new_default(device, queue, surface_format)` thin wrapper calling `TextPipelineConfig::default()` (empty `fonts`, `FontSource::Bundled`) to avoid a breaking one-line change at every existing call site being silent — `AkarCore::new` (`context.rs:24-42`) and its `mock()` path (`context.rs:48-60`) both need updating to thread this through, and `akar_ctx_new`/`akar_ctx_mock` (`akar-c-api/src/lib.rs:368-419`) need a config parameter or a builder (see C ABI below).
+
+Construction changes at `text_pipeline.rs:41` from:
+```rust
+let font_system = glyphon::FontSystem::new();
+```
+to building a `fontdb::Database` explicitly (no `FontSystem::new()`/`new_with_fonts()` call, since both hard-code `load_system_fonts()` unconditionally — Research point 3):
+```rust
+let mut db = glyphon::fontdb::Database::new();
+if matches!(config.font_source, FontSource::BundledPlusSystemScan) {
+    db.load_system_fonts();
+}
+for bytes in &config.fonts {
+    db.load_font_data(bytes.clone());
+}
+let font_system = glyphon::FontSystem::new_with_locale_and_db(
+    sys_locale::get_locale().unwrap_or_else(|| "en-US".into()),
+    db,
+);
+```
+(cosmic-text's own locale-detection call is private; akar would need its own locale lookup or accept `"en-US"` unconditionally for v1 — flag this as an open question for the implementation task, not resolved here.)
+
+New method on `TextPipeline`: `pub fn load_font_bytes(&mut self, data: Vec<u8>) -> Result<(), FontLoadError>` for loading fonts after construction (uses `FontSystem::db_mut()`, `text_pipeline.rs` — note `db_mut()` clears the internal font-match cache on access per `cosmic-text-0.18.2/src/font/system.rs:280-284`, so no separate cache invalidation is needed).
+
+### Rust: `akar-components` (epic 020 integration)
+
+Extend `FontFamily` (`crates/akar-components/src/text_style.rs:3-8`) with a fourth, string-carrying variant:
+```rust
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum FontFamily {
+    #[default]
+    SansSerif,
+    Serif,
+    Monospace,
+    Named(String),
+}
+```
+Note this drops `Copy`/`repr(C)` from the Rust-side `FontFamily` (a `String` cannot be `Copy`, and a data-carrying variant cannot be a plain C-style `#[repr(C)]` enum) — `Eq` is unaffected since `String` itself implements `Eq`, so it can still be derived. The existing `#[repr(C)]` enum shape stays reserved for the C ABI's numeric-tag encoding (see below); the Rust and C representations already diverge in spirit (`crates/akar-c-api/src/lib.rs:29-52` hand-converts between them), so this is a continuation of an existing pattern, not a new one. `resolved_to_attrs` (`text_style.rs:104-117`) gains a fifth match arm:
+```rust
+FontFamily::Named(name) => glyphon::Family::Name(name),
+```
+Fallback chain: add `fallback_families: Vec<String>` to `TextStyle`/`ResolvedTextStyle` (`text_style.rs:30-38`, `56-64`) defaulting to empty (inherits whatever `TextPipelineConfig::fallback_families` was set globally); when non-empty, akar would need to either (a) rely on cosmic-text's own per-script/monospace fallback machinery (`per_script_monospace_font_ids`, `Fallbacks`/`PlatformFallback` in `system.rs`) for codepoint-level fallback, which is automatic and not family-string-driven, or (b) implement explicit family-chain-try-in-order logic in akar by shaping against each family in turn and picking the first with full codepoint coverage. Recommend (a) for v1 — it's already what cosmic-text does internally for any text today, requires zero new akar code, and only the *initial* family (not the fallback chain) needs to be akar-configurable via `Named`. Explicit string-directed fallback chains (a genuine akar-level feature, not just "let cosmic-text's automatic fallback run") are proposed as a deferred v2 item — see Explicit Deferrals.
+
+### C ABI: `akar-c-api`
+
+New opaque-free, flat functions in `crates/akar-c-api/src/lib.rs`, following the existing `akar_ctx_new`/`akar_set_*` naming and the sentinel-for-`Option` convention (`SENTINEL_F32`/`SENTINEL_U32`, lines 12-14):
+
+```c
+// Load font bytes into the context's font database. Safe to call any time
+// after akar_ctx_new/akar_ctx_mock, before or between frames. Returns 0 on
+// success, non-zero on parse failure (mirrors existing akar error-code style
+// — check other akar_* return codes for the established convention before
+// implementing).
+uint32_t akar_load_font_bytes(AkarCtx* ctx, const uint8_t* bytes, size_t len);
+
+// Register a bundled font-loading source at context-creation configuration
+// time. AKAR_FONT_SOURCE_BUNDLED (0, default) disables system font scanning
+// entirely (reproducible). AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN (1)
+// additionally scans installed system fonts (Research: non-reproducible
+// across machines — opt-in only).
+typedef uint32_t AkarFontSource;
+#define AKAR_FONT_SOURCE_BUNDLED 0
+#define AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN 1
+
+// akar_ctx_new gains a trailing font_source parameter (breaking C signature
+// change — acceptable per DEVELOP.md: "No stable public API exists yet").
+AkarCtx* akar_ctx_new(const void* device, const void* queue,
+                       uint32_t surface_format, AkarFontSource font_source);
+
+// Sets the fallback-family chain consulted for text with no explicit
+// AkarFontFamily::Named match. `family_names` is a flat array of
+// null-terminated C strings, `count` its length. akar copies the strings;
+// the caller retains ownership of the buffer after the call returns.
+void akar_set_fallback_families(AkarCtx* ctx, const char* const* family_names, size_t count);
+```
+
+`AkarFontFamily` (`crates/akar-c-api/src/lib.rs:29-32`) is today a plain `#[repr(C)] struct AkarFontFamily { pub value: u32 }` — a numeric-tag wrapper, not a native C enum with named variants; the `SansSerif`/`Serif`/`Monospace` mapping exists only as `0`/`1`/`2` decoded in Rust (`lib.rs:216-223`). Adding a fourth "named family" case doesn't fit cleanly into a bare `u32` tag plus a string, since C has no tagged-union sugar to attach a `const char*` to one specific tag value. Proposed: keep `AkarFontFamily`'s numeric tag exactly as-is for the three generics, and add a **separate** function for named families rather than overloading the tag — mirrors how C APIs typically handle "enum + escape hatch" (cf. `sokol_gfx.h` patterns referenced in `DEVELOP.md`'s UI/API design references):
+```c
+// Sets an explicit font family by name on a TextStyle-equivalent C struct,
+// overriding the generic AkarFontFamily tag for this style only. Pass NULL
+// to clear and revert to the generic tag.
+void akar_text_style_set_family_name(AkarTextStyle* style, const char* name);
+```
+(Exact struct/field name TBD against whatever the current C `TextStyle`-equivalent struct is called in `akar-c-api/src/lib.rs` at implementation time — grep for the struct around lines 40-52 before writing this function, since this proposal is written from static reading, not a live compiler check of the exact struct name.)
+
+## Explicit Deferrals
+
+Out of scope for the first implementation of this epic (record kept here per Task 4's instruction):
+
+- **Variable font axis control** (weight/width/optical-size interpolation via `fvar`) — carried over from the epic's original "Notes for Future Work"; requires API surface this proposal does not attempt to design.
+- **Font subsetting** for binary-size-sensitive embedders — a later optimization once bundled-font-by-default (Task 2 recommendation) ships and binary size becomes a measured concern, not before.
+- **Color/emoji font presentation** (COLR/CPAL, CBDT/CBLC, emoji ZWJ sequence → single-glyph presentation selection) — closely coupled to Unicode emoji-sequence handling in text editing (epic 018); scoping this into font-support risks scope creep into a dedicated emoji-support epic, per the original epic notes.
+- **Explicit, akar-implemented string-directed fallback *chains*** (as opposed to relying on cosmic-text's automatic per-codepoint fallback, which ships "for free" with any font loading) — deferred to v2 per the "Rust: akar-components" section above; v1 exposes only the *initial* family choice (`FontFamily::Named`) plus whatever cosmic-text does automatically underneath.
+- **Filesystem-path-based font loading** (`akar_load_font_file(ctx, path)`) — the epic's own Research called out path-based loading as "harder to keep portable" than bytes; v1 is bytes-only. A path-based convenience wrapper can be added later as a pure addition (load bytes from disk, call the bytes API) without breaking the bytes-based core.
+- **Platform font APIs** (e.g. macOS `CTFontManager`, Windows `DirectWrite` enumeration beyond what `fontdb::load_system_fonts()` already does) — `fontdb`'s directory-scan approach is the only system-font mechanism proposed; no akar-specific platform font code.
+- **Live re-verification of Task 2/3 findings via actual builds/screenshots** — this research pass deliberately did not build/render (per task instructions); the first implementation task should include a concrete verification step using the debug toolchain (`--screenshot`, `akar-diff --compare`) once the bundled-by-default change lands, to empirically confirm reproducibility rather than relying solely on source-level reasoning.
+
+---
+
+## Tasks for Implementation (to be picked up by a coding agent)
+
+These are concrete enough to hand to an implementation agent. They assume Tasks 1-4 above (research) are the starting context and should be read first.
+
+### Task 5 — Add `FontSource`/`FontLoadError`/`TextPipelineConfig` to `akar-core` and thread through construction
+
 **Status:** Not Started
 
-- Based on Tasks 1-3, propose a minimal font-loading and fallback-configuration API (Rust + C ABI shape) as a design section in this epic.
-- Propose how the API interacts with `AkarTypography` (epic 020) — e.g., does `AkarTypography` gain a font-family field that resolves through the new fallback chain?
-- Identify what is explicitly out of scope for a first implementation (e.g., variable fonts, font subsetting, per-glyph color fonts/emoji presentation selection) and record it as an Explicit Deferral.
-- Once this proposal is reviewed, convert it into implementation Tasks and update this epic's Status.
+- Add the types from "Proposed API" → "Rust: `akar-core`" above (`FontSource`, `FontLoadError` via `thiserror`, `TextPipelineConfig`) to a new `crates/akar-core/src/font_source.rs`, exported from `crates/akar-core/src/lib.rs` alongside the other public re-exports.
+- Change `TextPipeline::new` (`crates/akar-core/src/text_pipeline.rs:36-59`) to accept a `TextPipelineConfig` and stop calling `glyphon::FontSystem::new()`; build a `fontdb::Database` directly per the "Construction changes" snippet in the Proposed API section, gating `db.load_system_fonts()` behind `FontSource::BundledPlusSystemScan`.
+- Update the internal test helper `create_pipeline()` (`text_pipeline.rs:400-412`) to pass a `TextPipelineConfig` to the new `TextPipeline::new` signature so it keeps compiling. Note `shaped_buffer` (`text_pipeline.rs:385-398`, used by the tests at lines 432/446/459) is a separate, standalone helper that builds its own `glyphon::FontSystem`/`Buffer` directly — it never calls `TextPipeline::new` and does not need to change for the signature update to compile. It may still need attention once Task 6 bundles a real default font: `shaped_buffer` computes "expected" glyph geometry against a plain `glyphon::FontSystem::new()` (full system scan), while `TextPipeline` will compute "actual" geometry against the bundled-only `FontSource::Bundled` database — if those two resolve to different font files, the expected/actual comparisons in these tests could diverge. Check this when Task 6 lands, not as part of this task.
+- Add `TextPipeline::load_font_bytes(&mut self, data: Vec<u8>) -> Result<(), FontLoadError>` using `FontSystem::db_mut().load_font_data(data)` (note `db_mut()` clears the font-match cache automatically — no extra cache-invalidation code needed).
+- Update `AkarCore::new` (`crates/akar-core/src/context.rs:24-42`) to accept and forward a `TextPipelineConfig`; keep `AkarCore::mock()` (`context.rs:48-60`) defaulting to `FontSource::Bundled` with empty fonts (it must keep working with zero fonts loaded — check whether any existing component/layout test relies on real glyph measurement from `mock()`, since an empty `fontdb::Database` will make all text measure as zero-width/zero-height; if so, `mock()` may need to opt into `BundledPlusSystemScan` specifically to preserve current test behavior — this is a real risk to check before flipping the default, not assumed away).
+- Add unit tests: `TextPipeline` constructed with `FontSource::Bundled` and zero fonts loaded produces the same (non-panicking, zero-size-or-tofu) behavior for `measure`/`set_text` as today's `FontSystem::new()` would for an unmatched family — establish this as the new baseline, not a regression.
+
+### Task 6 — Load a real bundled default font and make it the out-of-the-box default
+
+**Status:** Not Started
+
+Depends on Task 5 (`TextPipelineConfig`/`FontSource` and the config-driven construction path must exist before a default font can be loaded through it).
+
+- Decide and record (in this epic, as an addendum) which font(s) akar bundles by default, with an explicit license check — this needs a real answer (e.g. a specific Noto or Inter static build) before code lands, not a placeholder. Confirm license terms (SIL OFL is the common case for Noto/Inter) are compatible with `LICENSE` (MIT) redistribution — i.e. embedding OFL font binaries in an MIT-licensed binary is standard practice but must be verified, not assumed.
+- Add the font file(s) to the repo (likely `crates/akar-core/assets/fonts/` or similar — follow whatever asset-storage convention, if any, exists elsewhere in the repo; if none exists, propose one as part of this task rather than improvising silently) and load via `include_bytes!` into the default `TextPipelineConfig::fonts` used by `AkarCore::new`'s default path.
+- Verify via `cargo run --bin demo-rust -- --screenshot /tmp/font-default.png --exit` that text still renders (visual sanity check, not a diff yet — no baseline exists).
+- Update `DEVELOP.md`'s "Local Dependencies"/font mentions if warranted, and note the bundled font choice in `README.md`'s Stack table if that table gets a "Fonts" row (optional, check with maintainers/existing PR conventions first).
+
+### Task 7 — `FontFamily::Named` and C ABI `akar_load_font_bytes` / `akar_text_style_set_family_name`
+
+**Status:** Not Started
+
+Depends on Task 5 (`TextPipeline::load_font_bytes` must exist before `akar_load_font_bytes` has anything to call). Independent of Task 6 — does not require a bundled default font to land first.
+
+- Extend `crates/akar-components/src/text_style.rs`'s `FontFamily` enum with `Named(String)` per the Proposed API; update `resolved_to_attrs` (`text_style.rs:104-117`) with the new match arm; note the `Copy`/`Eq`/`repr(C)` derive impact called out in the proposal and fix any call sites that relied on `FontFamily: Copy` (`heading.rs:34`, `link.rs:24`, `paragraph.rs:18` currently construct it by value in const-like contexts — check whether `Clone` is sufficient there after removing `Copy`).
+- Add `akar_load_font_bytes(ctx, bytes, len) -> u32` and `akar_text_style_set_family_name(style, name)` to `crates/akar-c-api/src/lib.rs`, following the file's existing sentinel/error-code conventions (read the existing `akar_*` functions in that file for the established return-code and null-pointer-handling patterns before adding new ones — do not invent a new error convention).
+- Add C ABI integration tests under `crates/akar-c-api/tests/` (per `AGENTS.md` → "Testing approach": "C ABI tests are written in C and compiled as integration tests") covering: loading valid font bytes succeeds, loading garbage bytes fails cleanly (no panic, no crash), and a `Named` family round-trips through `resolved_to_attrs` to the correct `glyphon::Family::Name`.
+
+### Task 8 — `akar_ctx_new` font-source parameter and default-off system scanning
+
+**Status:** Not Started
+
+Depends on Task 5 (`FontSource`/`TextPipelineConfig` must exist on the Rust side before the C enum and `akar_ctx_new` parameter can forward to them). Independent of Tasks 6/7 — does not require the bundled default font or `FontFamily::Named` to land first.
+
+- Add the `AkarFontSource` C enum/`#define` constants and thread a `font_source` parameter through `akar_ctx_new` (`crates/akar-c-api/src/lib.rs:368-395`) and `akar_ctx_mock` (`lib.rs:407-419`) per the Proposed API's C ABI section. This is a breaking C signature change — acceptable per `DEVELOP.md`'s "Project Status" ("No stable public API exists yet"), but update any existing C integration tests / example callers (`examples/demo-rust`, `crates/akar-c-api/tests/`) that call `akar_ctx_new` directly.
+- Regenerate `akar.h` via the project's existing `cbindgen` flow (do not hand-edit `akar.h` — see `AGENTS.md` "What NOT to do").
+- Add a regression test/check (can be a `cargo test` in `akar-c-api` or a documented manual step) that constructing two `AkarCtx` on the default `AKAR_FONT_SOURCE_BUNDLED` path with the same input text produces byte-identical `--dump-frame` glyph output across repeated runs on the same machine, as a baseline for the eventual cross-machine reproducibility check called out in the Explicit Deferrals section.
+
+### Task 9 — Re-attempt Task 3 (CJK/Arabic prototype) using the new public API
+
+**Status:** Not Started
+
+Depends on Tasks 5, 6, and 7 (needs `load_font_bytes`/`akar_load_font_bytes` and `FontFamily::Named` to reference a loaded family by name); Task 8 is not a hard dependency (system-scan opt-in is orthogonal to loading explicit bytes) but should land first if practical, since it's the more architecturally central C ABI change and this task is the epic's final verification step regardless of order.
+
+- Once Tasks 5-8 land, load a CJK font (e.g. a Noto Sans CJK subset) and an Arabic font (e.g. Noto Naskh Arabic) via the new `akar_load_font_bytes`/`TextPipeline::load_font_bytes`, reference them via `FontFamily::Named`, and render sample CJK and Arabic strings through `demo-rust` (a small script under `examples/demo-rust/scripts/` following the pattern of `text_edit_*.txt`, or a dedicated demo panel).
+- Capture screenshots via `--screenshot`/`--component` and visually confirm glyph rendering (correct CJK glyphs, correctly shaped/joined Arabic letterforms) — this is the actual empirical version of the original Task 3, now unblocked by having a supported loading path instead of a bypass spike.
+- Record any shaping/coverage failures found as follow-up tasks in epic 023 (RTL) rather than re-opening this epic, per this epic's "soft prerequisite" framing.
 
 ---
 
@@ -74,3 +320,4 @@ Initial inputs, to be expanded by the coding agent doing the investigation:
 - Variable font axis control (weight/width interpolation) is out of scope until core loading/fallback lands.
 - Font subsetting for binary-size-sensitive embedders is a later optimization, not a blocker.
 - Color/emoji font presentation is closely related to Unicode emoji-sequence handling in text editing (epic 018) and should be scoped carefully to avoid scope creep into a full emoji-support epic.
+- (Superseded/expanded by the "Explicit Deferrals" section above, which is the authoritative deferral list as of this research pass — kept here unchanged for history.)
