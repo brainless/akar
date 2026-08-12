@@ -1,6 +1,6 @@
 # Epic 023: Right-to-Left (RTL) Text and Layout
 
-**Status:** Research Complete and Verified — Implementation Not Started. Tasks 1-6 (research) are Done and were re-verified on 2026-08-12 against current source, with several citations corrected, one empirical taffy experiment run, and one live `demo-rust` render captured (see "Review — 2026-08-12 verification pass"). The earlier pass's premise that "no GPU/display is available in this environment" is false on this machine and has been discharged. Implementation Tasks 7-13 are all `Ready for implementation`; Task 11's scope changed materially (the feature it was written to audit does not exist yet). No implementation code has been written.
+**Status:** Research Complete and Verified — Implementation Not Started. Tasks 1-6 (research) are Done. Tasks 7, 9, 10, 12, and 13 are ready for implementation subject to their recorded dependencies; Task 8 is optional non-blocking visual research; Task 11 is a newly discovered editing feature and is explicitly deferred from this epic's first implementation pass. The 2026-08-12 readiness audit corrected Tasks 9-11 to reuse cosmic-text's alignment, cursor-motion, and hit-testing APIs rather than duplicating them. No implementation code has been written.
 **Goal:** Establish correct rendering and interaction for right-to-left scripts (Arabic, Hebrew, etc.), covering both glyph shaping and direction-aware layout.
 
 **Prerequisite:** Epic 021 is `Status: Done`. Findings from [[022]] (font support) inform this epic — RTL scripts need correctly loaded, fallback-capable fonts before layout direction is even worth testing.
@@ -58,6 +58,10 @@ Initial inputs, to be expanded by the coding agent doing the investigation:
 ## Review — 2026-08-12 verification pass
 
 This pass re-checked every "Confirmed finding" and every `file:line` citation above against current source, ran one out-of-repo taffy experiment, and captured one live `demo-rust` render. No repository source file was modified. Findings are tagged **[executed]** (verified by running something) or **[read]** (verified by reading source).
+
+### Final readiness correction: use shaped-buffer APIs for editing
+
+The earlier text-editing proposal later in this review (`visual_previous`/`visual_next` driven by `Layout.direction()`) is superseded by Tasks 10 and 11 below. Source inspection found `cosmic_text::Buffer::cursor_motion(..., Motion::Left/Right)` and `Buffer::hit(x, y)`. Layout direction is the wrong input for editing: an RTL UI can contain an LTR value. The shaped paragraph must own physical arrow movement and pointer hit-testing. Any older paragraph below describing the global-direction swap is retained as investigation history, not an implementation instruction.
 
 ### Premise correction: this environment does have a GPU and display
 
@@ -250,6 +254,8 @@ Grepped every file under `crates/akar-components/src/` for `left`/`right`/`start
 
 **Readiness:** Ready for implementation (research complete)
 
+**Superseded detail:** §3 and the `text_input` part of §4 below proposed direction-swapping string boundary helpers. Do not implement those paragraphs; Task 10 is the authoritative design and uses cosmic-text's shaped-buffer cursor motion. The layout/navbar portions remain current.
+
 Based on Tasks 1-5, this is a concrete proposal for the first implementation pass, following akar's existing conventions (context-level flat config, no cascade, per `DEVELOP.md` → Theme system; construct/compute/paint separation).
 
 **1. `AkarDirection` type and where it lives.**
@@ -302,7 +308,7 @@ Tasks 7-13 below convert this proposal into concrete, file-level implementation 
 
 **Status:** Mostly Done (2026-08-12). The pure-RTL case was rendered and captured; conclusions (a), (b) and (c) all held with no correction needed to the Research section. What remains is the mixed-direction string.
 
-**Readiness:** Ready for implementation. No blockers — the environment renders, the script syntax is known-good, and `@form_name` is a working script target.
+**Readiness:** Unblocked, optional research; not an implementation dependency. The first implementation pass may start without this capture because mixed-run editing is explicitly deferred and pure-RTL shaping is already verified. Run it as a regression baseline when Task 13 adds the RTL demo mode.
 
 - **Done:** `"مرحبا بالعالم"` typed into `@form_name` via `demo-rust --component form --script`. Glyphs shape and join correctly, the string right-aligns inside the input, and no sibling in the form mirrored. Task 1(a)/(b)/(c) confirmed.
 - **Remaining:** the same capture for a mixed Latin+Arabic string (e.g. `"Hello مرحبا World"`) and for a display-only path (`paragraph`/`heading`, which draw text with their own `TextAlign` offset rather than relying on cosmic-text's default alignment — this is the case most likely to differ from the `text_input` result, since `paragraph.rs:54-56` adds its own `Start => 0.0` offset on top of cosmic-text's right-alignment). Capture with `--component paragraph --screenshot` after routing an RTL string through it.
@@ -323,47 +329,48 @@ screenshot /tmp/rtl.png
 
 **Status:** Not Started
 
-**Readiness:** Ready for implementation once Task 7 lands (it needs the `AkarDirection` type and `layout.direction()`). All three call sites and the enum definition were re-verified on 2026-08-12 and the cited lines are exact. One design note added below that the previous pass missed.
+**Readiness:** Ready for implementation once Task 7 lands (it needs the `AkarDirection` type and `layout.direction()`). The alignment owner is resolved below; do not combine a draw-origin offset with cosmic-text's own paragraph alignment.
 
 - `crates/akar-components/src/paragraph.rs:54-56`, `link.rs:72-74`, and `heading.rs:71-73` each independently resolve `TextAlign::Start => 0.0` / `TextAlign::End => rect[2] - text_width` — hardcoded LTR-only, despite `TextAlign` (`text_style.rs:22-27`) being a logical (direction-independent) enum.
-- **Design note (new):** these three components compute their own x offset *on top of* cosmic-text's paragraph alignment, which for RTL content already defaults to `Align::Right` (Task 1). Naively swapping `Start`/`End` under RTL therefore risks double-applying the shift for RTL *content* inside an RTL *context*. Decide explicitly whether the component offset or cosmic-text's alignment owns horizontal placement — the cleanest answer is probably to pass an explicit `Align` into `TextPipeline::set_text` (currently always `None`, `text_pipeline.rs:92`) rather than adjusting the draw x, but that is a larger change and should be a conscious choice, not an accident. Verify the outcome with a `--component paragraph --screenshot` capture per Task 8.
-- Extract one shared function, e.g. `pub(crate) fn resolve_text_align_offset(align: TextAlign, direction: AkarDirection, rect_width: f32, text_width: f32) -> f32` (candidate home: `text_style.rs`, next to the `TextAlign` definition), where under `AkarDirection::Rtl` the `Start`/`End` branches swap which one resolves to `0.0` vs. `rect_width - text_width` (`Center` is unaffected).
-- Update `paragraph.rs`, `link.rs`, `heading.rs` to call the shared function instead of their three near-identical inline `match` blocks, passing `layout.direction()` (from Task 7).
-- Add unit tests (likely `MockDrawList`-based, per `AGENTS.md` → Testing approach) covering `Start`/`Center`/`End` under both `Ltr` and `Rtl` for at least one of the three components; the shared function itself should get direct unit tests for all 6 `(align, direction)` combinations.
+- **Resolved design:** cosmic-text must own alignment inside the full-width buffer. `TextPipeline::set_text` currently gives cosmic-text the component width but passes `None` for alignment; the components then shift the entire already-aligned buffer origin using `line_w`. For RTL content, cosmic-text's default right alignment plus an RTL-aware origin shift would double-apply the offset. Extend `set_text` with an optional `glyphon::Align` (or add a narrowly named aligned variant), pass it to `Buffer::set_text`, and leave `TextCall.x` at `rect[0]` for these components.
+- Map logical `TextAlign::Start`/`End` through `AkarDirection`: LTR `Start/End → Left/Right`; RTL `Start/End → Right/Left`; `Center → Center`. Keep this mapping in `text_style.rs` beside `TextAlign`, while keeping glyphon types out of public component APIs if practical.
+- Update `paragraph.rs`, `link.rs`, and `heading.rs` to use that explicit cosmic-text alignment and remove their inline x-offset matches. Other `set_text` callers may continue passing `None` so script-derived paragraph direction remains available where no component alignment is requested.
+- Add direct tests for all six `(align, direction)` mappings and component tests confirming `TextCall.x == rect[0]`; visually verify LTR and RTL `Start`/`End` through Task 8/13.
 - Depends on Task 7 (`AkarDirection` type) but not on Task 10/11 (text editing) or Task 13 (proof components) — can be implemented independently and in parallel.
 
 ### Task 10 — Direction-Aware Keyboard Caret Movement in `text_edit.rs`
 
 **Status:** Not Started
 
-**Readiness:** Ready for implementation once Task 7 lands. The previously-open question in this task ("confirm whether `collapse_to_start`/`collapse_to_end` need changing") is now answered — see below. Sequencing note: `epics/024-internationalization.md` Task 5 rewrites `previous_boundary`/`next_boundary` to be grapheme-cluster-aware. Land 024 Task 5 first, or combine the two changes; doing them in parallel will conflict.
+**Readiness:** Ready for implementation, independently of Task 7. The earlier global-direction swap proposal was incorrect: an RTL application can contain an LTR value, and caret motion must follow the shaped paragraph rather than `Layout.direction()`. cosmic-text 0.18.2 already exposes the correct base-paragraph operation through `Buffer::cursor_motion(..., Motion::Left/Right)` and uses grapheme boundaries internally. Sequencing conflict with Epic 024 Task 5 is therefore avoided for arrow motion.
 
-- Add `pub fn visual_previous(value: &str, position: usize, direction: AkarDirection) -> usize` and `pub fn visual_next(...) -> usize` to `crates/akar-components/src/text_edit.rs`, next to the existing `previous_boundary` (`:117-123`) and `next_boundary` (`:125-131`). For v1 (whole-value paragraph-level direction, per Task 6 §3 and this epic's own scoping against mixed-direction documents): under `AkarDirection::Ltr`, `visual_previous` == `previous_boundary` and `visual_next` == `next_boundary`; under `AkarDirection::Rtl`, they swap (`visual_previous` calls `next_boundary` internally, and vice versa).
-- Update `crates/akar-components/src/text_input.rs:128-137` and `crates/akar-components/src/textarea.rs:154-157` to call `visual_previous`/`visual_next` instead of `previous_boundary`/`next_boundary` directly, sourcing the direction from the component's `&Layout` argument (`layout.direction()`, from Task 7). Note `text_input`'s arms are multi-line and also reset `edit_state.anchor`; `textarea`'s are one-liners that do not.
-- **`collapse_to_start`/`collapse_to_end`: answered (2026-08-12).** Do **not** change the methods. `TextEditState::collapse_to_start` (`text_edit.rs:26-29`) and `collapse_to_end` (`:31-33`) are defined as `selection().start` / `selection().end` = `min`/`max` of `(cursor, anchor)` (`:13-15`), which is the correct direction-free definition. What is direction-dependent is which one each key arm calls: under `AkarDirection::Rtl`, `Key::Left` must call `collapse_to_end` and `Key::Right` must call `collapse_to_start`, because the visually-leftmost edge of a selection in a right-aligned RTL line is its logically-later offset. Swap at the four call sites (`text_input.rs:128,133`; `textarea.rs:154,156`), exactly parallel to the `visual_previous`/`visual_next` swap.
+- Add a `TextPipeline` adapter that accepts a buffer id, akar's global byte offset, and physical `Left`/`Right`, converts the offset to a cosmic-text `Cursor { line, index, affinity }`, calls `Buffer::cursor_motion(&mut font_system, ..., glyphon::Motion::Left/Right)`, and converts the result back to a global byte offset. For textarea, conversion must account for line separators; use the buffer's public `lines` and test round trips rather than assuming `Cursor.index` is global.
+- Update `text_input.rs:128-137` and `textarea.rs:154-157` to use that shaped-buffer adapter. This requires key handling to happen after the frame's buffer has been created/shaped, or the component to retain/use its stable widget buffer id before handling keys; choose the smallest lifecycle-safe arrangement and cover it with tests.
+- cosmic-text's `Motion::Left/Right` chooses `Previous/Next` from the shaped line's base `rtl` flag. This is strictly better than using app layout direction: pure RTL, pure LTR inside an RTL UI, and grapheme movement work. True per-run visual traversal inside a mixed bidi line is not provided by this cosmic-text implementation and remains an explicit future limitation.
+- Selection collapse should be based on a shaped visual motion from each endpoint (or the endpoint caret x values), not `min`/`max` byte offsets and not `Layout.direction()`. Add focused tests for a selection in pure LTR and pure RTL values. Preserve `collapse_to_start`/`collapse_to_end` as logical helpers for existing non-visual uses.
 - **Out of scope, documented deferral:** `Key::Home`/`Key::End` have the same conflation (`text_input.rs:138-145` sets `0` / `value.len()`; `textarea.rs:164-169` uses `line_start`/`line_end`). Browsers treat these as *visual* line start/end. Leave them logical for v1 and note it in the epic's deferrals rather than growing this task's diff.
-- Unit tests: extend `text_edit.rs`'s existing `#[cfg(test)]` module (`:136-452`, ~315 lines; e.g. `arrows_collapse_selection_in_either_direction` at `:269`) with `Rtl`-direction cases proving `visual_previous`/`visual_next` swap correctly, using the same ASCII/Unicode fixtures already in the file (`"aé🙂"`, etc. — note these are direction-agnostic test values; a genuinely RTL-scripted fixture is not required for the v1 whole-value-swap logic, since it doesn't inspect script/bidi content, only the `AkarDirection` parameter).
-- Depends on Task 7. Independent of Task 9. Feeds directly into Task 13's `text_input` proof.
+- Unit tests must include actual Arabic/Hebrew and an LTR value while layout direction is RTL; ASCII-only tests cannot validate paragraph-direction discovery. Add textarea coverage for line/global-offset conversion.
+- Independent of Tasks 7 and 9. Feeds directly into Task 13's `text_input` proof.
 
 ### Task 11 — Pointer Hit-Testing and Drag Selection (Task 5 deferral)
 
 **Status:** Not Started — and **rescoped on 2026-08-12**. The audit this task was written to perform has been performed, and it found that the code to be audited does not exist.
 
-**Readiness:** Ready for implementation, but as a *feature* task rather than a *direction-fix* task, and it is the largest of Tasks 7-13. If the goal is only to prove the RTL direction model, this task can be dropped from the first pass without weakening Task 13.
+**Readiness:** Deferred, non-blocking for this epic. It is a missing general editing feature rather than an RTL regression and should move to a dedicated text-editing epic if selected. The upstream primitive is known, so no further RTL research is required.
 
 **What was found (verified by source reading, 2026-08-12):**
 
 - There is no pointer-drag-to-select in either editor. `text_input.rs` reads the mouse only to manage focus: `core.input.is_clicked(rect)` sets `focused_id` (`:63-65`), and a press outside the rect clears it (`:67-72`). `textarea.rs` has the same two uses and no others (`:87` is its only `mouse` reference).
-- There is no geometry-to-byte-offset mapping anywhere. `TextPipeline`'s public surface is `new` (`text_pipeline.rs:36`), `set_text` (`:61`), `remove_buffer` (`:99`), `measure` (`:103`), `measure_with_metadata` (`:115`), `geometry` (`:161`), `prepare` (`:175`), `render` (`:230`), `trim_atlas` (`:237`). `geometry` maps byte offsets → pixel rects; nothing maps pixel x → byte offset.
+- There is no akar geometry-to-byte-offset mapping. `TextPipeline`'s public surface is `new` (`text_pipeline.rs:36`), `set_text` (`:61`), `remove_buffer` (`:99`), `measure` (`:103`), `measure_with_metadata` (`:115`), `geometry` (`:161`), `prepare` (`:175`), `render` (`:230`), `trim_atlas` (`:237`). However, the wrapped cosmic-text 0.18.2 `Buffer` already provides `pub fn hit(&self, x, y) -> Option<Cursor>` (`src/buffer.rs:923`), including grapheme subdivision and `glyph.level.is_rtl()` handling. akar should adapt it, not reimplement the inverse geometry walk.
 - Consequently a selection can currently only be created via the select-all shortcut (`text_input.rs:97-100` dispatching to `TextEditState::select_all`, `text_edit.rs:21-24`). There is no click-to-position-caret, no drag-select, and no shift+arrow selection extension.
 
 **Revised work:**
 
-- Implement the inverse hit-test in `akar-core` next to the existing forward one — e.g. `TextPipeline::offset_at` taking a buffer id and a local x/y and returning a byte offset — reusing `glyph_boundary_x`'s bidi-aware logic (`text_pipeline.rs:368-379`) so it is correct for RTL and mixed runs from the start. Placing it in `akar-core` keeps `akar-components` free of shaped-buffer access, matching how `caret_x` already lives there.
+- Add `TextPipeline::offset_at(buffer_id, local_x, local_y)` as a thin adapter over `Buffer::hit`, converting cosmic-text's line-local `Cursor` into akar's global byte offset. Preserve/decide how `Cursor.affinity` is represented at bidi run boundaries; akar's current `usize` state loses that distinction, so add explicit boundary tests before claiming mixed-run correctness.
 - Wire click-to-position and press-drag-to-select in `text_input.rs`/`textarea.rs` on top of it, setting `TextEditState.anchor` on press and `cursor` on drag.
 - Because the hit-test is inherently visual (it searches shaped glyph positions, which are already bidi-ordered), it should need no `AkarDirection` parameter at all — unlike the arrow keys. Confirm that empirically rather than assuming it.
 - Verification: `--script` `press left` / `hover` / `release left` lines over an RTL value, plus screenshots of the resulting selection quads. Note the caret-blink and single-shot `--dump-frame` constraints recorded in the review section apply here too; selection quads are gated on `focused` only, not on the blink (`text_input.rs:215-233`), whereas the caret is gated on `focused && cursor_visible` (`:244`) — so screenshot verification of *selection* is far more reliable than of the *caret*.
-- Depends on Task 7 only if a direction parameter turns out to be needed. Independent of Task 10 in practice.
+- No Task 7 dependency and no `AkarDirection` parameter: shaped-buffer hit testing owns direction. Independent of Task 10, but both adapters should share the same line-local/global offset conversion helper.
 
 ### Task 12 — C ABI Exposure of `AkarDirection`
 
@@ -385,7 +392,7 @@ screenshot /tmp/rtl.png
 **Readiness:** Ready for implementation once Tasks 7 and 10 land. Both isolation targets were confirmed to exist and both verification mechanisms were exercised on 2026-08-12; two tooling gotchas are recorded below so the implementing agent does not rediscover them.
 
 - Wire `layout.direction()` (Task 7) into `navbar_layout`'s `Style` construction in `crates/akar-components/src/navbar.rs:34-45` (container) and the `start`/`center`/`end` leaves at `:46-76`, via the `From<AkarDirection> for taffy::style::Direction` conversion. Per the experiment in the review section, direction must be set on the *container* for its three slots to swap; setting it on the slots too is only needed if their own children must mirror.
-- Wire `visual_previous`/`visual_next` (Task 10) into `text_input.rs`'s `Key::Left`/`Key::Right` handling (`:128-137`), including the `collapse_to_*` swap.
+- Wire Task 10's shaped-buffer physical cursor motion into `text_input.rs`'s `Key::Left`/`Key::Right` handling (`:128-137`), including visual selection-collapse behavior.
 - Extend `demo-rust` (per `AGENTS.md` → Debug toolchain) with a way to set `AkarDirection::Rtl` on the demo's `Layout` — most likely a new CLI flag, since script lines cannot reach `Layout` today. Then capture `Ltr` vs `Rtl` pairs. **Confirmed component names** (`--list-components`, run 2026-08-12): `navbar`, `alert`, `tab_bar`, `list`, `canvas`, `stats`, `form`, `drawer`, `modal`, `toasts`, `dropdown`, `heading`, `paragraph`, `link`, `card`. Use `--component navbar` and `--component form` (the text input is inside `form`, addressable as `@form_name`).
 - Verify: navbar's `start`/`center`/`end` slot order visually mirrors under `Rtl` with no `alert.rs`-style manual pixel-math changes (this empirically discharges the Task 2/6 taffy pass-through claim at the akar level; the taffy level is already discharged by the experiment in the review section). Compare with `akar-diff --diff`.
 - **Tooling gotcha 1 — the caret blinks.** `examples/demo-rust/src/main.rs:664-665` computes `cursor_visible = (cursor_tick / 30).is_multiple_of(2)` and `text_input.rs:244` gates the caret quad on it. A before/after arrow-key capture taken on blink-off frames is byte-identical and proves nothing; this was observed for both an LTR and an RTL value during the verification pass. Either force `cursor_visible = true` in script mode or align the script's `delay` steps with the blink phase.
