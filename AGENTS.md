@@ -92,6 +92,8 @@ screenshot /tmp/pressed.png   # capture on this frame; can repeat for before/aft
 
 Element addressing is **labels-first on top of coordinates**. Labels are a `HashMap<String, NodeId>` in `akar-layout`; the demo registers ~20 of its named interaction nodes (e.g. `@navbar_dropdown`, `@form_submit`). Coordinates remain the fallback for inline-computed rects (dropdown items, list rows) that have no `NodeId` to register.
 
+Labels only resolve to a real rect once their subtree is actually part of the computed layout tree this frame. The demo's tabs (`list`/`canvas`/`stats`/`form`) are mutually exclusive — only the active tab's widgets are laid out — so a script that addresses `@form_name`/`@form_notes`/etc. without first activating the Form tab must run under `--component form` (see "Component isolation" below), which forces that tab active before the script's first step. Running such a script plain (no `--component`) resolves those labels to a zero rect and silently clicks/types at the origin.
+
 ### Layout & frame inspection
 
 ```bash
@@ -102,6 +104,8 @@ cargo run --bin demo-rust -- --dump-layout
 # z-order and scissor), labeled layout rects, and an input snapshot.
 cargo run --bin demo-rust -- --dump-frame /tmp/frame.json --screenshot /tmp/x.png --exit
 ```
+
+Plain `--dump-layout` (no `--component`) internally sweeps all four tabs so every registered label gets a real rect regardless of which tab is active by default — you don't need `--component <tab>` just to discover coordinates. `--component <name> --dump-layout` still isolates to that one component's tree (other labels report `0 0 0 0`, as expected). A small, fixed set of labels (`heading`, `paragraph`, `link`, `card`) are showcase-only widgets never part of the full page — they always report `0 0 0 0` outside of `--component <that-name>`; that's expected, not a bug.
 
 `--dump-frame` uses a gated recording mode in `DrawList` that snapshots `{call, scissor}` *before* the scissor-cull early-return, so culled calls are included — useful for "why didn't my quad render?" debugging.
 

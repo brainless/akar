@@ -253,6 +253,7 @@ fn main() {
             start_time: None,
             screenshot_taken: false,
             dump_frame_written: false,
+            dump_layout_written: false,
         })
         .unwrap();
 }
@@ -270,6 +271,7 @@ struct App {
     start_time: Option<Instant>,
     screenshot_taken: bool,
     dump_frame_written: bool,
+    dump_layout_written: bool,
 }
 
 fn ease_out_cubic(t: f32) -> f32 {
@@ -2184,6 +2186,35 @@ impl ApplicationHandler for App {
                 let size = state.window.inner_size();
                 let scale = state.window.scale_factor() as f32;
 
+                // Acquire the swapchain texture before doing ANY frame work (script
+                // advancement, layout, rendering). Surface acquisition can transiently
+                // fail (Outdated/Lost/Timeout/Occluded/Validation) on early frames.
+                // `AkarCore::end_frame` is where queued single-frame input (typed
+                // chars, key events, paste events) gets cleared; every other code
+                // path in this handler runs *before* end_frame. If a script step were
+                // consumed and rendered before this acquisition failed, the frame
+                // would be discarded without ever calling end_frame, leaving that
+                // input un-cleared — the next RedrawRequested would render again and
+                // re-apply the same still-queued input (e.g. a scripted `type "A"`
+                // landing twice). Bailing out here, before anything is touched, keeps
+                // a failed acquisition a clean no-op that retries correctly.
+                let output = match state.surface.get_current_texture() {
+                    CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
+                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                        state
+                            .surface
+                            .configure(&state.device, &state.surface_config);
+                        state.window.request_redraw();
+                        return;
+                    }
+                    CurrentSurfaceTexture::Timeout
+                    | CurrentSurfaceTexture::Occluded
+                    | CurrentSurfaceTexture::Validation => {
+                        state.window.request_redraw();
+                        return;
+                    }
+                };
+
                 state.core.begin_frame(size.width, size.height, scale);
                 let needs_recording = (self.dump_frame_path.is_some() && !self.dump_frame_written)
                     || self.isolated_component.is_some();
@@ -2210,8 +2241,56 @@ impl ApplicationHandler for App {
                 prepare_layout(state, size, scale, self.isolated_component.as_ref());
 
                 if self.dump_layout {
-                    for (name, rect) in state.layout.labeled_rects() {
-                        println!("{} {} {} {} {}", name, rect[0], rect[1], rect[2], rect[3]);
+                    if !self.dump_layout_written {
+                        self.dump_layout_written = true;
+
+                        // Widgets whose layout children are wired lazily (e.g. navbar
+                        // slots) or that only enter the tree for the currently active
+                        // tab are otherwise invisible to a single-pass dump: their
+                        // registered label resolves against a node that was never
+                        // added as a child this frame, producing a misleading
+                        // "0 0 0 0" that looks like a legitimate zero-sized rect
+                        // rather than "not laid out." Without `--component`, run one
+                        // full-page render plus a pass over every tab so every
+                        // registered label gets a real chance to resolve.
+                        let mut rects: std::collections::BTreeMap<String, [f32; 4]> =
+                            std::collections::BTreeMap::new();
+                        if self.isolated_component.is_none() {
+                            let original_tab = state.active_tab;
+                            render_containers(state);
+                            render_navbar(state, viewport_rect);
+                            render_alert(state);
+                            render_tab_bar(state);
+                            for tab in 0..4 {
+                                state.active_tab = tab;
+                                state.prev_active_tab = tab;
+                                prepare_layout(state, size, scale, None);
+                                match tab {
+                                    0 => render_list_tab(state, viewport_rect),
+                                    1 => render_canvas_tab(state),
+                                    2 => render_stats_tab(state),
+                                    3 => render_form_tab(state, viewport_rect),
+                                    _ => {}
+                                }
+                                for (name, rect) in state.layout.labeled_rects() {
+                                    let entry =
+                                        rects.entry(name).or_insert([0.0, 0.0, 0.0, 0.0]);
+                                    if *entry == [0.0, 0.0, 0.0, 0.0] {
+                                        *entry = rect;
+                                    }
+                                }
+                            }
+                            state.active_tab = original_tab;
+                            state.prev_active_tab = original_tab;
+                        } else {
+                            for (name, rect) in state.layout.labeled_rects() {
+                                rects.insert(name, rect);
+                            }
+                        }
+
+                        for (name, rect) in &rects {
+                            println!("{} {} {} {} {}", name, rect[0], rect[1], rect[2], rect[3]);
+                        }
                     }
                     event_loop.exit();
                     return;
@@ -2245,22 +2324,6 @@ impl ApplicationHandler for App {
                     state.core.request_screenshot();
                 }
 
-                let output = match state.surface.get_current_texture() {
-                    CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
-                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
-                        state
-                            .surface
-                            .configure(&state.device, &state.surface_config);
-                        state.window.request_redraw();
-                        return;
-                    }
-                    CurrentSurfaceTexture::Timeout
-                    | CurrentSurfaceTexture::Occluded
-                    | CurrentSurfaceTexture::Validation => {
-                        state.window.request_redraw();
-                        return;
-                    }
-                };
                 let mut encoder = state
                     .device
                     .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
