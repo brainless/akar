@@ -1,0 +1,10 @@
+# Epic 022 Task 9: CJK + Arabic rendered through the public font API.
+# Run with the i18n component isolated so both sample nodes are laid out:
+#   cargo run --bin demo-rust -- --component i18n \
+#     --script examples/demo-rust/scripts/i18n_named_fonts.txt
+# The demo loads a CJK and an Arabic font from local system font files at
+# startup via TextPipeline::load_font_bytes and selects them with
+# FontFamily::Named(handle). When no candidate font file exists on the
+# machine, the samples render an ASCII "font unavailable" notice instead.
+delay 0.3
+screenshot /tmp/akar_i18n_named_fonts.png

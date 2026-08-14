@@ -148,7 +148,56 @@ struct AppState {
     form_font_size_node: akar_layout::NodeId,
     form_language_node: akar_layout::NodeId,
     form_submit_node: akar_layout::NodeId,
+    i18n_container: akar_layout::NodeId,
+    i18n_cjk_label_node: akar_layout::NodeId,
+    i18n_cjk_node: akar_layout::NodeId,
+    i18n_arabic_label_node: akar_layout::NodeId,
+    i18n_arabic_node: akar_layout::NodeId,
+    i18n_cjk_font: Option<u32>,
+    i18n_arabic_font: Option<u32>,
     needs_repaint: bool,
+}
+
+/// Single-family `.ttf` candidates, tried in order. Collections spanning more
+/// than one family are rejected by `load_font_bytes`'s v1 single-family rule,
+/// so `.ttc` files are deliberately absent here.
+const I18N_CJK_FONT_CANDIDATES: &[&str] = &[
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "C:\\Windows\\Fonts\\msgothic.ttc",
+];
+
+const I18N_ARABIC_FONT_CANDIDATES: &[&str] = &[
+    "/System/Library/Fonts/SFArabic.ttf",
+    "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
+    "C:\\Windows\\Fonts\\arial.ttf",
+];
+
+/// Loads the first candidate font that exists and parses, through the public
+/// `TextPipeline::load_font_bytes` API. Returns `None` when no candidate is
+/// present, so the demo degrades gracefully on machines without these fonts.
+fn load_i18n_font(core: &mut AkarCore, label: &str, candidates: &[&str]) -> Option<u32> {
+    for path in candidates {
+        let Ok(bytes) = std::fs::read(path) else {
+            continue;
+        };
+        match core.text_pipeline.load_font_bytes(bytes) {
+            Ok(handle) => {
+                let family = core
+                    .text_pipeline
+                    .family_name(handle)
+                    .unwrap_or("<unknown>")
+                    .to_string();
+                println!("{label} font loaded from {path} as family '{family}' (handle {handle})");
+                return Some(handle);
+            }
+            Err(err) => {
+                eprintln!("{label} font at {path} could not be loaded: {err}");
+            }
+        }
+    }
+    eprintln!("{label} font unavailable on this machine; i18n samples will show a notice instead");
+    None
 }
 
 fn main() {
@@ -1095,6 +1144,46 @@ enum Component {
     Paragraph,
     Link,
     Card,
+    I18n,
+}
+
+fn render_i18n_sample(
+    state: &mut AppState,
+    label_node: akar_layout::NodeId,
+    text_node: akar_layout::NodeId,
+    font_handle: Option<u32>,
+    label: &str,
+    sample: &str,
+    missing_notice: &str,
+) {
+    akar_paragraph(
+        &mut state.core,
+        &state.layout,
+        label_node,
+        label,
+        None,
+        &AKAR_THEME_DARK,
+    );
+    let (text, style) = match font_handle {
+        Some(handle) => (
+            sample,
+            Some(TextStyle {
+                font_size: Some(28.0),
+                line_height: Some(44.0),
+                font_family: Some(FontFamily::Named(handle)),
+                ..TextStyle::empty()
+            }),
+        ),
+        None => (missing_notice, None),
+    };
+    akar_paragraph(
+        &mut state.core,
+        &state.layout,
+        text_node,
+        text,
+        style,
+        &AKAR_THEME_DARK,
+    );
 }
 
 fn ensure_navbar_slots(state: &mut AppState) {
@@ -1394,6 +1483,22 @@ impl Component {
                 );
                 return;
             }
+            Self::I18n => (
+                state.i18n_container,
+                Style {
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    size: Size {
+                        width: length(600.0_f32),
+                        height: length(220.0_f32),
+                    },
+                    gap: taffy::geometry::Size {
+                        width: length(0.0_f32),
+                        height: length(8.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
             Self::Drawer | Self::Modal | Self::Toasts => return,
         };
 
@@ -1425,6 +1530,7 @@ impl Component {
             "paragraph" => Some(Self::Paragraph),
             "link" => Some(Self::Link),
             "card" => Some(Self::Card),
+            "i18n" => Some(Self::I18n),
             _ => None,
         }
     }
@@ -1446,6 +1552,7 @@ impl Component {
             "paragraph",
             "link",
             "card",
+            "i18n",
         ]
     }
 
@@ -1532,6 +1639,26 @@ impl Component {
                     &AKAR_THEME_DARK,
                 );
             }
+            Self::I18n => {
+                render_i18n_sample(
+                    state,
+                    state.i18n_cjk_label_node,
+                    state.i18n_cjk_node,
+                    state.i18n_cjk_font,
+                    "CJK via FontFamily::Named:",
+                    "你好世界 汉字 ひらがな カタカナ 한국어",
+                    "CJK font unavailable on this machine",
+                );
+                render_i18n_sample(
+                    state,
+                    state.i18n_arabic_label_node,
+                    state.i18n_arabic_node,
+                    state.i18n_arabic_font,
+                    "Arabic via FontFamily::Named:",
+                    "مرحبا بالعالم العربية",
+                    "Arabic font unavailable on this machine",
+                );
+            }
         }
     }
 
@@ -1579,6 +1706,7 @@ impl Component {
             | Self::Paragraph
             | Self::Link
             | Self::Card
+            | Self::I18n
             | Self::Navbar
             | Self::TabBar => {}
         }
@@ -1625,6 +1753,10 @@ impl ApplicationHandler for App {
             akar_core::TextPipelineConfig::default(),
         );
         core.set_text_edit_keybindings(akar_core::TextEditKeybindings::platform_default());
+
+        let i18n_cjk_font = load_i18n_font(&mut core, "CJK", I18N_CJK_FONT_CANDIDATES);
+        let i18n_arabic_font = load_i18n_font(&mut core, "Arabic", I18N_ARABIC_FONT_CANDIDATES);
+
         let mut layout = Layout::new();
 
         let page = layout.page(PageConfig {
@@ -2056,6 +2188,53 @@ impl ApplicationHandler for App {
             },
             ..Default::default()
         });
+        let i18n_container = layout.new_leaf(Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Column,
+            size: Size {
+                width: length(600.0_f32),
+                height: length(220.0_f32),
+            },
+            gap: taffy::geometry::Size {
+                width: length(0.0_f32),
+                height: length(8.0_f32),
+            },
+            ..Default::default()
+        });
+        let i18n_leaf = || Style {
+            flex_shrink: 0.0,
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(24.0_f32),
+            },
+            ..Default::default()
+        };
+        let i18n_cjk_label_node = layout.new_leaf(i18n_leaf());
+        let i18n_cjk_node = layout.new_leaf(Style {
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(56.0_f32),
+            },
+            ..i18n_leaf()
+        });
+        let i18n_arabic_label_node = layout.new_leaf(i18n_leaf());
+        let i18n_arabic_node = layout.new_leaf(Style {
+            size: Size {
+                width: Dimension::percent(1.0),
+                height: length(56.0_f32),
+            },
+            ..i18n_leaf()
+        });
+        layout.set_children(
+            i18n_container,
+            &[
+                i18n_cjk_label_node,
+                i18n_cjk_node,
+                i18n_arabic_label_node,
+                i18n_arabic_node,
+            ],
+        );
+
         let card_layout_opts = CardLayout::with_header_footer(&AKAR_THEME_DARK);
         let card_slots = akar_card_layout(&mut layout, card_root, &card_layout_opts);
         let card_header = card_slots.header.unwrap();
@@ -2088,6 +2267,9 @@ impl ApplicationHandler for App {
         layout.register_label("paragraph", paragraph_node);
         layout.register_label("link", link_node);
         layout.register_label("card", card_root);
+        layout.register_label("i18n", i18n_container);
+        layout.register_label("i18n_cjk", i18n_cjk_node);
+        layout.register_label("i18n_arabic", i18n_arabic_node);
 
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
@@ -2157,6 +2339,13 @@ impl ApplicationHandler for App {
             card_body,
             card_footer,
             card_slots,
+            i18n_container,
+            i18n_cjk_label_node,
+            i18n_cjk_node,
+            i18n_arabic_label_node,
+            i18n_arabic_node,
+            i18n_cjk_font,
+            i18n_arabic_font,
             link_result: LinkResult {
                 clicked: false,
                 hovered: false,
