@@ -1,6 +1,6 @@
 # Epic 022: Font Support
 
-**Status:** Research Complete — API Design Follow-up Required Before Implementation. Tasks 1-4 (research) are Done and were re-verified on 2026-08-12 against current source. A second readiness audit found two implementation-blocking API issues in Tasks 5 and 7 (see "Readiness audit — 2026-08-12"): font loading must use `load_font_source` to detect invalid data and collections, and named-family selection needs an owned request passed into `TextPipeline` rather than a borrowed registry name. Tasks 5 and 7 are blocked on that small design amendment; Tasks 6, 8, and 9 are dependency-blocked. No implementation code has been written.
+**Status:** Research and API Design Complete — Ready for Implementation. Tasks 1-4 (research) are Done and were re-verified on 2026-08-12 against current source. A second readiness audit found two implementation-blocking API issues in Tasks 5 and 7 (see "Readiness audit — 2026-08-12"); both were resolved as design decisions on 2026-08-14 (see "Decisions — 2026-08-14"): v1 restricts font loading to single-family sources (error on collections with more than one distinct family), and named-family selection resolves through an owned request passed into a new `TextPipeline` entry point rather than a borrowed registry name. Tasks 5 and 7 are unblocked; Tasks 6, 8, and 9 remain dependency-blocked in sequence. No implementation code has been written.
 **Goal:** Give applications control over which fonts akar loads and falls back to, so text renders correctly for scripts beyond the current default font's coverage (CJK, Arabic, Devanagari, emoji, etc.).
 
 **Prerequisite:** Epic 021 is `Status: Done`.
@@ -129,6 +129,28 @@ The source and git-history audit found that the numeric-handle direction is soun
 
 With those amendments, the implementation sequence is: finalize the load-result/cardinality rule and the owned `TextSelection`/`TextAttrs` core type; implement Tasks 5+6 together; implement Task 7; then Task 8 and Task 9. No additional dependency-source research is needed.
 
+### Decisions — 2026-08-14
+
+Both open items from the readiness audit are now decided. No further design work is needed before implementing Tasks 5 and 7.
+
+1. **Multi-family load result (audit item 1): v1 restricts to single-family sources.** `TextPipeline::load_font_bytes` / `akar_load_font_bytes` calls `load_font_source`, inspects every returned `FaceInfo`, and collects the set of distinct family names across them. If that set has exactly one member, register it and return its handle as normal. If the set is empty, return `FontLoadError::EmptyFontSource`. If the set has more than one member (only possible with a `.ttc`/`.otc` collection spanning multiple families — a single `.ttf`/`.otf`, the format an application actually bundles, always yields exactly one), return a new `FontLoadError::MultipleFamilies` and load nothing. Rationale: collections are rare for bundled/app-supplied fonts (they're mostly a system-font packaging artifact — see Research point 4's `PingFang.ttc`/`Songti.ttc`-style examples) and this keeps the C ABI's single-`u32`-handle-per-call contract unambiguous. A list-returning API for multi-family collections can be added later purely additively (a new `akar_load_font_source_multi` alongside the existing function) without breaking this one. `FontLoadError` (Proposed API → "Rust: `akar-core`") gains this variant:
+   ```rust
+   #[derive(Debug, Error)]
+   pub enum FontLoadError {
+       #[error("font data could not be parsed: {0}")]
+       InvalidFontData(String),
+       #[error("no faces found in font data")]
+       EmptyFontSource,
+       #[error("font data contains {0} distinct families; v1 requires exactly one")]
+       MultipleFamilies(usize),
+   }
+   ```
+2. **Where the handle resolves (audit item 2): adopt the owned-selection-request design as specified, unchanged.** Confirmed as forced by the borrow checker, not a style preference: `resolved_to_attrs` lives in `akar-components` and cannot borrow a `&str` out of `akar-core`'s font registry while `TextPipeline::set_text` needs `&mut` access to that same pipeline. `FontFamily::Named(u32)` stays as designed (Research/Review section, "Additional correction to the Proposed API"). What changes is where the handle is resolved: components build an owned selection request (a generic family variant, or a numeric handle, plus weight) and pass it into a new `TextPipeline` entry point (name TBD at implementation time, e.g. `TextPipeline::set_text_with_style` or similar), which resolves the handle against its own registry and constructs the short-lived `glyphon::Attrs` internally, immediately before `Buffer::set_text`. No registry string or `Attrs` borrowing a registry name ever crosses back out to `akar-components`. Generic-family (`SansSerif`/`Serif`/`Monospace`) call sites migrate to the same entry point for consistency, rather than keeping two separate text-setting paths.
+
+   **Note on why this is the idiomatic fix, not a workaround.** The conflict is two incompatible borrows of one object: `Attrs<'a>` holding an immutable borrow of the registry for lifetime `'a`, alive at the same moment `set_text` needs `&mut` on that same pipeline. No lifetime annotation resolves that — it has to be restructured. The general Rust pattern for "look something up in a store, then mutate that same store using what was looked up" is to stop the borrowed data from crossing the API boundary at all: pass an owned, cheap descriptor in (here, the existing `Copy` `u32` handle), and do the lookup-then-mutate inside one function that takes `&mut self` once, so the borrow never outlives the call. Alternatives considered and rejected: cloning the family name into an owned `String` before calling `set_text` (works, but pays a per-call allocation for a lookup akar already does cheaply as `u32 → &str`); wrapping the registry in `RefCell` for interior mutability (trades a compile-time-provable non-issue for a runtime borrow check and a new panic path, and cuts against akar's synchronous, no-hidden-state design per `DEVELOP.md`); splitting `TextPipeline` into separate registry/renderer structs so each can be borrowed independently (a legitimate general technique, but more structural change than this problem needs). Resolve-then-mutate in one call, on an owned handle, is the smallest change that satisfies the borrow checker without sacrificing `Copy`/`repr(C)` on the public types.
+
+Tasks 5 and 7 below are updated to reflect these as adopted decisions rather than open blockers.
+
 ---
 
 ## Tasks
@@ -168,10 +190,10 @@ This task as written ("load a CJK font and an Arabic font by bytes... render... 
 
 ### Task 4 — API and Scope Proposal
 
-**Status:** Research Done — API amendment required. Locale and broad API direction are resolved, but the load-result cardinality and owned core-side font-selection request in "Readiness audit — 2026-08-12" must be written into the final API before coding.
-**Readiness:** Blocked on that bounded design amendment; no further dependency research is needed.
+**Status:** Done. Locale and broad API direction were resolved in the original research pass; the load-result cardinality and owned core-side font-selection request flagged in "Readiness audit — 2026-08-12" are now resolved in "Decisions — 2026-08-14".
+**Readiness:** Ready for implementation — no open design amendment, no further dependency research needed.
 
-See "Proposed API" and "Explicit Deferrals" sections below, read together with the 2026-08-12 review section, which overrides them where they conflict.
+See "Proposed API" and "Explicit Deferrals" sections below, read together with the 2026-08-12 review section and the 2026-08-14 decisions section, which override them where they conflict.
 
 ---
 
@@ -192,6 +214,11 @@ pub enum FontLoadError {
     InvalidFontData(String),
     #[error("no faces found in font data")]
     EmptyFontSource,
+    /// v1 restricts loading to sources containing exactly one distinct family
+    /// (Decisions — 2026-08-14, audit item 1). A .ttc/.otc spanning more than
+    /// one family hits this; a single .ttf/.otf never does.
+    #[error("font data contains {0} distinct families; v1 requires exactly one")]
+    MultipleFamilies(usize),
 }
 
 /// How TextPipeline populates its fontdb::Database at construction time.
@@ -318,12 +345,12 @@ These are concrete enough to hand to an implementation agent. They assume Tasks 
 ### Task 5 — Add `FontSource`/`FontLoadError`/`TextPipelineConfig` to `akar-core` and thread through construction
 
 **Status:** Not Started
-**Readiness:** Blocked on the two API amendments in "Readiness audit — 2026-08-12": choose the multi-family load-result rule and define the owned core-side font-selection request. Once decided, implement together with Task 6. The empty-database panic and test requirements are otherwise fully researched.
+**Readiness:** Ready for implementation. The two API amendments from "Readiness audit — 2026-08-12" are resolved in "Decisions — 2026-08-14": `load_font_bytes` restricts v1 to single-family sources (`FontLoadError::MultipleFamilies` otherwise), and the owned-selection-request design is adopted as specified. Implement together with Task 6. The empty-database panic and test requirements are otherwise fully researched.
 
 - Add the types from "Proposed API" → "Rust: `akar-core`" above (`FontSource`, `FontLoadError` via `thiserror`, `TextPipelineConfig`) to a new `crates/akar-core/src/font_source.rs`, exported from `crates/akar-core/src/lib.rs` alongside the other public re-exports.
 - Change `TextPipeline::new` (`crates/akar-core/src/text_pipeline.rs:36-59`) to accept a `TextPipelineConfig` and stop calling `glyphon::FontSystem::new()`; build a `fontdb::Database` directly per the "Construction changes" snippet in the Proposed API section, gating `db.load_system_fonts()` behind `FontSource::BundledPlusSystemScan`.
 - Update the internal test helper `create_pipeline()` (`text_pipeline.rs:400-412`) to pass a `TextPipelineConfig` to the new `TextPipeline::new` signature so it keeps compiling. Note `shaped_buffer` (`text_pipeline.rs:385-398`, used by the tests at lines 432/446/459) is a separate, standalone helper that builds its own `glyphon::FontSystem`/`Buffer` directly — it never calls `TextPipeline::new` and does not need to change for the signature update to compile. It may still need attention once Task 6 bundles a real default font: `shaped_buffer` computes "expected" glyph geometry against a plain `glyphon::FontSystem::new()` (full system scan), while `TextPipeline` will compute "actual" geometry against the bundled-only `FontSource::Bundled` database — if those two resolve to different font files, the expected/actual comparisons in these tests could diverge. Check this when Task 6 lands, not as part of this task.
-- Add `TextPipeline::load_font_bytes` using `FontSystem::db_mut().load_font_source(glyphon::fontdb::Source::Binary(...))`, **not** `load_font_data`: only `load_font_source` returns inserted IDs, which are required to detect invalid data and enumerate collection faces. Return the finalized load-result type from the readiness audit. `db_mut()` clears the font-match cache automatically, so no extra cache invalidation is needed.
+- Add `TextPipeline::load_font_bytes` using `FontSystem::db_mut().load_font_source(glyphon::fontdb::Source::Binary(...))`, **not** `load_font_data`: only `load_font_source` returns inserted IDs, which are required to detect invalid data and enumerate collection faces. Per "Decisions — 2026-08-14" (audit item 1): collect the distinct family names across all returned `FaceInfo`; zero families is `FontLoadError::EmptyFontSource`, exactly one registers and returns its handle, more than one is `FontLoadError::MultipleFamilies(count)` with nothing registered. `db_mut()` clears the font-match cache automatically, so no extra cache invalidation is needed.
 - Update `AkarCore::new` (`crates/akar-core/src/context.rs:24-42`) to accept and forward a `TextPipelineConfig`; keep `AkarCore::mock()` (`context.rs:48-60`) on the populated bundled-default configuration from Task 6. It must never construct an empty database: existing layout/component tests require real shaped geometry, and cosmic-text panics on first shaping when no face exists.
 - **Corrected 2026-08-12 — do not write the originally-proposed test.** The original text asked for a unit test asserting that `FontSource::Bundled` with zero fonts behaves "non-panicking, zero-size-or-tofu". That is factually wrong: zero fonts panics at `cosmic-text-0.18.2/src/shape.rs:315`. Write instead: (a) a test that a `TextPipeline` built from a config carrying at least one real font measures non-zero width for Latin text, and (b) a test that text whose script the loaded font does not cover measures non-zero but renders tofu rather than panicking (verified behavior: 4 glyphs, width `30.21` for `"你好世界"` against a Latin-only database). If a zero-font configuration must remain expressible, make it either impossible by construction (`TextPipelineConfig` always seeds the bundled default) or an explicit documented panic.
 - **Confirmed risk, not hypothetical:** `crates/akar-layout/tests/text_measurement.rs` builds cores with `AkarCore::mock()` (`text_measurement.rs:12-14`) and asserts `size.width > 0.0` / `size.height > 0.0` (`text_measurement.rs:48-68`) plus wrap-height comparisons; `text_pipeline.rs:467-541` does the same through `create_pipeline()`. Both break the moment `mock()` gets an empty database. Keep `mock()` on a populated database at all times.
@@ -343,12 +370,12 @@ Depends on Task 5 (`TextPipelineConfig`/`FontSource` and the config-driven const
 ### Task 7 — `FontFamily::Named` and C ABI `akar_load_font_bytes` / named-family selection
 
 **Status:** Not Started
-**Readiness:** Blocked on the owned core-side selection API and multi-family load-result rule in "Readiness audit — 2026-08-12". Keep `FontFamily::Named(u32)` and the flat `AkarTextStyle` field, but do not make `resolved_to_attrs` borrow the core registry. The setter rejection remains correct.
+**Readiness:** Ready for implementation. The owned core-side selection API and multi-family load-result rule are resolved in "Decisions — 2026-08-14". Keep `FontFamily::Named(u32)` and the flat `AkarTextStyle` field, but do not make `resolved_to_attrs` borrow the core registry. The setter rejection remains correct.
 
 Depends on Task 5 (`TextPipeline::load_font_bytes` must exist before `akar_load_font_bytes` has anything to call). Independent of Task 6 — does not require a bundled default font to land first.
 
-- Extend `crates/akar-components/src/text_style.rs`'s `FontFamily` enum (`text_style.rs:3-8`) with `Named(u32)`. Convert resolved styles to an owned akar-core font-selection request and let `TextPipeline::set_text` resolve the handle/construct `glyphon::Attrs` internally. Do not pass a registry into `resolved_to_attrs` or return `Attrs` borrowing a registry name. With the handle design, `FontFamily`, `TextStyle` and `ResolvedTextStyle` keep `Copy`/`Eq`/`repr(C)`.
-- Add the finalized collection-aware `akar_load_font_bytes` API to `crates/akar-c-api/src/lib.rs`, and add a `font_family_name_handle: u32` field to `AkarTextStyle`. Use a dedicated `UINT32_MAX`/`u32::MAX` sentinel for this handle field, not the existing `0xFF` small-enum sentinel. Do not add a setter function. Follow the surrounding null-pointer patterns.
+- Extend `crates/akar-components/src/text_style.rs`'s `FontFamily` enum (`text_style.rs:3-8`) with `Named(u32)`. Convert resolved styles to an owned akar-core font-selection request (generic family or handle, plus weight) and pass it into the new `TextPipeline` entry point from "Decisions — 2026-08-14" (audit item 2), which resolves the handle and constructs `glyphon::Attrs` internally immediately before `Buffer::set_text`. Migrate the generic-family call sites (`heading.rs`, `link.rs`, `paragraph.rs`) to the same entry point. Do not pass a registry into `resolved_to_attrs` or return `Attrs` borrowing a registry name. With the handle design, `FontFamily`, `TextStyle` and `ResolvedTextStyle` keep `Copy`/`Eq`/`repr(C)`.
+- Add the finalized collection-aware `akar_load_font_bytes` API to `crates/akar-c-api/src/lib.rs`, returning a distinct error code for `MultipleFamilies` alongside the existing invalid-data/empty-source codes (mirror akar's established `akar_*` return-code convention), and add a `font_family_name_handle: u32` field to `AkarTextStyle`. Use a dedicated `UINT32_MAX`/`u32::MAX` sentinel for this handle field, not the existing `0xFF` small-enum sentinel. Do not add a setter function. Follow the surrounding null-pointer patterns.
 - Add C ABI integration tests under `crates/akar-c-api/tests/` (per `AGENTS.md` → "Testing approach": "C ABI tests are written in C and compiled as integration tests") covering: loading valid font bytes succeeds, loading garbage bytes fails cleanly (no panic, no crash), and a `Named` family round-trips through `resolved_to_attrs` to the correct `glyphon::Family::Name`. Existing pattern to follow: `crates/akar-c-api/tests/text_edit.c` (uses `akar_ctx_mock()` at line 39), compiled by `crates/akar-c-api/build.rs` via the `cc` crate — a new `.c` file needs a corresponding `cc::Build` entry in that build script.
 
 ### Task 8 — `akar_ctx_new` font-source parameter and default-off system scanning
