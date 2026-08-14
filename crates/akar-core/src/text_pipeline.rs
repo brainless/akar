@@ -1,4 +1,6 @@
-use crate::font_source::{FontLoadError, FontSource, TextPipelineConfig};
+use crate::font_source::{
+    FontLoadError, FontRequest, FontSelection, FontSource, TextPipelineConfig,
+};
 use crate::TextCall;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -170,33 +172,59 @@ impl TextPipeline {
         height: Option<f32>,
         attrs: Option<glyphon::Attrs>,
     ) -> u64 {
-        let id = buffer_id.unwrap_or_else(|| {
-            let id = self.next_id;
-            self.next_id += 1;
-            id
-        });
-
-        let buffer = self
-            .buffers
-            .entry(id)
-            .or_insert_with(|| glyphon::Buffer::new(&mut self.font_system, metrics));
-
-        buffer.set_metrics(&mut self.font_system, metrics);
-
-        if let Some(w) = width {
-            buffer.set_size(&mut self.font_system, Some(w), height);
-        }
-
-        buffer.set_text(
+        set_text_impl(
             &mut self.font_system,
+            &mut self.buffers,
+            &mut self.next_id,
+            buffer_id,
             text,
+            metrics,
+            width,
+            height,
             attrs.as_ref().unwrap_or(&glyphon::Attrs::new()),
-            glyphon::Shaping::Advanced,
-            None,
-        );
-        buffer.shape_until_scroll(&mut self.font_system, false);
+        )
+    }
 
-        id
+    /// Shapes text from an owned, `Copy` font request. `FontSelection::Named`
+    /// handles are resolved against this pipeline's family registry here, so
+    /// callers never hold a borrow of a registry name.
+    ///
+    /// An unknown handle falls back to the generic sans-serif family.
+    pub fn set_text_styled(
+        &mut self,
+        buffer_id: Option<u64>,
+        text: &str,
+        metrics: glyphon::Metrics,
+        width: Option<f32>,
+        height: Option<f32>,
+        font: FontRequest,
+    ) -> u64 {
+        let family = match font.family {
+            FontSelection::SansSerif => glyphon::Family::SansSerif,
+            FontSelection::Serif => glyphon::Family::Serif,
+            FontSelection::Monospace => glyphon::Family::Monospace,
+            FontSelection::Named(handle) => self
+                .font_families
+                .get(handle as usize)
+                .map_or(glyphon::Family::SansSerif, |name| {
+                    glyphon::Family::Name(name)
+                }),
+        };
+        let attrs = glyphon::Attrs::new()
+            .family(family)
+            .weight(glyphon::Weight(font.weight));
+
+        set_text_impl(
+            &mut self.font_system,
+            &mut self.buffers,
+            &mut self.next_id,
+            buffer_id,
+            text,
+            metrics,
+            width,
+            height,
+            &attrs,
+        )
     }
 
     pub fn remove_buffer(&mut self, buffer_id: u64) {
@@ -340,6 +368,40 @@ impl TextPipeline {
     pub fn trim_atlas(&mut self) {
         self.atlas.trim();
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn set_text_impl(
+    font_system: &mut glyphon::FontSystem,
+    buffers: &mut HashMap<u64, glyphon::Buffer>,
+    next_id: &mut u64,
+    buffer_id: Option<u64>,
+    text: &str,
+    metrics: glyphon::Metrics,
+    width: Option<f32>,
+    height: Option<f32>,
+    attrs: &glyphon::Attrs,
+) -> u64 {
+    let id = buffer_id.unwrap_or_else(|| {
+        let id = *next_id;
+        *next_id += 1;
+        id
+    });
+
+    let buffer = buffers
+        .entry(id)
+        .or_insert_with(|| glyphon::Buffer::new(font_system, metrics));
+
+    buffer.set_metrics(font_system, metrics);
+
+    if let Some(w) = width {
+        buffer.set_size(font_system, Some(w), height);
+    }
+
+    buffer.set_text(font_system, text, attrs, glyphon::Shaping::Advanced, None);
+    buffer.shape_until_scroll(font_system, false);
+
+    id
 }
 
 pub fn text_geometry(
@@ -579,6 +641,75 @@ mod tests {
             Err(FontLoadError::InvalidFontData(_))
         ));
         assert_eq!(pipeline.family_name(0), None);
+    }
+
+    #[cfg(feature = "bundled-font")]
+    #[test]
+    fn set_text_styled_named_handle_shapes_text() {
+        let mut pipeline = create_pipeline();
+        let handle = pipeline
+            .load_font_bytes(crate::font_source::IBM_PLEX_SANS_REGULAR.to_vec())
+            .expect("single-family font loads");
+
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text_styled(
+            None,
+            "Hello world",
+            metrics,
+            None,
+            None,
+            FontRequest {
+                family: FontSelection::Named(handle),
+                weight: 400,
+            },
+        );
+
+        let result = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: None,
+            },
+        );
+        assert!(result.width > 0.0);
+        assert!(result.height > 0.0);
+    }
+
+    #[test]
+    fn set_text_styled_unknown_handle_falls_back_to_sans_serif() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        let named = pipeline.set_text_styled(
+            None,
+            "Hello world",
+            metrics,
+            None,
+            None,
+            FontRequest {
+                family: FontSelection::Named(9999),
+                weight: 400,
+            },
+        );
+        let generic = pipeline.set_text_styled(
+            None,
+            "Hello world",
+            metrics,
+            None,
+            None,
+            FontRequest::default(),
+        );
+
+        let input = TextMeasureInput {
+            known_width: None,
+            known_height: None,
+            available_width: None,
+        };
+        let named = pipeline.measure_with_metadata(named, input);
+        let generic = pipeline.measure_with_metadata(generic, input);
+        assert!(named.width > 0.0);
+        assert_eq!(named.width, generic.width);
     }
 
     #[test]

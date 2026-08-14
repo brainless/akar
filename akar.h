@@ -6,6 +6,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * Unset value for `AkarTextStyle::font_family_name_handle`. Distinct from
+ * `SENTINEL_U32` (0xFF), which would collide with a real font handle.
+ */
+#define AKAR_FONT_FAMILY_NAME_HANDLE_NONE UINT32_MAX
+
 #define AKAR_SHORTCUT_MODIFIER_PRIMARY (1 << 0)
 
 #define AKAR_SHORTCUT_MODIFIER_CONTROL (1 << 1)
@@ -17,6 +23,28 @@
 #define AKAR_SHORTCUT_MODIFIER_SHIFT (1 << 4)
 
 #define AKAR_KEY_CHARACTER 11
+
+#define AKAR_FONT_LOAD_OK 0
+
+/**
+ * Null context, null byte pointer, or zero length.
+ */
+#define AKAR_FONT_LOAD_INVALID_ARGUMENT 1
+
+/**
+ * The bytes contain no parsable font face.
+ */
+#define AKAR_FONT_LOAD_INVALID_DATA 2
+
+/**
+ * The bytes parsed but carry no font family.
+ */
+#define AKAR_FONT_LOAD_EMPTY_SOURCE 3
+
+/**
+ * A collection spanning more than one family; v1 accepts exactly one.
+ */
+#define AKAR_FONT_LOAD_MULTIPLE_FAMILIES 4
 
 #define AKAR_KEY_BACKSPACE 0
 
@@ -190,6 +218,12 @@ typedef struct AkarTextStyle {
     uint32_t color;
     uint32_t font_weight;
     uint32_t font_family;
+    /**
+     * Handle returned by `akar_load_font_bytes`, selecting a runtime-loaded
+     * family and overriding `font_family`. Set to
+     * `AKAR_FONT_FAMILY_NAME_HANDLE_NONE` when unused.
+     */
+    uint32_t font_family_name_handle;
     uint32_t align;
     uint8_t wrap;
 } AkarTextStyle;
@@ -295,6 +329,19 @@ void akar_ctx_free(struct AkarCtx *ctx);
  * or real window is required. Do not call `akar_end_frame` on a mock context.
  */
 struct AkarCtx *akar_ctx_mock(void);
+
+/**
+ * Loads font bytes (TTF/OTF/TTC/OTC) into the context's font database.
+ *
+ * Returns `AKAR_FONT_LOAD_OK` and writes the family handle to `out_handle`
+ * (when non-NULL) on success, or one of the `AKAR_FONT_LOAD_*` error codes.
+ * `out_handle` is left untouched on failure. Loading the same family twice
+ * returns the same handle. Safe to call any time after context creation.
+ */
+uint32_t akar_load_font_bytes(struct AkarCtx *ctx,
+                              const uint8_t *bytes,
+                              uint32_t len,
+                              uint32_t *out_handle);
 
 void akar_begin_frame(struct AkarCtx *ctx, uint32_t width, uint32_t height, float scale_factor);
 

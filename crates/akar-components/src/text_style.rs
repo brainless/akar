@@ -5,6 +5,9 @@ pub enum FontFamily {
     SansSerif,
     Serif,
     Monospace,
+    /// A family loaded at runtime, addressed by the handle returned from
+    /// `TextPipeline::load_font_bytes` / `akar_load_font_bytes`.
+    Named(u32),
 }
 
 #[repr(C)]
@@ -100,12 +103,17 @@ pub(crate) fn resolve_text_style(
     resolved
 }
 
-#[allow(dead_code, clippy::needless_lifetimes)]
-pub(crate) fn resolved_to_attrs<'a>(rt: &ResolvedTextStyle) -> glyphon::Attrs<'a> {
+/// Builds the owned font request handed to `TextPipeline::set_text_styled`.
+///
+/// The named-family handle is resolved inside `akar-core`, immediately before
+/// shaping — components never borrow a family name out of the font registry.
+#[allow(dead_code)]
+pub(crate) fn resolved_to_font_request(rt: &ResolvedTextStyle) -> akar_core::FontRequest {
     let family = match rt.font_family {
-        FontFamily::SansSerif => glyphon::Family::SansSerif,
-        FontFamily::Serif => glyphon::Family::Serif,
-        FontFamily::Monospace => glyphon::Family::Monospace,
+        FontFamily::SansSerif => akar_core::FontSelection::SansSerif,
+        FontFamily::Serif => akar_core::FontSelection::Serif,
+        FontFamily::Monospace => akar_core::FontSelection::Monospace,
+        FontFamily::Named(handle) => akar_core::FontSelection::Named(handle),
     };
     let weight = match rt.font_weight {
         FontWeight::Normal => glyphon::Weight::NORMAL,
@@ -113,7 +121,10 @@ pub(crate) fn resolved_to_attrs<'a>(rt: &ResolvedTextStyle) -> glyphon::Attrs<'a
         FontWeight::Semibold => glyphon::Weight::SEMIBOLD,
         FontWeight::Bold => glyphon::Weight::BOLD,
     };
-    glyphon::Attrs::new().family(family).weight(weight)
+    akar_core::FontRequest {
+        family,
+        weight: weight.0,
+    }
 }
 
 #[allow(dead_code)]
@@ -226,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_to_attrs_maps_family_and_weight() {
+    fn resolved_to_font_request_maps_family_and_weight() {
         let rt = ResolvedTextStyle {
             font_size: 16.0,
             line_height: 20.0,
@@ -237,15 +248,15 @@ mod tests {
             wrap: false,
         };
 
-        let attrs = resolved_to_attrs(&rt);
+        let request = resolved_to_font_request(&rt);
 
-        assert_eq!(attrs.weight, glyphon::Weight::BOLD);
-        assert_eq!(attrs.family, glyphon::Family::Serif);
+        assert_eq!(request.weight, glyphon::Weight::BOLD.0);
+        assert_eq!(request.family, akar_core::FontSelection::Serif);
     }
 
     #[test]
     fn font_weight_enum_maps_to_glyphon_weights() {
-        let sans = resolved_to_attrs(&ResolvedTextStyle {
+        let sans = resolved_to_font_request(&ResolvedTextStyle {
             font_size: 16.0,
             line_height: 20.0,
             color: 0,
@@ -254,10 +265,10 @@ mod tests {
             align: TextAlign::Start,
             wrap: false,
         });
-        assert_eq!(sans.weight, glyphon::Weight::NORMAL);
-        assert_eq!(sans.family, glyphon::Family::SansSerif);
+        assert_eq!(sans.weight, glyphon::Weight::NORMAL.0);
+        assert_eq!(sans.family, akar_core::FontSelection::SansSerif);
 
-        let mono = resolved_to_attrs(&ResolvedTextStyle {
+        let mono = resolved_to_font_request(&ResolvedTextStyle {
             font_size: 16.0,
             line_height: 20.0,
             color: 0,
@@ -266,10 +277,10 @@ mod tests {
             align: TextAlign::Start,
             wrap: false,
         });
-        assert_eq!(mono.weight, glyphon::Weight::MEDIUM);
-        assert_eq!(mono.family, glyphon::Family::Monospace);
+        assert_eq!(mono.weight, glyphon::Weight::MEDIUM.0);
+        assert_eq!(mono.family, akar_core::FontSelection::Monospace);
 
-        let semi = resolved_to_attrs(&ResolvedTextStyle {
+        let semi = resolved_to_font_request(&ResolvedTextStyle {
             font_size: 16.0,
             line_height: 20.0,
             color: 0,
@@ -278,7 +289,36 @@ mod tests {
             align: TextAlign::Start,
             wrap: false,
         });
-        assert_eq!(semi.weight, glyphon::Weight::SEMIBOLD);
+        assert_eq!(semi.weight, glyphon::Weight::SEMIBOLD.0);
+    }
+
+    #[test]
+    fn named_family_maps_to_handle_selection() {
+        let request = resolved_to_font_request(&ResolvedTextStyle {
+            font_size: 16.0,
+            line_height: 20.0,
+            color: 0,
+            font_weight: FontWeight::Normal,
+            font_family: FontFamily::Named(7),
+            align: TextAlign::Start,
+            wrap: false,
+        });
+
+        assert_eq!(request.family, akar_core::FontSelection::Named(7));
+    }
+
+    #[test]
+    fn named_family_survives_style_cascade() {
+        let theme = AKAR_THEME_DARK;
+        let defaults = h1_defaults(&theme);
+        let override_style = TextStyle {
+            font_family: Some(FontFamily::Named(3)),
+            ..TextStyle::empty()
+        };
+
+        let resolved = resolve_text_style(&theme, &defaults, Some(&override_style));
+
+        assert_eq!(resolved.font_family, FontFamily::Named(3));
     }
 
     #[test]

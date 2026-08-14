@@ -3,7 +3,7 @@ use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_style::{
-    resolve_text_style, resolved_to_attrs, resolved_to_metrics, FontFamily, FontWeight,
+    resolve_text_style, resolved_to_font_request, resolved_to_metrics, FontFamily, FontWeight,
     ResolvedTextStyle, TextAlign, TextStyle,
 };
 use crate::AkarTheme;
@@ -38,15 +38,15 @@ pub fn paragraph(
     let defaults = paragraph_defaults(theme);
     let resolved = resolve_text_style(theme, &defaults, overrides.as_ref());
     let metrics = resolved_to_metrics(&resolved);
-    let attrs = resolved_to_attrs(&resolved);
+    let font = resolved_to_font_request(&resolved);
 
-    let buffer_id = core.text_pipeline.set_text(
+    let buffer_id = core.text_pipeline.set_text_styled(
         Some(layout.widget_id(node_id)),
         text,
         metrics,
         Some(rect[2]),
         None,
-        Some(attrs),
+        font,
     );
 
     let text_width = core.text_pipeline.measure(buffer_id, Some(rect[2])).x;

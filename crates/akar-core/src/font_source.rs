@@ -34,6 +34,37 @@ pub enum FontSource {
     BundledPlusSystemScan,
 }
 
+/// Font family selection carried in a `FontRequest`.
+///
+/// `Named` holds a handle returned by `TextPipeline::load_font_bytes`. The
+/// handle is resolved to a family name inside `TextPipeline`, so no registry
+/// string is ever borrowed across a crate boundary.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FontSelection {
+    #[default]
+    SansSerif,
+    Serif,
+    Monospace,
+    Named(u32),
+}
+
+/// Owned, `Copy` font request passed into `TextPipeline::set_text_styled`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FontRequest {
+    pub family: FontSelection,
+    /// CSS numeric weight (400 normal, 700 bold).
+    pub weight: u16,
+}
+
+impl Default for FontRequest {
+    fn default() -> Self {
+        Self {
+            family: FontSelection::default(),
+            weight: 400,
+        }
+    }
+}
+
 #[cfg(feature = "bundled-font")]
 pub const IBM_PLEX_SANS_REGULAR: &[u8] = include_bytes!("../assets/fonts/IBMPlexSans-Regular.ttf");
 

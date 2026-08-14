@@ -41,6 +41,10 @@ pub struct AkarTextAlign {
     pub value: u32,
 }
 
+/// Unset value for `AkarTextStyle::font_family_name_handle`. Distinct from
+/// `SENTINEL_U32` (0xFF), which would collide with a real font handle.
+pub const AKAR_FONT_FAMILY_NAME_HANDLE_NONE: u32 = u32::MAX;
+
 #[repr(C)]
 pub struct AkarTextStyle {
     pub font_size: f32,
@@ -48,6 +52,10 @@ pub struct AkarTextStyle {
     pub color: u32,
     pub font_weight: u32,
     pub font_family: u32,
+    /// Handle returned by `akar_load_font_bytes`, selecting a runtime-loaded
+    /// family and overriding `font_family`. Set to
+    /// `AKAR_FONT_FAMILY_NAME_HANDLE_NONE` when unused.
+    pub font_family_name_handle: u32,
     pub align: u32,
     pub wrap: u8,
 }
@@ -220,6 +228,12 @@ fn c_text_style_to_rust(ptr: *const AkarTextStyle) -> Option<akar_components::Te
             2 => akar_components::FontFamily::Monospace,
             _ => return Some(style),
         });
+        any = true;
+    }
+    if s.font_family_name_handle != AKAR_FONT_FAMILY_NAME_HANDLE_NONE {
+        style.font_family = Some(akar_components::FontFamily::Named(
+            s.font_family_name_handle,
+        ));
         any = true;
     }
     if s.align != SENTINEL_U32 {
@@ -421,6 +435,50 @@ pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
         device: std::ptr::null(),
         queue: std::ptr::null(),
     }))
+}
+
+pub const AKAR_FONT_LOAD_OK: u32 = 0;
+/// Null context, null byte pointer, or zero length.
+pub const AKAR_FONT_LOAD_INVALID_ARGUMENT: u32 = 1;
+/// The bytes contain no parsable font face.
+pub const AKAR_FONT_LOAD_INVALID_DATA: u32 = 2;
+/// The bytes parsed but carry no font family.
+pub const AKAR_FONT_LOAD_EMPTY_SOURCE: u32 = 3;
+/// A collection spanning more than one family; v1 accepts exactly one.
+pub const AKAR_FONT_LOAD_MULTIPLE_FAMILIES: u32 = 4;
+
+/// Loads font bytes (TTF/OTF/TTC/OTC) into the context's font database.
+///
+/// Returns `AKAR_FONT_LOAD_OK` and writes the family handle to `out_handle`
+/// (when non-NULL) on success, or one of the `AKAR_FONT_LOAD_*` error codes.
+/// `out_handle` is left untouched on failure. Loading the same family twice
+/// returns the same handle. Safe to call any time after context creation.
+#[no_mangle]
+pub unsafe extern "C" fn akar_load_font_bytes(
+    ctx: *mut AkarCtx,
+    bytes: *const u8,
+    len: u32,
+    out_handle: *mut u32,
+) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FONT_LOAD_INVALID_ARGUMENT;
+    };
+    if bytes.is_null() || len == 0 {
+        return AKAR_FONT_LOAD_INVALID_ARGUMENT;
+    }
+
+    let data = unsafe { std::slice::from_raw_parts(bytes, len as usize) }.to_vec();
+    match ctx.core.text_pipeline.load_font_bytes(data) {
+        Ok(handle) => {
+            if let Some(out) = unsafe { out_handle.as_mut() } {
+                *out = handle;
+            }
+            AKAR_FONT_LOAD_OK
+        }
+        Err(akar_core::FontLoadError::InvalidFontData(_)) => AKAR_FONT_LOAD_INVALID_DATA,
+        Err(akar_core::FontLoadError::EmptyFontSource) => AKAR_FONT_LOAD_EMPTY_SOURCE,
+        Err(akar_core::FontLoadError::MultipleFamilies(_)) => AKAR_FONT_LOAD_MULTIPLE_FAMILIES,
+    }
 }
 
 #[no_mangle]
@@ -3017,6 +3075,7 @@ mod component_c_api_tests {
             color: 0,
             font_weight: 0xFF,
             font_family: 0xFF,
+            font_family_name_handle: AKAR_FONT_FAMILY_NAME_HANDLE_NONE,
             align: 0xFF,
             wrap: 0xFF,
         };
@@ -3032,6 +3091,7 @@ mod component_c_api_tests {
             color: 0xff0000ff,
             font_weight: 3,
             font_family: 1,
+            font_family_name_handle: AKAR_FONT_FAMILY_NAME_HANDLE_NONE,
             align: 1,
             wrap: 1,
         };
@@ -3114,6 +3174,74 @@ mod component_c_api_tests {
         ));
     }
 
+    #[test]
+    fn c_text_style_name_handle_overrides_generic_family() {
+        let style = AkarTextStyle {
+            font_family: 1,
+            font_family_name_handle: 7,
+            ..default_c_text_style_for_test()
+        };
+        let resolved = c_text_style_to_rust(&style).expect("handle sets an override");
+        assert_eq!(
+            resolved.font_family,
+            Some(akar_components::FontFamily::Named(7))
+        );
+    }
+
+    #[test]
+    fn load_font_bytes_rejects_invalid_arguments() {
+        let ctx = unsafe { akar_ctx_mock() };
+        let mut handle = 12345u32;
+        assert_eq!(
+            unsafe {
+                akar_load_font_bytes(std::ptr::null_mut(), [0u8; 4].as_ptr(), 4, &mut handle)
+            },
+            AKAR_FONT_LOAD_INVALID_ARGUMENT
+        );
+        assert_eq!(
+            unsafe { akar_load_font_bytes(ctx, std::ptr::null(), 4, &mut handle) },
+            AKAR_FONT_LOAD_INVALID_ARGUMENT
+        );
+        assert_eq!(
+            unsafe { akar_load_font_bytes(ctx, [0u8; 4].as_ptr(), 0, &mut handle) },
+            AKAR_FONT_LOAD_INVALID_ARGUMENT
+        );
+        assert_eq!(handle, 12345, "out_handle untouched on failure");
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn load_font_bytes_rejects_garbage_data() {
+        let ctx = unsafe { akar_ctx_mock() };
+        let garbage = [0u8; 64];
+        let mut handle = 12345u32;
+        assert_eq!(
+            unsafe { akar_load_font_bytes(ctx, garbage.as_ptr(), 64, &mut handle) },
+            AKAR_FONT_LOAD_INVALID_DATA
+        );
+        assert_eq!(handle, 12345);
+        unsafe { akar_ctx_free(ctx) };
+    }
+
+    #[test]
+    fn load_font_bytes_accepts_valid_font_and_null_out_handle() {
+        let ctx = unsafe { akar_ctx_mock() };
+        let bytes = akar_core::font_source::IBM_PLEX_SANS_REGULAR;
+        let mut handle = u32::MAX;
+        assert_eq!(
+            unsafe { akar_load_font_bytes(ctx, bytes.as_ptr(), bytes.len() as u32, &mut handle) },
+            AKAR_FONT_LOAD_OK
+        );
+        assert_ne!(handle, u32::MAX);
+        assert_eq!(
+            unsafe {
+                akar_load_font_bytes(ctx, bytes.as_ptr(), bytes.len() as u32, ptr::null_mut())
+            },
+            AKAR_FONT_LOAD_OK
+        );
+        unsafe { akar_ctx_free(ctx) };
+    }
+
     fn default_c_text_style_for_test() -> AkarTextStyle {
         AkarTextStyle {
             font_size: 0.0,
@@ -3121,6 +3249,7 @@ mod component_c_api_tests {
             color: 0,
             font_weight: 0xFF,
             font_family: 0xFF,
+            font_family_name_handle: AKAR_FONT_FAMILY_NAME_HANDLE_NONE,
             align: 0xFF,
             wrap: 0xFF,
         }

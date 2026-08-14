@@ -20,5 +20,20 @@ fn main() {
         .warnings_into_errors(true)
         .cargo_metadata(false)
         .compile("akar_c_api_text_edit_tests");
+
+    let font_path = workspace_root.join("crates/akar-core/assets/fonts/IBMPlexSans-Regular.ttf");
+    cc::Build::new()
+        .file(workspace_root.join("crates/akar-c-api/tests/font.c"))
+        .include(workspace_root)
+        .define(
+            "AKAR_TEST_FONT_PATH",
+            format!("\"{}\"", font_path.display()).as_str(),
+        )
+        .warnings(true)
+        .extra_warnings(true)
+        .warnings_into_errors(true)
+        .cargo_metadata(false)
+        .compile("akar_c_api_font_tests");
+
     println!("cargo:rustc-link-search=native={out_dir}");
 }
