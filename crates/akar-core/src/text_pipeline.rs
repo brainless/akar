@@ -121,13 +121,18 @@ impl TextPipeline {
             ));
         }
 
+        // Only the primary name counts: fontdb lists every localized alias of
+        // one family in `FaceInfo::families` (English first), so counting all
+        // of them would reject a single-face font that merely carries a
+        // non-Latin alias.
         let mut families: Vec<String> = Vec::new();
         for id in ids.iter() {
             let Some(face) = db.face(*id) else { continue };
-            for (name, _) in &face.families {
-                if !families.iter().any(|existing| existing == name) {
-                    families.push(name.clone());
-                }
+            let Some((name, _)) = face.families.first() else {
+                continue;
+            };
+            if !families.iter().any(|existing| existing == name) {
+                families.push(name.clone());
             }
         }
 
@@ -695,6 +700,24 @@ mod tests {
             .load_font_bytes(crate::font_source::IBM_PLEX_SANS_SEMIBOLD.to_vec())
             .expect("same family reloads");
         assert_eq!(handle, again, "same family reuses its handle");
+    }
+
+    /// A single-face font whose family carries a localized alias must load:
+    /// fontdb reports the aliases as extra `families` entries, which an
+    /// alias-counting implementation mistakes for a multi-family collection.
+    /// Skipped where the sample font is not installed.
+    #[test]
+    fn load_font_bytes_accepts_localized_family_alias() {
+        const ALIASED_FONT: &str = "/System/Library/Fonts/Supplemental/Mishafi.ttf";
+        let Ok(bytes) = std::fs::read(ALIASED_FONT) else {
+            return;
+        };
+
+        let mut pipeline = create_pipeline();
+        let handle = pipeline
+            .load_font_bytes(bytes)
+            .expect("a localized alias is not a second family");
+        assert_eq!(pipeline.family_name(handle), Some("Mishafi"));
     }
 
     #[test]
