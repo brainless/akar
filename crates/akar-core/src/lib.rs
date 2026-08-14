@@ -10,6 +10,9 @@ pub use input::{
 pub mod quad_pipeline;
 pub use quad_pipeline::QuadPipeline;
 
+pub mod font_source;
+pub use font_source::{bundled_fonts, FontLoadError, FontSource, TextPipelineConfig};
+
 pub mod text_pipeline;
 pub use text_pipeline::{TextGeometry, TextMeasureInput, TextMeasureResult, TextPipeline};
 

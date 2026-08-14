@@ -2,7 +2,7 @@ use crate::draw_list::DrawCall;
 use crate::screenshot::ScreenshotCapture;
 use crate::{
     CapturedFrame, DrawList, InputState, QuadPipeline, ScreenshotError, TextEditKeybindings,
-    TextPipeline,
+    TextPipeline, TextPipelineConfig,
 };
 
 pub struct AkarCore {
@@ -25,6 +25,7 @@ impl AkarCore {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
+        config: TextPipelineConfig,
     ) -> Self {
         Self {
             draw_list: DrawList::new(),
@@ -32,7 +33,7 @@ impl AkarCore {
             text_edit_keybindings: TextEditKeybindings::default(),
             quad_pipeline: QuadPipeline::new(device, surface_format),
             foreground_quad_pipeline: QuadPipeline::new(device, surface_format),
-            text_pipeline: TextPipeline::new(device, queue, surface_format),
+            text_pipeline: TextPipeline::new(device, queue, surface_format, config),
             screenshot_capture: ScreenshotCapture::new(device, surface_format),
             surface_format,
             viewport_width: 0,
@@ -56,7 +57,12 @@ impl AkarCore {
         let (device, queue) =
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
                 .expect("failed to create device");
-        Self::new(&device, &queue, wgpu::TextureFormat::Bgra8UnormSrgb)
+        Self::new(
+            &device,
+            &queue,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+            TextPipelineConfig::default(),
+        )
     }
 
     pub fn begin_frame(&mut self, width: u32, height: u32, scale_factor: f32) {

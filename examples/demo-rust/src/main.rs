@@ -1618,7 +1618,12 @@ impl ApplicationHandler for App {
         let surface_format = surface_config.format;
         surface.configure(&device, &surface_config);
 
-        let mut core = AkarCore::new(&device, &queue, surface_format);
+        let mut core = AkarCore::new(
+            &device,
+            &queue,
+            surface_format,
+            akar_core::TextPipelineConfig::default(),
+        );
         core.set_text_edit_keybindings(akar_core::TextEditKeybindings::platform_default());
         let mut layout = Layout::new();
 
@@ -2273,8 +2278,7 @@ impl ApplicationHandler for App {
                                     _ => {}
                                 }
                                 for (name, rect) in state.layout.labeled_rects() {
-                                    let entry =
-                                        rects.entry(name).or_insert([0.0, 0.0, 0.0, 0.0]);
+                                    let entry = rects.entry(name).or_insert([0.0, 0.0, 0.0, 0.0]);
                                     if *entry == [0.0, 0.0, 0.0, 0.0] {
                                         *entry = rect;
                                     }

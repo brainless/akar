@@ -141,6 +141,8 @@ Two render pipelines run in the same wgpu render pass:
 1. **Quad pipeline** — axis-aligned rectangles with per-corner radius, solid fill, border. Implemented in a custom WGSL shader (SDF-based for anti-aliased corners).
 2. **Text pipeline** — glyphon's `TextRenderer` / `TextAtlas` / `Viewport` pipeline. Glyphs are cached in a GPU texture atlas by cosmic-text.
 
+The font database is built explicitly by `akar-core` (`TextPipelineConfig`, `crates/akar-core/src/font_source.rs`) — there is no implicit system font scan. By default akar embeds IBM Plex Sans Regular + SemiBold (SIL OFL 1.1, `crates/akar-core/assets/fonts/`, see `NOTICE`) behind the default-on `bundled-font` feature, so text renders identically across machines. Applications can add fonts via `TextPipelineConfig::fonts` / `TextPipeline::load_font_bytes`, or opt into the machine-dependent system scan with `FontSource::BundledPlusSystemScan`. Building `akar-core` with `--no-default-features` drops the bundled faces, and the caller must then supply at least one font.
+
 The developer supplies a wgpu `Device + Queue + Surface` (or the C equivalent). akar does not own the swap chain or the event loop.
 
 ### Immediate mode and large datasets

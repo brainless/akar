@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+default = ["bundled-font"]
+# Embeds IBM Plex Sans Regular + SemiBold (SIL OFL 1.1) into the binary so the
+# default font database is populated and reproducible across machines. With this
+# feature off, the caller must supply at least one font via TextPipelineConfig.
+bundled-font = []
 serde = ["dep:serde"]
 
 [dependencies]

@@ -108,7 +108,12 @@ impl ApplicationHandler for App {
         let surface_format = surface_config.format;
         surface.configure(&device, &surface_config);
 
-        let core = AkarCore::new(&device, &queue, surface_format);
+        let core = AkarCore::new(
+            &device,
+            &queue,
+            surface_format,
+            akar_core::TextPipelineConfig::default(),
+        );
         let mut layout = Layout::new();
 
         let mut site = sites::create_site(&self.site_name);

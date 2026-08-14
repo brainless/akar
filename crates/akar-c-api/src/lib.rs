@@ -381,7 +381,12 @@ pub unsafe extern "C" fn akar_ctx_new(
     let device_ref = unsafe { &*(device as *const wgpu::Device) };
     let queue_ref = unsafe { &*(queue as *const wgpu::Queue) };
 
-    let core = AkarCore::new(device_ref, queue_ref, format);
+    let core = AkarCore::new(
+        device_ref,
+        queue_ref,
+        format,
+        akar_core::TextPipelineConfig::default(),
+    );
     let layout = Layout::new();
     let theme = AKAR_THEME_DARK;
 

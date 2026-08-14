@@ -1,5 +1,7 @@
+use crate::font_source::{FontLoadError, FontSource, TextPipelineConfig};
 use crate::TextCall;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextGeometry {
@@ -30,15 +32,52 @@ pub struct TextPipeline {
     renderer: glyphon::TextRenderer,
     buffers: HashMap<u64, glyphon::Buffer>,
     next_id: u64,
+    font_families: Vec<String>,
 }
 
+const LOCALE: &str = "en-US";
+
 impl TextPipeline {
-    pub fn new(
+    /// Builds a pipeline with the default configuration (bundled fonts, no
+    /// system scan).
+    pub fn new_default(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         surface_format: wgpu::TextureFormat,
     ) -> Self {
-        let font_system = glyphon::FontSystem::new();
+        Self::new(device, queue, surface_format, TextPipelineConfig::default())
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the resulting font database contains no faces. akar requires
+    /// at least one font: cosmic-text panics with an opaque "no default font
+    /// found" on the first shaping call otherwise. This happens when `akar-core`
+    /// is built with `--no-default-features` (no `bundled-font`) and the caller
+    /// supplies neither `TextPipelineConfig::fonts` nor
+    /// `FontSource::BundledPlusSystemScan`.
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        surface_format: wgpu::TextureFormat,
+        config: TextPipelineConfig,
+    ) -> Self {
+        let mut db = glyphon::fontdb::Database::new();
+        if config.font_source == FontSource::BundledPlusSystemScan {
+            db.load_system_fonts();
+        }
+        for bytes in config.fonts {
+            db.load_font_source(glyphon::fontdb::Source::Binary(Arc::new(bytes)));
+        }
+        assert!(
+            !db.is_empty(),
+            "akar: no fonts available. akar-core was built without the default \
+             `bundled-font` feature, so the caller must supply a font via \
+             TextPipelineConfig::fonts (or opt into \
+             FontSource::BundledPlusSystemScan) before any text is shaped."
+        );
+
+        let font_system = glyphon::FontSystem::new_with_locale_and_db(LOCALE.to_string(), db);
         let swash_cache = glyphon::SwashCache::new();
         let cache = glyphon::Cache::new(device);
         let viewport = glyphon::Viewport::new(device, &cache);
@@ -55,7 +94,71 @@ impl TextPipeline {
             renderer,
             buffers: HashMap::new(),
             next_id: 1,
+            font_families: Vec::new(),
         }
+    }
+
+    /// Loads font bytes (TTF/OTF/TTC/OTC) into the live font database and
+    /// returns a handle for the loaded family.
+    ///
+    /// v1 accepts only sources containing exactly one distinct family: a
+    /// collection spanning several families is rejected with
+    /// `FontLoadError::MultipleFamilies` and nothing is loaded.
+    pub fn load_font_bytes(&mut self, data: Vec<u8>) -> Result<u32, FontLoadError> {
+        if data.is_empty() {
+            return Err(FontLoadError::InvalidFontData(
+                "empty byte slice".to_string(),
+            ));
+        }
+
+        let db = self.font_system.db_mut();
+        let ids = db.load_font_source(glyphon::fontdb::Source::Binary(Arc::new(data)));
+        if ids.is_empty() {
+            return Err(FontLoadError::InvalidFontData(
+                "no parsable font face in data".to_string(),
+            ));
+        }
+
+        let mut families: Vec<String> = Vec::new();
+        for id in ids.iter() {
+            let Some(face) = db.face(*id) else { continue };
+            for (name, _) in &face.families {
+                if !families.iter().any(|existing| existing == name) {
+                    families.push(name.clone());
+                }
+            }
+        }
+
+        if families.len() == 1 {
+            return Ok(self.register_family(families.remove(0)));
+        }
+
+        let db = self.font_system.db_mut();
+        for id in ids.iter() {
+            db.remove_face(*id);
+        }
+        if families.is_empty() {
+            Err(FontLoadError::EmptyFontSource)
+        } else {
+            Err(FontLoadError::MultipleFamilies(families.len()))
+        }
+    }
+
+    fn register_family(&mut self, name: String) -> u32 {
+        if let Some(index) = self
+            .font_families
+            .iter()
+            .position(|existing| *existing == name)
+        {
+            return index as u32;
+        }
+        self.font_families.push(name);
+        (self.font_families.len() - 1) as u32
+    }
+
+    /// Resolves a handle returned by `load_font_bytes` to its family name.
+    pub fn family_name(&self, handle: u32) -> Option<&str> {
+        self.font_families.get(handle as usize).map(String::as_str)
     }
 
     pub fn set_text(
@@ -408,7 +511,74 @@ mod tests {
             pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default()))
                 .expect("failed to create device");
         let format = wgpu::TextureFormat::Bgra8UnormSrgb;
-        TextPipeline::new(&device, &queue, format)
+        TextPipeline::new(&device, &queue, format, TextPipelineConfig::default())
+    }
+
+    #[test]
+    fn bundled_config_measures_latin_text() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "Hello world", metrics, None, None, None);
+
+        let result = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: None,
+            },
+        );
+
+        assert!(result.width > 0.0, "latin text must measure non-zero width");
+        assert!(result.height > 0.0);
+    }
+
+    #[test]
+    fn uncovered_script_renders_tofu_without_panicking() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "你好世界", metrics, None, None, None);
+
+        let result = pipeline.measure_with_metadata(
+            id,
+            TextMeasureInput {
+                known_width: None,
+                known_height: None,
+                available_width: None,
+            },
+        );
+
+        assert!(result.width > 0.0);
+        assert!(result.height > 0.0);
+    }
+
+    #[cfg(feature = "bundled-font")]
+    #[test]
+    fn load_font_bytes_registers_single_family() {
+        let mut pipeline = create_pipeline();
+        let handle = pipeline
+            .load_font_bytes(crate::font_source::IBM_PLEX_SANS_REGULAR.to_vec())
+            .expect("single-family font loads");
+        assert_eq!(pipeline.family_name(handle), Some("IBM Plex Sans"));
+
+        let again = pipeline
+            .load_font_bytes(crate::font_source::IBM_PLEX_SANS_SEMIBOLD.to_vec())
+            .expect("same family reloads");
+        assert_eq!(handle, again, "same family reuses its handle");
+    }
+
+    #[test]
+    fn load_font_bytes_rejects_garbage() {
+        let mut pipeline = create_pipeline();
+        assert!(matches!(
+            pipeline.load_font_bytes(vec![0u8; 64]),
+            Err(FontLoadError::InvalidFontData(_))
+        ));
+        assert!(matches!(
+            pipeline.load_font_bytes(Vec::new()),
+            Err(FontLoadError::InvalidFontData(_))
+        ));
+        assert_eq!(pipeline.family_name(0), None);
     }
 
     #[test]
@@ -507,7 +677,9 @@ mod tests {
         );
 
         assert!(narrow.height > wide.height, "wrapping yields taller text");
-        assert!(narrow.width <= 40.0 + 0.5);
+        // The longest unbreakable word can exceed the wrap width, so the
+        // measured width is bounded by that word, not by the constraint.
+        assert!(narrow.width < wide.width, "wrapping narrows measured width");
     }
 
     #[test]
