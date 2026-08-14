@@ -614,6 +614,74 @@ mod tests {
         assert!(result.height > 0.0);
     }
 
+    /// Byte-exact fingerprint of everything the renderer derives from shaping:
+    /// which face each glyph came from, which glyph it is, where it sits, and
+    /// its bidi level. Floats are hashed by their raw bits, so this is an
+    /// equality check on bytes, not on approximate geometry.
+    fn glyph_signature(pipeline: &TextPipeline, buffer_id: u64) -> Vec<u8> {
+        let buffer = pipeline.buffers.get(&buffer_id).expect("buffer exists");
+        let mut bytes = Vec::new();
+        for run in buffer.layout_runs() {
+            bytes.extend_from_slice(&run.line_i.to_le_bytes());
+            bytes.extend_from_slice(&run.line_w.to_bits().to_le_bytes());
+            bytes.extend_from_slice(&run.line_top.to_bits().to_le_bytes());
+            for glyph in run.glyphs {
+                bytes.extend_from_slice(format!("{:?}", glyph.font_id).as_bytes());
+                bytes.extend_from_slice(&glyph.glyph_id.to_le_bytes());
+                bytes.extend_from_slice(&glyph.start.to_le_bytes());
+                bytes.extend_from_slice(&glyph.end.to_le_bytes());
+                bytes.extend_from_slice(&glyph.x.to_bits().to_le_bytes());
+                bytes.extend_from_slice(&glyph.y.to_bits().to_le_bytes());
+                bytes.extend_from_slice(&glyph.w.to_bits().to_le_bytes());
+                bytes.extend_from_slice(&glyph.x_offset.to_bits().to_le_bytes());
+                bytes.extend_from_slice(&glyph.y_offset.to_bits().to_le_bytes());
+                bytes.push(glyph.level.number());
+            }
+        }
+        bytes
+    }
+
+    /// Task 8 regression check: the default `FontSource::Bundled` path is the
+    /// reproducibility guarantee akar's screenshot diffing depends on. Two
+    /// independently constructed pipelines (i.e. two contexts on the default
+    /// `AKAR_FONT_SOURCE_BUNDLED` path) must shape the same input into
+    /// byte-identical glyph output on the same machine.
+    #[test]
+    fn bundled_source_shapes_identically_across_contexts() {
+        const SAMPLE: &str = "Hello world — akar 022 fonts";
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        let signature = |request: FontRequest| {
+            assert_eq!(
+                TextPipelineConfig::default().font_source,
+                FontSource::Bundled
+            );
+            let mut pipeline = create_pipeline();
+            let id = pipeline.set_text_styled(None, SAMPLE, metrics, Some(400.0), None, request);
+            glyph_signature(&pipeline, id)
+        };
+
+        for request in [
+            FontRequest::default(),
+            FontRequest {
+                family: FontSelection::SansSerif,
+                weight: 700,
+            },
+            FontRequest {
+                family: FontSelection::Monospace,
+                weight: 400,
+            },
+        ] {
+            let first = signature(request);
+            let second = signature(request);
+            assert!(!first.is_empty(), "sample text must produce glyphs");
+            assert_eq!(
+                first, second,
+                "bundled-source shaping must be byte-identical across contexts for {request:?}"
+            );
+        }
+    }
+
     #[cfg(feature = "bundled-font")]
     #[test]
     fn load_font_bytes_registers_single_family() {

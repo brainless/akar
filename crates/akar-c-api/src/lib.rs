@@ -6,6 +6,7 @@ use std::ptr;
 use akar_components::{AkarTheme, ButtonVariant, AKAR_THEME_DARK};
 use akar_core::{
     AkarCore, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
+    TextPipelineConfig,
 };
 use akar_layout::Layout;
 
@@ -378,11 +379,41 @@ fn texture_format_from_raw(raw: u32) -> Option<wgpu::TextureFormat> {
     }
 }
 
+/// Selects how the context populates its font database. Numeric tag carried as
+/// a plain `uint32_t`, matching the existing `AkarFontFamily`/`AkarFontWeight`
+/// convention.
+pub type AkarFontSource = u32;
+
+/// Bundled fonts only; no system font scanning. Deterministic across machines
+/// and the default for every akar context.
+pub const AKAR_FONT_SOURCE_BUNDLED: AkarFontSource = 0;
+/// Bundled fonts plus a full system font scan. Broader glyph coverage, but the
+/// resolved faces are machine-dependent, so rendering is no longer reproducible
+/// across machines or operating systems. Opt-in only.
+pub const AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN: AkarFontSource = 1;
+
+/// Maps a C `AkarFontSource` tag onto a `TextPipelineConfig`.
+///
+/// Unknown / out-of-range values fall back to `AKAR_FONT_SOURCE_BUNDLED`: the
+/// reproducible default is the safe interpretation of a caller mistake, and a
+/// panic across the FFI boundary is never an option.
+fn text_pipeline_config_from_font_source(font_source: AkarFontSource) -> TextPipelineConfig {
+    match font_source {
+        AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN => TextPipelineConfig::bundled_plus_system_scan(),
+        _ => TextPipelineConfig::bundled(),
+    }
+}
+
+/// Creates a context bound to an existing wgpu device and queue.
+///
+/// `font_source` is one of the `AKAR_FONT_SOURCE_*` constants; any unrecognized
+/// value is treated as `AKAR_FONT_SOURCE_BUNDLED`.
 #[no_mangle]
 pub unsafe extern "C" fn akar_ctx_new(
     device: *const c_void,
     queue: *const c_void,
     surface_format_raw: u32,
+    font_source: AkarFontSource,
 ) -> *mut AkarCtx {
     if device.is_null() || queue.is_null() {
         return ptr::null_mut();
@@ -399,7 +430,7 @@ pub unsafe extern "C" fn akar_ctx_new(
         device_ref,
         queue_ref,
         format,
-        akar_core::TextPipelineConfig::default(),
+        text_pipeline_config_from_font_source(font_source),
     );
     let layout = Layout::new();
     let theme = AKAR_THEME_DARK;
@@ -423,6 +454,9 @@ pub unsafe extern "C" fn akar_ctx_free(ctx: *mut AkarCtx) {
 /// Creates a headless context suitable for testing layout and input logic.
 /// The GPU pipeline is initialized against a headless wgpu adapter; no surface
 /// or real window is required. Do not call `akar_end_frame` on a mock context.
+///
+/// Takes no font source: a mock context is always pinned to
+/// `AKAR_FONT_SOURCE_BUNDLED` so test rendering stays reproducible.
 #[no_mangle]
 pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
     let core = AkarCore::mock();
@@ -2652,7 +2686,35 @@ pub unsafe extern "C" fn akar_tab_bar_styled(
 
 #[cfg(test)]
 mod tests {
-    use super::{utf8_prefix_len, write_copy_to_ffi, write_value_to_ffi};
+    use super::{
+        text_pipeline_config_from_font_source, utf8_prefix_len, write_copy_to_ffi,
+        write_value_to_ffi, AKAR_FONT_SOURCE_BUNDLED, AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN,
+    };
+    use akar_core::FontSource;
+
+    #[test]
+    fn font_source_tags_map_to_configs() {
+        assert_eq!(
+            text_pipeline_config_from_font_source(AKAR_FONT_SOURCE_BUNDLED).font_source,
+            FontSource::Bundled
+        );
+        assert_eq!(
+            text_pipeline_config_from_font_source(AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN)
+                .font_source,
+            FontSource::BundledPlusSystemScan
+        );
+    }
+
+    #[test]
+    fn unknown_font_source_falls_back_to_bundled() {
+        for tag in [2u32, 99, u32::MAX] {
+            assert_eq!(
+                text_pipeline_config_from_font_source(tag).font_source,
+                FontSource::Bundled,
+                "tag {tag} must fall back to the reproducible bundled default"
+            );
+        }
+    }
 
     #[test]
     fn utf8_prefix_never_splits_a_character() {

@@ -70,6 +70,13 @@
 
 typedef struct AkarCtx AkarCtx;
 
+/**
+ * Selects how the context populates its font database. Numeric tag carried as
+ * a plain `uint32_t`, matching the existing `AkarFontFamily`/`AkarFontWeight`
+ * convention.
+ */
+typedef uint32_t AkarFontSource;
+
 typedef struct AkarRect {
     float x;
     float y;
@@ -319,7 +326,29 @@ typedef struct AkarHeadingLevel {
     uint32_t value;
 } AkarHeadingLevel;
 
-struct AkarCtx *akar_ctx_new(const void *device, const void *queue, uint32_t surface_format_raw);
+/**
+ * Bundled fonts only; no system font scanning. Deterministic across machines
+ * and the default for every akar context.
+ */
+#define AKAR_FONT_SOURCE_BUNDLED 0
+
+/**
+ * Bundled fonts plus a full system font scan. Broader glyph coverage, but the
+ * resolved faces are machine-dependent, so rendering is no longer reproducible
+ * across machines or operating systems. Opt-in only.
+ */
+#define AKAR_FONT_SOURCE_BUNDLED_PLUS_SYSTEM_SCAN 1
+
+/**
+ * Creates a context bound to an existing wgpu device and queue.
+ *
+ * `font_source` is one of the `AKAR_FONT_SOURCE_*` constants; any unrecognized
+ * value is treated as `AKAR_FONT_SOURCE_BUNDLED`.
+ */
+struct AkarCtx *akar_ctx_new(const void *device,
+                             const void *queue,
+                             uint32_t surface_format_raw,
+                             AkarFontSource font_source);
 
 void akar_ctx_free(struct AkarCtx *ctx);
 
@@ -327,6 +356,9 @@ void akar_ctx_free(struct AkarCtx *ctx);
  * Creates a headless context suitable for testing layout and input logic.
  * The GPU pipeline is initialized against a headless wgpu adapter; no surface
  * or real window is required. Do not call `akar_end_frame` on a mock context.
+ *
+ * Takes no font source: a mock context is always pinned to
+ * `AKAR_FONT_SOURCE_BUNDLED` so test rendering stays reproducible.
  */
 struct AkarCtx *akar_ctx_mock(void);
 
