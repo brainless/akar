@@ -204,17 +204,7 @@ impl TextPipeline {
         height: Option<f32>,
         font: FontRequest,
     ) -> u64 {
-        let family = match font.family {
-            FontSelection::SansSerif => glyphon::Family::SansSerif,
-            FontSelection::Serif => glyphon::Family::Serif,
-            FontSelection::Monospace => glyphon::Family::Monospace,
-            FontSelection::Named(handle) => self
-                .font_families
-                .get(handle as usize)
-                .map_or(glyphon::Family::SansSerif, |name| {
-                    glyphon::Family::Name(name)
-                }),
-        };
+        let family = resolve_font_family(&self.font_families, font.family);
         let attrs = glyphon::Attrs::new()
             .family(family)
             .weight(glyphon::Weight(font.weight));
@@ -372,6 +362,19 @@ impl TextPipeline {
 
     pub fn trim_atlas(&mut self) {
         self.atlas.trim();
+    }
+}
+
+fn resolve_font_family(font_families: &[String], selection: FontSelection) -> glyphon::Family<'_> {
+    match selection {
+        FontSelection::SansSerif => glyphon::Family::SansSerif,
+        FontSelection::Serif => glyphon::Family::Serif,
+        FontSelection::Monospace => glyphon::Family::Monospace,
+        FontSelection::Named(handle) => font_families
+            .get(handle as usize)
+            .map_or(glyphon::Family::SansSerif, |name| {
+                glyphon::Family::Name(name)
+            }),
     }
 }
 
@@ -765,6 +768,20 @@ mod tests {
         );
         assert!(result.width > 0.0);
         assert!(result.height > 0.0);
+    }
+
+    #[test]
+    fn named_handle_resolves_to_registered_family_name() {
+        let families = vec!["Distinct Test Family".to_string()];
+
+        assert!(matches!(
+            resolve_font_family(&families, FontSelection::Named(0)),
+            glyphon::Family::Name("Distinct Test Family")
+        ));
+        assert!(matches!(
+            resolve_font_family(&families, FontSelection::Named(1)),
+            glyphon::Family::SansSerif
+        ));
     }
 
     #[test]
