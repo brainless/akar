@@ -1,10 +1,10 @@
-use akar_core::{AkarCore, Key, QuadCall, TextCall, Z_TEXT_FOREGROUND};
+use akar_core::{AkarCore, CaretMotion, Key, QuadCall, TextCall, Z_TEXT_FOREGROUND};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_edit::{
-    apply_targeted_pastes, clipboard_shortcut, delete_selection, next_boundary, normalize_paste,
-    previous_boundary, replace_selection, TextEditState,
+    apply_targeted_pastes, clipboard_shortcut, collapse_selection_visually, delete_selection,
+    next_boundary, normalize_paste, previous_boundary, replace_selection, TextEditState,
 };
 use crate::AkarTheme;
 
@@ -73,6 +73,11 @@ pub fn text_input_masked(
 
     let focused = core.input.focused_id == Some(id_u64);
 
+    let text_x = rect[0] + theme.padding_x;
+    let text_y = rect[1] + theme.padding_y;
+    let max_text_width = (rect[2] - 2.0 * theme.padding_x).max(0.0);
+    let metrics = glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2);
+
     let mut changed = false;
     let mut submitted = false;
     let mut copy_text = None;
@@ -125,14 +130,68 @@ pub fn text_input_masked(
                 }
             } else {
                 match event.key {
-                    Key::Left if edit_state.has_selection() => edit_state.collapse_to_start(),
+                    Key::Left if edit_state.has_selection() => {
+                        let buffer_id = reshape_for_motion(
+                            core,
+                            id_u64,
+                            value,
+                            masked,
+                            metrics,
+                            max_text_width,
+                        );
+                        collapse_selection_visually(
+                            &core.text_pipeline,
+                            buffer_id,
+                            edit_state,
+                            CaretMotion::Left,
+                        );
+                    }
                     Key::Left => {
-                        edit_state.cursor = previous_boundary(value, edit_state.cursor);
+                        let buffer_id = reshape_for_motion(
+                            core,
+                            id_u64,
+                            value,
+                            masked,
+                            metrics,
+                            max_text_width,
+                        );
+                        edit_state.cursor = core.text_pipeline.move_caret(
+                            buffer_id,
+                            edit_state.cursor,
+                            CaretMotion::Left,
+                        );
                         edit_state.anchor = edit_state.cursor;
                     }
-                    Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
+                    Key::Right if edit_state.has_selection() => {
+                        let buffer_id = reshape_for_motion(
+                            core,
+                            id_u64,
+                            value,
+                            masked,
+                            metrics,
+                            max_text_width,
+                        );
+                        collapse_selection_visually(
+                            &core.text_pipeline,
+                            buffer_id,
+                            edit_state,
+                            CaretMotion::Right,
+                        );
+                    }
                     Key::Right => {
-                        edit_state.cursor = next_boundary(value, edit_state.cursor);
+                        let buffer_id = reshape_for_motion(
+                            core,
+                            id_u64,
+                            value,
+                            masked,
+                            metrics,
+                            max_text_width,
+                        );
+                        edit_state.cursor = core.text_pipeline.move_caret(
+                            buffer_id,
+                            edit_state.cursor,
+                            CaretMotion::Right,
+                        );
                         edit_state.anchor = edit_state.cursor;
                     }
                     Key::Home => {
@@ -179,10 +238,6 @@ pub fn text_input_masked(
         _pad: [0.0; 2],
     });
 
-    let text_x = rect[0] + theme.padding_x;
-    let text_y = rect[1] + theme.padding_y;
-    let max_text_width = rect[2] - 2.0 * theme.padding_x;
-
     let display_text = if value.is_empty() && !focused {
         placeholder.to_string()
     } else if masked && !value.is_empty() {
@@ -197,10 +252,10 @@ pub fn text_input_masked(
     };
 
     let buffer_id = core.text_pipeline.set_text(
-        Some(layout.widget_id(node_id)),
+        Some(id_u64),
         &display_text,
-        glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
-        Some(max_text_width.max(0.0)),
+        metrics,
+        Some(max_text_width),
         None,
         None,
     );
@@ -263,6 +318,39 @@ pub fn text_input_masked(
     }
 }
 
+/// Ensures the widget's stable buffer id reflects `value` as shaped right
+/// now, so a same-frame `Left`/`Right` key event always drives cosmic-text's
+/// `Buffer::cursor_motion` off the paragraph this keystroke actually acted
+/// on — not a shape left over from the previous frame, or from an earlier
+/// edit (insert/backspace/delete) processed earlier in this same frame's
+/// key-event loop. `set_text` is idempotent and already runs unconditionally
+/// once per frame for rendering, so re-running it here on demand is the
+/// smallest lifecycle-safe way to guarantee a fresh shape at the point of
+/// use, rather than restructuring the whole frame around a "shape first, then
+/// handle keys" ordering.
+fn reshape_for_motion(
+    core: &mut AkarCore,
+    id_u64: u64,
+    value: &str,
+    masked: bool,
+    metrics: glyphon::Metrics,
+    max_text_width: f32,
+) -> u64 {
+    let display = if masked && !value.is_empty() {
+        "*".repeat(value.chars().count())
+    } else {
+        value.to_string()
+    };
+    core.text_pipeline.set_text(
+        Some(id_u64),
+        &display,
+        metrics,
+        Some(max_text_width),
+        None,
+        None,
+    )
+}
+
 fn text_edit_quad(rect: [f32; 4], fill: [f32; 4], z: f32, clip: [f32; 4]) -> Option<QuadCall> {
     let x = rect[0].max(clip[0]);
     let y = rect[1].max(clip[1]);
@@ -314,6 +402,158 @@ mod tests {
 
         assert!(!result.changed);
         assert!(!result.submitted);
+    }
+
+    fn focused_field(value: &str) -> (AkarCore, Layout, NodeId, String, TextEditState) {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style {
+            size: akar_layout::Size {
+                width: akar_layout::length(300.0_f32),
+                height: akar_layout::length(40.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.compute(node_id, (Some(400.0), Some(400.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+        let id_u64 = layout.widget_id(node_id);
+        core.input.focused_id = Some(id_u64);
+
+        let edit_state = TextEditState {
+            cursor: value.len(),
+            anchor: value.len(),
+        };
+        (core, layout, node_id, value.to_string(), edit_state)
+    }
+
+    fn press_arrow(
+        core: &mut AkarCore,
+        layout: &Layout,
+        node_id: NodeId,
+        value: &mut String,
+        edit_state: &mut TextEditState,
+        key: Key,
+    ) {
+        core.input.begin_frame();
+        core.input.focused_id = Some(layout.widget_id(node_id));
+        core.input.push_key(key);
+        text_input(
+            core,
+            layout,
+            node_id,
+            value,
+            edit_state,
+            "",
+            true,
+            &AKAR_THEME_DARK,
+        );
+    }
+
+    /// ASCII alone cannot distinguish "moved by app layout direction" from
+    /// "moved by the shaped paragraph's own direction," since both would
+    /// agree on plain LTR text. This drives the arrow keys through the real
+    /// `text_input` key-event loop (not the pipeline adapter directly) for
+    /// real Arabic text, and checks that physical `Right` is a no-op at a
+    /// pure-RTL paragraph's logical start (its visually-rightmost, leading
+    /// edge), while `Left` advances.
+    #[test]
+    fn arrow_keys_follow_shaped_paragraph_direction_for_arabic_value() {
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field("مرحبا");
+        edit_state.cursor = 0;
+        edit_state.anchor = 0;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+        );
+        assert_eq!(
+            edit_state.cursor, 0,
+            "Right at the start of an RTL value must not move logically backward"
+        );
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Left,
+        );
+        assert_ne!(
+            edit_state.cursor, 0,
+            "Left at the start of an RTL value must advance logically"
+        );
+    }
+
+    /// Same wiring, but for Hebrew — a second RTL script, and an LTR value
+    /// on the same code path so the two are contrasted rather than assumed.
+    #[test]
+    fn arrow_keys_follow_shaped_paragraph_direction_for_hebrew_and_ltr_values() {
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field("שלום");
+        edit_state.cursor = 0;
+        edit_state.anchor = 0;
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+        );
+        assert_eq!(edit_state.cursor, 0);
+
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field("value");
+        edit_state.cursor = 0;
+        edit_state.anchor = 0;
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+        );
+        assert_eq!(
+            edit_state.cursor, 1,
+            "Right on an LTR value must advance logically"
+        );
+    }
+
+    /// Pressing an arrow with an active selection must collapse to the
+    /// visually-left/right endpoint, not the smaller/larger byte offset —
+    /// verified end to end through the component, on top of the
+    /// `text_edit::collapse_selection_visually` unit coverage.
+    #[test]
+    fn right_arrow_collapses_rtl_selection_to_visual_right_endpoint() {
+        let text = "שלום";
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field(text);
+        edit_state.anchor = 0;
+        edit_state.cursor = text.len();
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+        );
+
+        assert_eq!(
+            edit_state,
+            TextEditState {
+                cursor: 0,
+                anchor: 0
+            },
+            "visual-right of an RTL selection is its logical start, byte offset 0"
+        );
     }
 
     #[test]

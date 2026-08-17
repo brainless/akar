@@ -16,7 +16,9 @@ pub use font_source::{
 };
 
 pub mod text_pipeline;
-pub use text_pipeline::{TextGeometry, TextMeasureInput, TextMeasureResult, TextPipeline};
+pub use text_pipeline::{
+    CaretMotion, TextGeometry, TextMeasureInput, TextMeasureResult, TextPipeline,
+};
 
 pub mod screenshot;
 pub use screenshot::{CapturedFrame, ScreenshotError};

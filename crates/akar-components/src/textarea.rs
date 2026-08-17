@@ -1,10 +1,10 @@
-use akar_core::{AkarCore, Key, QuadCall, TextCall, Z_TEXT_FOREGROUND};
+use akar_core::{AkarCore, CaretMotion, Key, QuadCall, TextCall, Z_TEXT_FOREGROUND};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_edit::{
-    apply_targeted_pastes, clipboard_shortcut, delete_selection, next_boundary, normalize_paste,
-    previous_boundary, replace_selection, TextEditState,
+    apply_targeted_pastes, clipboard_shortcut, collapse_selection_visually, delete_selection,
+    next_boundary, normalize_paste, previous_boundary, replace_selection, TextEditState,
 };
 use crate::AkarTheme;
 
@@ -100,6 +100,9 @@ pub fn textarea(
     let max_scroll = (content_height - rect[3]).max(0.0);
     *scroll_y = scroll_y.clamp(0.0, max_scroll);
 
+    let max_text_width = (rect[2] - 2.0 * theme.padding_x).max(0.0);
+    let metrics = glyphon::Metrics::new(theme.font_size_base, line_height);
+
     let mut changed = false;
     let mut copy_text = None;
     let mut request_paste = false;
@@ -151,10 +154,44 @@ pub fn textarea(
                 }
             } else {
                 match event.key {
-                    Key::Left if edit_state.has_selection() => edit_state.collapse_to_start(),
-                    Key::Left => edit_state.cursor = previous_boundary(value, edit_state.cursor),
-                    Key::Right if edit_state.has_selection() => edit_state.collapse_to_end(),
-                    Key::Right => edit_state.cursor = next_boundary(value, edit_state.cursor),
+                    Key::Left if edit_state.has_selection() => {
+                        let buffer_id =
+                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                        collapse_selection_visually(
+                            &core.text_pipeline,
+                            buffer_id,
+                            edit_state,
+                            CaretMotion::Left,
+                        );
+                    }
+                    Key::Left => {
+                        let buffer_id =
+                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                        edit_state.cursor = core.text_pipeline.move_caret(
+                            buffer_id,
+                            edit_state.cursor,
+                            CaretMotion::Left,
+                        );
+                    }
+                    Key::Right if edit_state.has_selection() => {
+                        let buffer_id =
+                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                        collapse_selection_visually(
+                            &core.text_pipeline,
+                            buffer_id,
+                            edit_state,
+                            CaretMotion::Right,
+                        );
+                    }
+                    Key::Right => {
+                        let buffer_id =
+                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                        edit_state.cursor = core.text_pipeline.move_caret(
+                            buffer_id,
+                            edit_state.cursor,
+                            CaretMotion::Right,
+                        );
+                    }
                     Key::Up => {
                         edit_state.cursor = move_vertical(value, edit_state.cursor, -1);
                     }
@@ -208,7 +245,6 @@ pub fn textarea(
 
     let text_x = rect[0] + theme.padding_x;
     let text_y = rect[1] + theme.padding_y - *scroll_y;
-    let max_text_width = rect[2] - 2.0 * theme.padding_x;
 
     let display_text = if value.is_empty() && !focused {
         placeholder
@@ -222,10 +258,10 @@ pub fn textarea(
     };
 
     let buffer_id = core.text_pipeline.set_text(
-        Some(layout.widget_id(node_id)),
+        Some(id_u64),
         display_text,
-        glyphon::Metrics::new(theme.font_size_base, line_height),
-        Some(max_text_width.max(0.0)),
+        metrics,
+        Some(max_text_width),
         None,
         None,
     );
@@ -287,6 +323,32 @@ pub fn textarea(
     }
 }
 
+/// Ensures the widget's stable buffer id reflects `value` as shaped right
+/// now, so a same-frame `Left`/`Right` key event always drives cosmic-text's
+/// `Buffer::cursor_motion` off the paragraph this keystroke actually acted
+/// on — not a shape left over from the previous frame, or from an earlier
+/// edit (insert/backspace/delete/Enter) processed earlier in this same
+/// frame's key-event loop. `set_text` is idempotent and already runs
+/// unconditionally once per frame for rendering, so re-running it here on
+/// demand is the smallest lifecycle-safe way to guarantee a fresh shape at
+/// the point of use.
+fn reshape_for_motion(
+    core: &mut AkarCore,
+    id_u64: u64,
+    value: &str,
+    metrics: glyphon::Metrics,
+    max_text_width: f32,
+) -> u64 {
+    core.text_pipeline.set_text(
+        Some(id_u64),
+        value,
+        metrics,
+        Some(max_text_width),
+        None,
+        None,
+    )
+}
+
 fn text_edit_quad(rect: [f32; 4], fill: [f32; 4], z: f32, clip: [f32; 4]) -> Option<QuadCall> {
     let x = rect[0].max(clip[0]);
     let y = rect[1].max(clip[1]);
@@ -339,6 +401,134 @@ mod tests {
         );
 
         assert!(!result.changed);
+    }
+
+    fn focused_area(value: &str) -> (AkarCore, Layout, NodeId, String, TextEditState, f32) {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style {
+            size: akar_layout::Size {
+                width: akar_layout::length(300.0_f32),
+                height: akar_layout::length(200.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.compute(node_id, (Some(400.0), Some(400.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+        let id_u64 = layout.widget_id(node_id);
+        core.input.focused_id = Some(id_u64);
+
+        let edit_state = TextEditState {
+            cursor: value.len(),
+            anchor: value.len(),
+        };
+        (core, layout, node_id, value.to_string(), edit_state, 0.0)
+    }
+
+    fn press_arrow(
+        core: &mut AkarCore,
+        layout: &Layout,
+        node_id: NodeId,
+        value: &mut String,
+        edit_state: &mut TextEditState,
+        scroll_y: &mut f32,
+        key: Key,
+    ) {
+        core.input.begin_frame();
+        core.input.focused_id = Some(layout.widget_id(node_id));
+        core.input.push_key(key);
+        textarea(
+            core,
+            layout,
+            node_id,
+            value,
+            edit_state,
+            scroll_y,
+            "",
+            true,
+            &AKAR_THEME_DARK,
+        );
+    }
+
+    /// Right at the end of one line must cross into the start of the next
+    /// line's global byte offset, not misread the new line-local `Cursor`
+    /// index as if it were still a global offset.
+    #[test]
+    fn right_arrow_crosses_line_separator_to_next_lines_global_offset() {
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area("one\ntwo");
+        edit_state.cursor = 3; // end of "one", right before '\n'
+        edit_state.anchor = 3;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Right,
+        );
+
+        assert_eq!(
+            edit_state,
+            TextEditState {
+                cursor: 4,
+                anchor: 4
+            },
+            "must land at global offset 4 (start of \"two\"), not line-local index 4"
+        );
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Left,
+        );
+        assert_eq!(edit_state.cursor, 3);
+    }
+
+    /// Same paragraph-direction-discovery property as `text_input`, exercised
+    /// through the multi-line editor: physical `Right` is a no-op at a
+    /// pure-RTL line's logical start, `Left` advances. Uses real Arabic text
+    /// inside a `textarea`.
+    #[test]
+    fn arrow_keys_follow_shaped_paragraph_direction_in_textarea() {
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area("مرحبا\nsecond line");
+        edit_state.cursor = 0;
+        edit_state.anchor = 0;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Right,
+        );
+        assert_eq!(
+            edit_state.cursor, 0,
+            "Right at the start of an RTL first line must not move logically backward"
+        );
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Left,
+        );
+        assert_ne!(edit_state.cursor, 0);
     }
 
     #[test]

@@ -11,6 +11,16 @@ pub struct TextGeometry {
     pub selection: Vec<[f32; 4]>,
 }
 
+/// Physical caret direction for keyboard navigation. This is intentionally
+/// *not* `AkarDirection`: caret motion must follow the shaped paragraph's own
+/// bidi direction (an RTL app can contain an LTR value, and vice versa), not
+/// app-level layout direction. See `TextPipeline::move_caret`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CaretMotion {
+    Left,
+    Right,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextMeasureInput {
     pub known_width: Option<f32>,
@@ -311,6 +321,46 @@ impl TextPipeline {
             })
     }
 
+    /// Moves `offset` (akar's global byte offset into the shaped buffer's
+    /// text) one physical `Left`/`Right` step, using cosmic-text's own
+    /// `Buffer::cursor_motion`. cosmic-text picks `Previous`/`Next` based on
+    /// the shaped line's base bidi direction, so this follows the
+    /// *paragraph's* direction rather than any app-level layout direction —
+    /// correct for an LTR value inside an RTL app and vice versa.
+    ///
+    /// Returns `offset` unchanged if `buffer_id` is unknown or cosmic-text
+    /// can't resolve a motion (e.g. an empty buffer).
+    pub fn move_caret(&mut self, buffer_id: u64, offset: usize, motion: CaretMotion) -> usize {
+        let Some(buffer) = self.buffers.get_mut(&buffer_id) else {
+            return offset;
+        };
+        let cursor = global_offset_to_cursor(&buffer.lines, offset);
+        let cosmic_motion = match motion {
+            CaretMotion::Left => glyphon::cosmic_text::Motion::Left,
+            CaretMotion::Right => glyphon::cosmic_text::Motion::Right,
+        };
+        let Some((new_cursor, _)) =
+            buffer.cursor_motion(&mut self.font_system, cursor, None, cosmic_motion)
+        else {
+            return offset;
+        };
+        cursor_to_global_offset(&buffer.lines, new_cursor)
+    }
+
+    /// The shaped-glyph x position of the caret at `offset`, for comparing
+    /// two selection endpoints visually (see `move_caret`'s direction note —
+    /// this is the same paragraph-direction-aware notion of "left"/"right").
+    /// `None` if `buffer_id` is unknown or the offset's line has no shaped
+    /// run yet.
+    pub fn caret_x(&self, buffer_id: u64, offset: usize) -> Option<f32> {
+        let buffer = self.buffers.get(&buffer_id)?;
+        let cursor = global_offset_to_cursor(&buffer.lines, offset);
+        buffer
+            .layout_runs()
+            .find(|run| run.line_i == cursor.line)
+            .and_then(|run| caret_x(&run, cursor.index))
+    }
+
     pub fn prepare(
         &mut self,
         device: &wgpu::Device,
@@ -492,6 +542,37 @@ fn line_position(text: &str, starts: &[usize], position: usize) -> (usize, usize
         .find('\n')
         .map_or(text.len(), |index| start + index);
     (line, position.min(line_end) - start)
+}
+
+/// Converts akar's global byte offset (into the concatenation of every
+/// `BufferLine`'s text plus its line-ending separator) into a cosmic-text
+/// `Cursor`. Does **not** assume `\n`-only separators: it reads each line's
+/// own `LineEnding` so `\r\n`/`\r`/`\n\r` documents (were one ever shaped)
+/// round-trip too, even though akar's own paste/insert normalization only
+/// ever produces `\n`.
+fn global_offset_to_cursor(lines: &[glyphon::BufferLine], offset: usize) -> glyphon::Cursor {
+    let mut start = 0usize;
+    for (index, line) in lines.iter().enumerate() {
+        let text_len = line.text().len();
+        if offset <= start + text_len || index + 1 == lines.len() {
+            return glyphon::Cursor::new(index, offset.saturating_sub(start).min(text_len));
+        }
+        start += text_len + line.ending().as_str().len();
+    }
+    glyphon::Cursor::new(0, 0)
+}
+
+/// Inverse of `global_offset_to_cursor`.
+fn cursor_to_global_offset(lines: &[glyphon::BufferLine], cursor: glyphon::Cursor) -> usize {
+    let mut start = 0usize;
+    for (index, line) in lines.iter().enumerate() {
+        let text_len = line.text().len();
+        if index == cursor.line {
+            return start + cursor.index.min(text_len);
+        }
+        start += text_len + line.ending().as_str().len();
+    }
+    start
 }
 
 fn selected_span(
@@ -993,5 +1074,141 @@ mod tests {
         );
         assert_eq!(result.width, 0.0);
         assert_eq!(result.height, 0.0);
+    }
+
+    #[test]
+    fn global_offset_cursor_round_trips_across_multiline_text() {
+        let text = "one\ntwo\nthree";
+        let buffer = shaped_buffer(text, 500.0);
+
+        for offset in [0, 1, 3, 4, 7, 8, 12, text.len()] {
+            let cursor = global_offset_to_cursor(&buffer.lines, offset);
+            assert_eq!(
+                cursor_to_global_offset(&buffer.lines, cursor),
+                offset,
+                "offset {offset} must round-trip through Cursor {{ line: {}, index: {} }}",
+                cursor.line,
+                cursor.index
+            );
+        }
+
+        // Cursor.index is line-local, not the global offset: line 2 ("three")
+        // starts at global offset 8, so global offset 12 is index 4 on line 2,
+        // not global offset 12 reused as an index.
+        assert_eq!(
+            global_offset_to_cursor(&buffer.lines, 0),
+            glyphon::Cursor::new(0, 0)
+        );
+        assert_eq!(
+            global_offset_to_cursor(&buffer.lines, 3),
+            glyphon::Cursor::new(0, 3),
+            "end of line 0, before its separator"
+        );
+        assert_eq!(
+            global_offset_to_cursor(&buffer.lines, 4),
+            glyphon::Cursor::new(1, 0),
+            "start of line 1, just past the separator"
+        );
+        assert_eq!(
+            global_offset_to_cursor(&buffer.lines, 8),
+            glyphon::Cursor::new(2, 0),
+            "start of line 2"
+        );
+        assert_eq!(
+            global_offset_to_cursor(&buffer.lines, text.len()),
+            glyphon::Cursor::new(2, 5),
+            "end of the last line"
+        );
+    }
+
+    #[test]
+    fn move_caret_right_crosses_line_separator_to_global_offset() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let text = "one\ntwo";
+        let id = pipeline.set_text(None, text, metrics, Some(500.0), None, None);
+
+        // End of "one" (offset 3, right before the '\n') moving right must
+        // land at the start of "two" (global offset 4), not at line-local
+        // index 4 misread as a global offset.
+        let moved = pipeline.move_caret(id, 3, CaretMotion::Right);
+        assert_eq!(moved, 4);
+
+        let back = pipeline.move_caret(id, moved, CaretMotion::Left);
+        assert_eq!(back, 3);
+    }
+
+    /// ASCII-only tests cannot distinguish "moved by app layout direction"
+    /// from "moved by the shaped paragraph's own direction" because both
+    /// would agree on plain LTR text. This asserts the paragraph-direction
+    /// discovery itself: at the very start of a buffer, physical `Right`
+    /// advances through an LTR paragraph but is a no-op on an RTL one
+    /// (visually already at the paragraph's leading edge), and `Left` does
+    /// the reverse — using real Arabic and Hebrew text, not transliteration.
+    #[test]
+    fn move_caret_follows_the_shaped_paragraphs_own_direction() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        let ltr_id = pipeline.set_text(None, "hello", metrics, Some(500.0), None, None);
+        assert_eq!(pipeline.move_caret(ltr_id, 0, CaretMotion::Right), 1);
+        assert_eq!(pipeline.move_caret(ltr_id, 0, CaretMotion::Left), 0);
+
+        // Arabic: "مرحبا" (hello), a pure-RTL paragraph.
+        let arabic_id = pipeline.set_text(None, "مرحبا", metrics, Some(500.0), None, None);
+        assert_eq!(
+            pipeline.move_caret(arabic_id, 0, CaretMotion::Right),
+            0,
+            "Right at the start of an RTL paragraph must not move logically \
+             backward past its leading (visually rightmost) edge"
+        );
+        let after_left = pipeline.move_caret(arabic_id, 0, CaretMotion::Left);
+        assert_ne!(
+            after_left, 0,
+            "Left at the start of an RTL paragraph must advance logically, \
+             since visual-left is toward the paragraph's end"
+        );
+
+        // Hebrew: "שלום" (hello/peace), a pure-RTL paragraph.
+        let hebrew_id = pipeline.set_text(None, "שלום", metrics, Some(500.0), None, None);
+        assert_eq!(pipeline.move_caret(hebrew_id, 0, CaretMotion::Right), 0);
+        assert_ne!(pipeline.move_caret(hebrew_id, 0, CaretMotion::Left), 0);
+    }
+
+    /// An RTL app can still contain an LTR value: this adapter takes no
+    /// `AkarDirection` at all, so an LTR value shapes and moves the same way
+    /// regardless of what an enclosing layout direction would have been.
+    #[test]
+    fn move_caret_on_ltr_value_is_direction_parameter_free() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "value", metrics, Some(500.0), None, None);
+
+        assert_eq!(pipeline.move_caret(id, 0, CaretMotion::Right), 1);
+        assert_eq!(pipeline.move_caret(id, 5, CaretMotion::Left), 4);
+    }
+
+    #[test]
+    fn move_caret_missing_buffer_is_a_no_op() {
+        let mut pipeline = create_pipeline();
+        assert_eq!(pipeline.move_caret(9999, 3, CaretMotion::Left), 3);
+        assert_eq!(pipeline.move_caret(9999, 3, CaretMotion::Right), 3);
+    }
+
+    #[test]
+    fn caret_x_missing_buffer_returns_none() {
+        let pipeline = create_pipeline();
+        assert_eq!(pipeline.caret_x(9999, 0), None);
+    }
+
+    #[test]
+    fn caret_x_increases_left_to_right_for_ltr_text() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(None, "value", metrics, Some(500.0), None, None);
+
+        let start_x = pipeline.caret_x(id, 0).expect("caret x at start");
+        let end_x = pipeline.caret_x(id, 5).expect("caret x at end");
+        assert!(end_x > start_x, "LTR caret x must increase toward the end");
     }
 }

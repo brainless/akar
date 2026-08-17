@@ -130,9 +130,176 @@ pub fn next_boundary(value: &str, position: usize) -> usize {
         .map_or(value.len(), |character| position + character.len_utf8())
 }
 
+/// Collapses an active selection to whichever endpoint is visually in the
+/// pressed arrow's direction, using each endpoint's shaped caret x position
+/// rather than `min`/`max` byte offsets — a logical collapse is wrong for an
+/// RTL selection, where the anchor can have a *smaller* byte offset than the
+/// cursor while sitting visually to the right of it.
+///
+/// `TextEditState::collapse_to_start`/`collapse_to_end` remain logical
+/// helpers for other, non-visual callers; this is the visual counterpart for
+/// arrow-key call sites specifically.
+///
+/// Falls back to the logical cursor position if `buffer_id` has no shaped
+/// geometry for either endpoint yet (e.g. a zero-area field).
+pub(crate) fn collapse_selection_visually(
+    pipeline: &akar_core::TextPipeline,
+    buffer_id: u64,
+    state: &mut TextEditState,
+    direction: akar_core::CaretMotion,
+) {
+    let target = match (
+        pipeline.caret_x(buffer_id, state.cursor),
+        pipeline.caret_x(buffer_id, state.anchor),
+        direction,
+    ) {
+        (Some(cursor_x), Some(anchor_x), akar_core::CaretMotion::Left) => {
+            if cursor_x <= anchor_x {
+                state.cursor
+            } else {
+                state.anchor
+            }
+        }
+        (Some(cursor_x), Some(anchor_x), akar_core::CaretMotion::Right) => {
+            if cursor_x >= anchor_x {
+                state.cursor
+            } else {
+                state.anchor
+            }
+        }
+        _ => state.cursor,
+    };
+    state.cursor = target;
+    state.anchor = target;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn shaped_selection_buffer(text: &str) -> (akar_core::AkarCore, u64) {
+        let mut core = akar_core::AkarCore::mock();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let buffer_id = core
+            .text_pipeline
+            .set_text(None, text, metrics, Some(500.0), None, None);
+        (core, buffer_id)
+    }
+
+    /// A pure-LTR selection collapses the same way a logical min/max would:
+    /// visual-left is the smaller byte offset, visual-right is the larger
+    /// one. This is the baseline the RTL test below is contrasted against.
+    #[test]
+    fn collapse_selection_visually_matches_logical_bounds_for_ltr_text() {
+        let (core, buffer_id) = shaped_selection_buffer("hello");
+
+        let mut left = TextEditState {
+            cursor: 5,
+            anchor: 0,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut left,
+            akar_core::CaretMotion::Left,
+        );
+        assert_eq!(
+            left,
+            TextEditState {
+                cursor: 0,
+                anchor: 0
+            }
+        );
+
+        let mut right = TextEditState {
+            cursor: 0,
+            anchor: 5,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut right,
+            akar_core::CaretMotion::Right,
+        );
+        assert_eq!(
+            right,
+            TextEditState {
+                cursor: 5,
+                anchor: 5
+            }
+        );
+    }
+
+    /// For a pure-RTL selection, visual-left is the *larger* byte offset
+    /// (the shaped run starts at the right edge), the opposite of what a
+    /// logical min/max collapse would pick. Uses real Hebrew text, since
+    /// ASCII cannot exercise this at all.
+    #[test]
+    fn collapse_selection_visually_is_reversed_for_rtl_text() {
+        let (core, buffer_id) = shaped_selection_buffer("שלום");
+        let len = "שלום".len();
+
+        // anchor at logical start (0), cursor at logical end (len).
+        let mut left = TextEditState {
+            cursor: len,
+            anchor: 0,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut left,
+            akar_core::CaretMotion::Left,
+        );
+        assert_eq!(
+            left,
+            TextEditState {
+                cursor: len,
+                anchor: len
+            },
+            "visual-left of an RTL selection is the logical end, not offset 0"
+        );
+
+        let mut right = TextEditState {
+            cursor: len,
+            anchor: 0,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut right,
+            akar_core::CaretMotion::Right,
+        );
+        assert_eq!(
+            right,
+            TextEditState {
+                cursor: 0,
+                anchor: 0
+            },
+            "visual-right of an RTL selection is the logical start"
+        );
+    }
+
+    #[test]
+    fn collapse_selection_visually_falls_back_to_cursor_for_unknown_buffer() {
+        let (core, _buffer_id) = shaped_selection_buffer("hello");
+        let mut state = TextEditState {
+            cursor: 3,
+            anchor: 0,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            9999,
+            &mut state,
+            akar_core::CaretMotion::Left,
+        );
+        assert_eq!(
+            state,
+            TextEditState {
+                cursor: 3,
+                anchor: 3
+            }
+        );
+    }
 
     #[test]
     fn normalizes_invalid_utf8_positions() {
