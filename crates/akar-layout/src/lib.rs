@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 pub use taffy::prelude::*;
+use taffy::style::Direction;
 
 mod responsive;
 pub use responsive::responsive_columns;
@@ -14,6 +15,22 @@ pub use canvas_transform::{
 };
 
 pub type NodeId = taffy::NodeId;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AkarDirection {
+    #[default]
+    Ltr,
+    Rtl,
+}
+
+impl From<AkarDirection> for Direction {
+    fn from(direction: AkarDirection) -> Self {
+        match direction {
+            AkarDirection::Ltr => Direction::Ltr,
+            AkarDirection::Rtl => Direction::Rtl,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AkarNodeContext {
@@ -38,6 +55,7 @@ pub struct Layout {
     labels: HashMap<String, NodeId>,
     screen_origin: [f32; 2],
     namespace_id: u64,
+    direction: AkarDirection,
 }
 
 impl Layout {
@@ -48,6 +66,7 @@ impl Layout {
             labels: HashMap::new(),
             screen_origin: [0.0; 2],
             namespace_id: 0,
+            direction: AkarDirection::default(),
         }
     }
 
@@ -61,6 +80,14 @@ impl Layout {
 
     pub fn namespace_id(&self) -> u64 {
         self.namespace_id
+    }
+
+    pub fn set_direction(&mut self, direction: AkarDirection) {
+        self.direction = direction;
+    }
+
+    pub fn direction(&self) -> AkarDirection {
+        self.direction
     }
 
     pub fn widget_id(&self, node: NodeId) -> u64 {
@@ -91,15 +118,18 @@ impl Layout {
             .collect()
     }
 
-    pub fn new_leaf(&mut self, style: Style) -> NodeId {
+    pub fn new_leaf(&mut self, mut style: Style) -> NodeId {
+        style.direction = self.direction.into();
         self.tree.new_leaf(style).unwrap()
     }
 
-    pub fn new_leaf_with_context(&mut self, style: Style, ctx: AkarNodeContext) -> NodeId {
+    pub fn new_leaf_with_context(&mut self, mut style: Style, ctx: AkarNodeContext) -> NodeId {
+        style.direction = self.direction.into();
         self.tree.new_leaf_with_context(style, ctx).unwrap()
     }
 
-    pub fn new_with_children(&mut self, style: Style, children: &[NodeId]) -> NodeId {
+    pub fn new_with_children(&mut self, mut style: Style, children: &[NodeId]) -> NodeId {
+        style.direction = self.direction.into();
         let node = self.tree.new_with_children(style, children).unwrap();
         for &child in children {
             self.parents.insert(child, node);
@@ -124,7 +154,8 @@ impl Layout {
         self.tree.remove(node).unwrap();
     }
 
-    pub fn set_style(&mut self, node: NodeId, style: Style) {
+    pub fn set_style(&mut self, node: NodeId, mut style: Style) {
+        style.direction = self.direction.into();
         self.tree.set_style(node, style).unwrap();
     }
 
@@ -588,6 +619,97 @@ mod tests {
         let r_b = layout.rect(child_b);
         assert_eq!(r_b[0], 100.0, "child_b.x should be 100.0");
         assert_eq!(r_b[2], 100.0, "child_b.width should be 100.0");
+    }
+
+    #[test]
+    fn direction_defaults_to_ltr_and_round_trips() {
+        let mut layout = Layout::new();
+        assert_eq!(layout.direction(), AkarDirection::Ltr);
+
+        layout.set_direction(AkarDirection::Rtl);
+        assert_eq!(layout.direction(), AkarDirection::Rtl);
+    }
+
+    #[test]
+    fn direction_stamp_reverses_flex_row_main_axis() {
+        // LTR: child_a first (left), child_b second (right).
+        let mut ltr = Layout::new();
+
+        let child_a = ltr.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(100.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        let child_b = ltr.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(100.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        let root = ltr.new_with_children(
+            Style {
+                display: Display::Flex,
+                ..Default::default()
+            },
+            &[child_a, child_b],
+        );
+
+        ltr.compute(root, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let ltr_a = ltr.rect(child_a);
+        let ltr_b = ltr.rect(child_b);
+        assert_eq!(ltr_a[0], 0.0, "LTR child_a.x should be 0.0");
+        assert_eq!(ltr_b[0], 100.0, "LTR child_b.x should be 100.0");
+
+        // RTL: a single layout.set_direction(Rtl) call before construction should
+        // reverse the main axis for every node created afterward, without any
+        // caller touching Style.direction directly.
+        let mut rtl = Layout::new();
+        rtl.set_direction(AkarDirection::Rtl);
+
+        let child_a = rtl.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(100.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        let child_b = rtl.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(100.0),
+                height: length(50.0),
+            },
+            ..Default::default()
+        });
+
+        let root = rtl.new_with_children(
+            Style {
+                display: Display::Flex,
+                ..Default::default()
+            },
+            &[child_a, child_b],
+        );
+
+        rtl.compute(root, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let rtl_a = rtl.rect(child_a);
+        let rtl_b = rtl.rect(child_b);
+        assert_eq!(rtl_a[0], 300.0, "RTL child_a.x should be 300.0");
+        assert_eq!(rtl_b[0], 200.0, "RTL child_b.x should be 200.0");
+        assert!(
+            rtl_a[0] > rtl_b[0],
+            "RTL should place the first child to the right of the second"
+        );
     }
 
     #[test]

@@ -292,7 +292,7 @@ Tasks 7-13 below convert this proposal into concrete, file-level implementation 
 
 ### Task 7 — `AkarDirection` Type and `Layout` Plumbing
 
-**Status:** Not Started
+**Status:** Done (2026-08-17). `AkarDirection { Ltr, Rtl }` added to `crates/akar-layout/src/lib.rs` alongside `impl From<AkarDirection> for taffy::style::Direction` (via an explicit `use taffy::style::Direction;`, since it is not in `taffy::prelude`). `Layout` gained a `direction` field with `set_direction`/`direction()` accessors. The central-stamp approach was adopted: `new_leaf`, `new_leaf_with_context`, `new_with_children`, and `set_style` now stamp `style.direction = self.direction.into()` before delegating to the underlying `TaffyTree`, so a single `layout.set_direction(...)` call propagates to every node created afterward — no per-call-site edits needed across the 122+17 existing `Style { .. }` literals. Two new tests cover the default/round-trip and an end-to-end two-child flex-row mirroring assertion (children pack from the right edge under `Rtl`, matching the taffy experiment in the review section above). `cargo test --workspace` and `cargo fmt --check` pass; `cargo clippy -p akar-layout -- -D warnings` is clean (the 5 workspace-wide clippy errors are pre-existing on `main`, unrelated to this change).
 
 **Readiness:** Ready for implementation. Every target line number below was re-verified on 2026-08-12, and the one previously-unknown detail (whether `taffy::style::Direction` is reachable through akar's re-exports) is resolved.
 
