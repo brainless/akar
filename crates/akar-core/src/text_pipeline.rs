@@ -210,6 +210,7 @@ impl TextPipeline {
             width,
             height,
             attrs.as_ref().unwrap_or(&glyphon::Attrs::new()),
+            None,
         )
     }
 
@@ -218,6 +219,16 @@ impl TextPipeline {
     /// callers never hold a borrow of a registry name.
     ///
     /// An unknown handle falls back to the generic sans-serif family.
+    ///
+    /// `align`, when set, is passed straight to `Buffer::set_text` so
+    /// cosmic-text aligns the shaped text within the full component-width
+    /// buffer itself. Callers must not *also* apply a manual x-offset for
+    /// `Start`/`End` alignment on top of this — see
+    /// `text_style::resolve_align` and `crates/akar-components/src/paragraph.rs`
+    /// for the intended direction-aware mapping. Passing `None` here leaves
+    /// cosmic-text's own paragraph-direction-derived default alignment in
+    /// effect.
+    #[allow(clippy::too_many_arguments)]
     pub fn set_text_styled(
         &mut self,
         buffer_id: Option<u64>,
@@ -226,6 +237,7 @@ impl TextPipeline {
         width: Option<f32>,
         height: Option<f32>,
         font: FontRequest,
+        align: Option<glyphon::cosmic_text::Align>,
     ) -> u64 {
         let family = resolve_font_family(&self.font_families, font.family);
         let attrs = glyphon::Attrs::new()
@@ -242,6 +254,7 @@ impl TextPipeline {
             width,
             height,
             &attrs,
+            align,
         )
     }
 
@@ -452,6 +465,7 @@ fn set_text_impl(
     width: Option<f32>,
     height: Option<f32>,
     attrs: &glyphon::Attrs,
+    align: Option<glyphon::cosmic_text::Align>,
 ) -> u64 {
     let id = buffer_id.unwrap_or_else(|| {
         let id = *next_id;
@@ -469,7 +483,7 @@ fn set_text_impl(
         buffer.set_size(font_system, Some(w), height);
     }
 
-    buffer.set_text(font_system, text, attrs, glyphon::Shaping::Advanced, None);
+    buffer.set_text(font_system, text, attrs, glyphon::Shaping::Advanced, align);
     buffer.shape_until_scroll(font_system, false);
 
     id
@@ -759,7 +773,8 @@ mod tests {
                 FontSource::Bundled
             );
             let mut pipeline = create_pipeline();
-            let id = pipeline.set_text_styled(None, SAMPLE, metrics, Some(400.0), None, request);
+            let id =
+                pipeline.set_text_styled(None, SAMPLE, metrics, Some(400.0), None, request, None);
             glyph_signature(&pipeline, id)
         };
 
@@ -874,6 +889,7 @@ mod tests {
                 family: FontSelection::Named(handle),
                 weight: 400,
             },
+            None,
         );
 
         let result = pipeline.measure_with_metadata(
@@ -917,6 +933,7 @@ mod tests {
                 family: FontSelection::Named(9999),
                 weight: 400,
             },
+            None,
         );
         let generic = pipeline.set_text_styled(
             None,
@@ -925,6 +942,7 @@ mod tests {
             None,
             None,
             FontRequest::default(),
+            None,
         );
 
         let input = TextMeasureInput {
@@ -1210,5 +1228,64 @@ mod tests {
         let start_x = pipeline.caret_x(id, 0).expect("caret x at start");
         let end_x = pipeline.caret_x(id, 5).expect("caret x at end");
         assert!(end_x > start_x, "LTR caret x must increase toward the end");
+    }
+
+    /// `set_text_styled`'s `align` parameter must reach cosmic-text's own
+    /// `Buffer::set_text` so the buffer aligns itself within the full
+    /// component-width buffer, rather than akar computing a manual x-offset
+    /// on top of it (Epic 023 Task 9's resolved design). Short text in a wide
+    /// buffer is the simplest way to observe this: `Align::Right` must push
+    /// the run's glyphs toward the right edge of the buffer, further right
+    /// than the buffer's own default (left) alignment would.
+    #[test]
+    fn set_text_styled_align_right_shifts_glyphs_right_of_default() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        let default_id = pipeline.set_text_styled(
+            None,
+            "hi",
+            metrics,
+            Some(400.0),
+            None,
+            FontRequest::default(),
+            None,
+        );
+        let right_id = pipeline.set_text_styled(
+            None,
+            "hi",
+            metrics,
+            Some(400.0),
+            None,
+            FontRequest::default(),
+            Some(glyphon::cosmic_text::Align::Right),
+        );
+
+        let default_buffer = pipeline.buffers.get(&default_id).expect("default buffer");
+        let default_run = default_buffer
+            .layout_runs()
+            .next()
+            .expect("default run shaped");
+        let default_x = default_run
+            .glyphs
+            .first()
+            .map(|glyph| glyph.x)
+            .unwrap_or(0.0);
+
+        let right_buffer = pipeline
+            .buffers
+            .get(&right_id)
+            .expect("right-aligned buffer");
+        let right_run = right_buffer
+            .layout_runs()
+            .next()
+            .expect("right-aligned run shaped");
+        let right_x = right_run.glyphs.first().map(|glyph| glyph.x).unwrap_or(0.0);
+
+        assert!(
+            right_x > default_x,
+            "Align::Right must shift the shaped run right of the default alignment \
+             (default {default_x}, right-aligned {right_x})"
+        );
     }
 }

@@ -132,9 +132,68 @@ pub(crate) fn resolved_to_metrics(rt: &ResolvedTextStyle) -> glyphon::Metrics {
     glyphon::Metrics::new(rt.font_size, rt.line_height)
 }
 
+/// Maps a logical (direction-independent) `TextAlign` through
+/// `akar_layout::AkarDirection` to the physical `glyphon::cosmic_text::Align` cosmic-text
+/// needs to align a shaped run inside its own full-width buffer.
+///
+/// `Start`/`End` are logical: in LTR they mean `Left`/`Right`, and in RTL
+/// they *swap* to `Right`/`Left`. `Center` is direction-independent.
+///
+/// This mapping exists so components pass an explicit physical alignment
+/// into `TextPipeline::set_text_styled` and let cosmic-text own alignment
+/// inside the full-width buffer — instead of computing a manual x-offset on
+/// top of cosmic-text's own (already direction-aware) default alignment,
+/// which double-applies the offset for RTL content. See Epic 023 Task 9.
+pub(crate) fn resolve_align(
+    align: TextAlign,
+    direction: akar_layout::AkarDirection,
+) -> glyphon::cosmic_text::Align {
+    use akar_layout::AkarDirection;
+
+    match (align, direction) {
+        (TextAlign::Start, AkarDirection::Ltr) => glyphon::cosmic_text::Align::Left,
+        (TextAlign::Start, AkarDirection::Rtl) => glyphon::cosmic_text::Align::Right,
+        (TextAlign::End, AkarDirection::Ltr) => glyphon::cosmic_text::Align::Right,
+        (TextAlign::End, AkarDirection::Rtl) => glyphon::cosmic_text::Align::Left,
+        (TextAlign::Center, _) => glyphon::cosmic_text::Align::Center,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use akar_layout::AkarDirection;
+
+    #[test]
+    fn resolve_align_covers_all_six_align_direction_mappings() {
+        assert_eq!(
+            resolve_align(TextAlign::Start, AkarDirection::Ltr),
+            glyphon::cosmic_text::Align::Left
+        );
+        assert_eq!(
+            resolve_align(TextAlign::End, AkarDirection::Ltr),
+            glyphon::cosmic_text::Align::Right
+        );
+        assert_eq!(
+            resolve_align(TextAlign::Center, AkarDirection::Ltr),
+            glyphon::cosmic_text::Align::Center
+        );
+        assert_eq!(
+            resolve_align(TextAlign::Start, AkarDirection::Rtl),
+            glyphon::cosmic_text::Align::Right,
+            "Start is logical: it swaps to the physical right edge under RTL"
+        );
+        assert_eq!(
+            resolve_align(TextAlign::End, AkarDirection::Rtl),
+            glyphon::cosmic_text::Align::Left,
+            "End is logical: it swaps to the physical left edge under RTL"
+        );
+        assert_eq!(
+            resolve_align(TextAlign::Center, AkarDirection::Rtl),
+            glyphon::cosmic_text::Align::Center,
+            "Center is direction-independent"
+        );
+    }
     use crate::{AKAR_THEME_DARK, AKAR_THEME_LIGHT};
 
     fn h1_defaults(theme: &crate::AkarTheme) -> ResolvedTextStyle {

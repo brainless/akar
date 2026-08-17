@@ -3,8 +3,8 @@ use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_style::{
-    resolve_text_style, resolved_to_font_request, resolved_to_metrics, FontFamily, FontWeight,
-    ResolvedTextStyle, TextAlign, TextStyle,
+    resolve_align, resolve_text_style, resolved_to_font_request, resolved_to_metrics, FontFamily,
+    FontWeight, ResolvedTextStyle, TextStyle,
 };
 use crate::AkarTheme;
 
@@ -57,6 +57,7 @@ pub fn heading(
     let metrics = resolved_to_metrics(&resolved);
     let font = resolved_to_font_request(&resolved);
 
+    let align = resolve_align(resolved.align, layout.direction());
     let buffer_id = core.text_pipeline.set_text_styled(
         Some(layout.widget_id(node_id)),
         text,
@@ -64,18 +65,12 @@ pub fn heading(
         Some(rect[2]),
         None,
         font,
+        Some(align),
     );
-
-    let text_width = core.text_pipeline.measure(buffer_id, Some(rect[2])).x;
-    let x_offset = match resolved.align {
-        TextAlign::Start => 0.0,
-        TextAlign::Center => (rect[2] - text_width) * 0.5,
-        TextAlign::End => rect[2] - text_width,
-    };
 
     core.draw_list.push_text(TextCall {
         buffer_id,
-        x: rect[0] + x_offset.max(0.0),
+        x: rect[0],
         y: rect[1],
         clip: rect,
         color: color_to_f32(resolved.color),
@@ -86,6 +81,7 @@ pub fn heading(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::text_style::TextAlign;
     use crate::AKAR_THEME_DARK;
     use akar_layout::Style;
 
@@ -194,5 +190,54 @@ mod tests {
 
         let text_count = core.draw_list.len() - core.draw_list.sorted_quads().len();
         assert!(text_count >= 1);
+    }
+
+    /// Epic 023 Task 9: cosmic-text now owns Start/End alignment inside the
+    /// full-width buffer, so heading's `TextCall.x` must always sit at
+    /// `rect[0]` regardless of alignment or direction.
+    #[test]
+    fn text_call_x_is_rect_origin_across_align_and_direction() {
+        use akar_core::DrawCall;
+        use akar_layout::AkarDirection;
+
+        for direction in [AkarDirection::Ltr, AkarDirection::Rtl] {
+            for align in [TextAlign::Start, TextAlign::Center, TextAlign::End] {
+                let mut layout = akar_layout::Layout::new();
+                layout.set_direction(direction);
+                let node = sized_node(&mut layout);
+                let mut core = AkarCore::mock();
+
+                let override_style = TextStyle {
+                    align: Some(align),
+                    ..TextStyle::empty()
+                };
+
+                heading(
+                    &mut core,
+                    &layout,
+                    node,
+                    "Heading text",
+                    HeadingLevel::H1,
+                    Some(override_style),
+                    &AKAR_THEME_DARK,
+                );
+
+                let rect = layout.rect(node);
+                let text_call = core
+                    .draw_list
+                    .text_calls()
+                    .iter()
+                    .find_map(|call| match call {
+                        DrawCall::Text(text) => Some(text),
+                        DrawCall::Quad(_) => None,
+                    })
+                    .expect("heading pushes exactly one text call");
+
+                assert_eq!(
+                    text_call.x, rect[0],
+                    "align {align:?} direction {direction:?}: TextCall.x must equal rect[0]"
+                );
+            }
+        }
     }
 }

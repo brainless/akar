@@ -3,8 +3,8 @@ use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
 use crate::text_style::{
-    resolve_text_style, resolved_to_font_request, resolved_to_metrics, FontFamily, FontWeight,
-    ResolvedTextStyle, TextAlign, TextStyle,
+    resolve_align, resolve_text_style, resolved_to_font_request, resolved_to_metrics, FontFamily,
+    FontWeight, ResolvedTextStyle, TextStyle,
 };
 use crate::AkarTheme;
 
@@ -54,6 +54,7 @@ pub fn link(
     let metrics = resolved_to_metrics(&resolved);
     let font = resolved_to_font_request(&resolved);
 
+    let align = resolve_align(resolved.align, layout.direction());
     let buffer_id = core.text_pipeline.set_text_styled(
         Some(layout.widget_id(node_id)),
         text,
@@ -61,19 +62,26 @@ pub fn link(
         Some(rect[2]),
         None,
         font,
+        Some(align),
     );
 
+    // The underline is a separate quad, not part of the shaped buffer, so it
+    // must independently locate where cosmic-text placed the aligned text
+    // within the full-width buffer. `align` here is the same physical
+    // (Left/Right/Center) value handed to cosmic-text above, so this offset
+    // matches its placement without re-deriving direction.
     let text_width = {
         let measured = core.text_pipeline.measure(buffer_id, Some(rect[2]));
         measured.x
     };
-
-    let x_offset = match resolved.align {
-        TextAlign::Start => 0.0,
-        TextAlign::Center => (rect[2] - text_width) * 0.5,
-        TextAlign::End => rect[2] - text_width,
+    let underline_offset = match align {
+        glyphon::cosmic_text::Align::Left => 0.0,
+        glyphon::cosmic_text::Align::Center => (rect[2] - text_width) * 0.5,
+        glyphon::cosmic_text::Align::Right
+        | glyphon::cosmic_text::Align::End
+        | glyphon::cosmic_text::Align::Justified => rect[2] - text_width,
     };
-    let text_x = rect[0] + x_offset.max(0.0);
+    let text_x = rect[0] + underline_offset.max(0.0);
 
     if hovered {
         let underline_height = 2.0;
@@ -95,7 +103,7 @@ pub fn link(
 
     core.draw_list.push_text(TextCall {
         buffer_id,
-        x: text_x,
+        x: rect[0],
         y: rect[1],
         clip: rect,
         color: color_to_f32(resolved.color),
@@ -112,6 +120,7 @@ pub fn link(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::text_style::TextAlign;
     use crate::AKAR_THEME_DARK;
     use akar_layout::Style;
 
@@ -241,5 +250,55 @@ mod tests {
         assert_eq!(defaults.color, AKAR_THEME_DARK.primary);
         assert_eq!(defaults.font_weight, FontWeight::Normal);
         assert!(!defaults.wrap);
+    }
+
+    /// Epic 023 Task 9: cosmic-text now owns Start/End alignment inside the
+    /// full-width buffer, so link's `TextCall.x` must always sit at
+    /// `rect[0]` regardless of alignment or direction (the underline quad,
+    /// which is not part of the shaped buffer, is allowed to shift with
+    /// alignment on its own — this test targets only the text draw call).
+    #[test]
+    fn text_call_x_is_rect_origin_across_align_and_direction() {
+        use akar_core::DrawCall;
+        use akar_layout::AkarDirection;
+
+        for direction in [AkarDirection::Ltr, AkarDirection::Rtl] {
+            for align in [TextAlign::Start, TextAlign::Center, TextAlign::End] {
+                let mut layout = akar_layout::Layout::new();
+                layout.set_direction(direction);
+                let node = sized_node(&mut layout);
+                let mut core = AkarCore::mock();
+
+                let override_style = TextStyle {
+                    align: Some(align),
+                    ..TextStyle::empty()
+                };
+
+                link(
+                    &mut core,
+                    &layout,
+                    node,
+                    "Click here",
+                    Some(override_style),
+                    &AKAR_THEME_DARK,
+                );
+
+                let rect = layout.rect(node);
+                let text_call = core
+                    .draw_list
+                    .text_calls()
+                    .iter()
+                    .find_map(|call| match call {
+                        DrawCall::Text(text) => Some(text),
+                        DrawCall::Quad(_) => None,
+                    })
+                    .expect("link pushes exactly one text call");
+
+                assert_eq!(
+                    text_call.x, rect[0],
+                    "align {align:?} direction {direction:?}: TextCall.x must equal rect[0]"
+                );
+            }
+        }
     }
 }
