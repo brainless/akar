@@ -165,7 +165,7 @@ Once `akar-c-api` exists, agents integrating akar from non-Rust languages must:
 
 1. Link against the compiled shared library (`libakar.dylib` / `libakar.so` / `akar.dll`).
 2. Include the generated `akar.h` (do not write it manually — it is `cbindgen` output).
-3. Call `akar_ctx_new(device_ptr, queue_ptr)` to create an `AkarCtx*`. All subsequent calls take this pointer as the first argument.
+3. Call `akar_ctx_new(device_ptr, queue_ptr, surface_format_raw, AKAR_FONT_SOURCE_BUNDLED)` to create an `AkarCtx*`. `surface_format_raw` is the wgpu texture-format discriminant for the target surface; use the bundled font source for the normal reproducible default. All subsequent calls take this pointer as the first argument.
 4. Each frame: call `akar_begin_frame(ctx, width, height, dpi)`, submit input via `akar_set_mouse*` / `akar_push_char` etc., call component functions, call `akar_end_frame(ctx)`.
 5. Call `akar_ctx_free(ctx)` on shutdown.
 

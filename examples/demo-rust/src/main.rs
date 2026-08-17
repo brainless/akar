@@ -158,9 +158,9 @@ struct AppState {
     needs_repaint: bool,
 }
 
-/// Single-family `.ttf` candidates, tried in order. Collections spanning more
-/// than one family are rejected by `load_font_bytes`'s v1 single-family rule,
-/// so `.ttc` files are deliberately absent here.
+/// Font candidates tried in order. v1 accepts collections only when all loaded
+/// faces resolve to one distinct primary family; multi-family collections are
+/// rejected by `load_font_bytes`.
 const I18N_CJK_FONT_CANDIDATES: &[&str] = &[
     "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",

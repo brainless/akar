@@ -35,6 +35,7 @@ pub struct TextPipeline {
     buffers: HashMap<u64, glyphon::Buffer>,
     next_id: u64,
     font_families: Vec<String>,
+    font_sources: Vec<(Arc<Vec<u8>>, u32)>,
 }
 
 const LOCALE: &str = "en-US";
@@ -97,6 +98,7 @@ impl TextPipeline {
             buffers: HashMap::new(),
             next_id: 1,
             font_families: Vec::new(),
+            font_sources: Vec::new(),
         }
     }
 
@@ -113,8 +115,17 @@ impl TextPipeline {
             ));
         }
 
+        if let Some((_, handle)) = self
+            .font_sources
+            .iter()
+            .find(|(source, _)| source.as_slice() == data.as_slice())
+        {
+            return Ok(*handle);
+        }
+
+        let source = Arc::new(data);
         let db = self.font_system.db_mut();
-        let ids = db.load_font_source(glyphon::fontdb::Source::Binary(Arc::new(data)));
+        let ids = db.load_font_source(glyphon::fontdb::Source::Binary(source.clone()));
         if ids.is_empty() {
             return Err(FontLoadError::InvalidFontData(
                 "no parsable font face in data".to_string(),
@@ -137,7 +148,9 @@ impl TextPipeline {
         }
 
         if families.len() == 1 {
-            return Ok(self.register_family(families.remove(0)));
+            let handle = self.register_family(families.remove(0));
+            self.font_sources.push((source, handle));
+            return Ok(handle);
         }
 
         let db = self.font_system.db_mut();
@@ -703,6 +716,30 @@ mod tests {
             .load_font_bytes(crate::font_source::IBM_PLEX_SANS_SEMIBOLD.to_vec())
             .expect("same family reloads");
         assert_eq!(handle, again, "same family reuses its handle");
+    }
+
+    #[cfg(feature = "bundled-font")]
+    #[test]
+    fn load_font_bytes_is_idempotent_for_identical_source() {
+        let mut pipeline = create_pipeline();
+        let bytes = crate::font_source::IBM_PLEX_SANS_REGULAR.to_vec();
+        let faces_before = pipeline.font_system.db().faces().count();
+
+        let handle = pipeline
+            .load_font_bytes(bytes.clone())
+            .expect("font source loads");
+        let faces_after_first_load = pipeline.font_system.db().faces().count();
+        let again = pipeline
+            .load_font_bytes(bytes)
+            .expect("identical font source reload succeeds");
+
+        assert_eq!(handle, again, "identical source reuses its handle");
+        assert!(faces_after_first_load > faces_before);
+        assert_eq!(
+            pipeline.font_system.db().faces().count(),
+            faces_after_first_load,
+            "identical source must not add duplicate faces"
+        );
     }
 
     /// A single-face font whose family carries a localized alias must load:
