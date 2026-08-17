@@ -16,8 +16,8 @@ use akar_core::list_clip;
 use akar_core::AkarCore;
 use akar_core::Z_FLOAT;
 use akar_layout::{
-    length, AlignItems, AlignSelf, Dimension, Display, FlexDirection, JustifyContent, Layout,
-    PageConfig, Size, Style,
+    length, AkarDirection, AlignItems, AlignSelf, Dimension, Display, FlexDirection,
+    JustifyContent, Layout, PageConfig, Size, Style,
 };
 use akar_winit::process_window_event;
 use script::{parse_script, ScriptRunner};
@@ -156,6 +156,12 @@ struct AppState {
     i18n_cjk_font: Option<u32>,
     i18n_arabic_font: Option<u32>,
     needs_repaint: bool,
+    /// When true, the text-edit caret is forced visible instead of blinking.
+    /// Script-driven runs (`--script`) are frame-precise but real-time-driven
+    /// blink phase is not: a before/after arrow-key capture can land on a
+    /// blink-off frame and look byte-identical, proving nothing. See epic
+    /// 023 Task 13 tooling gotcha 1.
+    force_caret_visible: bool,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -209,11 +215,15 @@ fn main() {
     let mut dump_frame_path = None;
     let mut component_name: Option<String> = None;
     let mut list_components = false;
+    let mut rtl = false;
     let mut args = std::env::args().peekable();
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--screenshot" => {
                 screenshot_path = args.next();
+            }
+            "--rtl" => {
+                rtl = true;
             }
             "--exit" => {
                 exit_after = true;
@@ -298,6 +308,7 @@ fn main() {
             dump_layout,
             dump_frame_path,
             isolated_component,
+            rtl,
             forced_initial_state: false,
             start_time: None,
             screenshot_taken: false,
@@ -316,6 +327,7 @@ struct App {
     dump_layout: bool,
     dump_frame_path: Option<String>,
     isolated_component: Option<Component>,
+    rtl: bool,
     forced_initial_state: bool,
     start_time: Option<Instant>,
     screenshot_taken: bool,
@@ -713,7 +725,7 @@ fn render_stats_tab(state: &mut AppState) {
 
 fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
     state.cursor_tick += 1;
-    let cursor_visible = (state.cursor_tick / 30).is_multiple_of(2);
+    let cursor_visible = state.force_caret_visible || (state.cursor_tick / 30).is_multiple_of(2);
     let form_rect = state.layout.rect(state.form_container);
 
     let title_buf = state.core.text_pipeline.set_text(
@@ -1758,6 +1770,9 @@ impl ApplicationHandler for App {
         let i18n_arabic_font = load_i18n_font(&mut core, "Arabic", I18N_ARABIC_FONT_CANDIDATES);
 
         let mut layout = Layout::new();
+        if self.rtl {
+            layout.set_direction(AkarDirection::Rtl);
+        }
 
         let page = layout.page(PageConfig {
             header_height: Some(48.0),
@@ -2352,6 +2367,7 @@ impl ApplicationHandler for App {
                 pressed: false,
             },
             needs_repaint: false,
+            force_caret_visible: self.script_runner.is_some(),
         });
     }
 

@@ -284,6 +284,80 @@ mod tests {
     }
 
     #[test]
+    fn navbar_slots_mirror_under_rtl_direction() {
+        use akar_layout::AkarDirection;
+
+        let mut layout = akar_layout::Layout::new();
+        layout.set_direction(AkarDirection::Rtl);
+        let node = layout.new_leaf(Style {
+            size: Size {
+                width: length(800.0),
+                height: length(60.0),
+            },
+            ..Default::default()
+        });
+        let slots = navbar_layout(&mut layout, node, &crate::AKAR_THEME_DARK);
+
+        let child_start = layout.new_leaf(Style {
+            size: Size {
+                width: length(100.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        layout.add_child(slots.start, child_start);
+
+        let child_center = layout.new_leaf(Style {
+            size: Size {
+                width: length(200.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        layout.add_child(slots.center, child_center);
+
+        let child_end = layout.new_leaf(Style {
+            size: Size {
+                width: length(100.0),
+                height: length(40.0),
+            },
+            ..Default::default()
+        });
+        layout.add_child(slots.end, child_end);
+
+        layout.compute(node, (Some(800.0), Some(60.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+
+        let start_rect = layout.rect(slots.start);
+        let center_rect = layout.rect(slots.center);
+        let end_rect = layout.rect(slots.end);
+
+        // Under RTL the visual order of the flex row reverses: `start` packs
+        // against the right edge, `end` against the left edge, with no
+        // code change to navbar.rs itself (the direction is stamped onto
+        // every Style by Layout's central stamp per epic 023 Task 7).
+        assert!(
+            end_rect[0] <= center_rect[0] + 1.0,
+            "end.x = {}, expected <= center.x = {}",
+            end_rect[0],
+            center_rect[0]
+        );
+        assert!(
+            center_rect[0] <= start_rect[0] + 1.0,
+            "center.x = {}, expected <= start.x = {}",
+            center_rect[0],
+            start_rect[0]
+        );
+        assert!(
+            (start_rect[0] + start_rect[2] - 800.0).abs() < 1.0,
+            "start should end flush with the right edge under RTL, start.x={}, start.w={}",
+            start_rect[0],
+            start_rect[2]
+        );
+    }
+
+    #[test]
     fn navbar_combined_does_layout_and_paint() {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
