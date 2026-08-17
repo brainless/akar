@@ -3,9 +3,9 @@ use akar_c_api::{
     akar_data_item_style_default, akar_data_list_begin, akar_data_list_end, akar_input_begin,
     akar_input_end, akar_layout_compute, akar_layout_rect, akar_new_fixed_leaf, akar_new_flex_col,
     akar_new_flex_row, akar_new_leaf, akar_push_key_event, akar_push_mouse_button, akar_push_paste,
-    akar_push_scroll, akar_set_mouse_pos, akar_set_text_edit_keybindings, akar_text_input,
-    AkarDataItemStyle, AkarDataListState, AkarShortcut, AkarTextEditKeybindings, AkarTextEditState,
-    AKAR_KEY_CHARACTER, AKAR_SHORTCUT_MODIFIER_ALT,
+    akar_push_scroll, akar_set_direction, akar_set_mouse_pos, akar_set_text_edit_keybindings,
+    akar_text_input, AkarDataItemStyle, AkarDataListState, AkarShortcut, AkarTextEditKeybindings,
+    AkarTextEditState, AKAR_KEY_CHARACTER, AKAR_SHORTCUT_MODIFIER_ALT,
 };
 use std::ffi::CString;
 
@@ -64,6 +64,71 @@ fn layout_two_flex_siblings_fill_row() {
     assert!((lr.w - 400.0).abs() < 1.0, "left.w = {}", lr.w);
     assert!((rr.w - 400.0).abs() < 1.0, "right.w = {}", rr.w);
     assert!((rr.x - 400.0).abs() < 1.0, "right.x = {}", rr.x);
+
+    unsafe { akar_ctx_free(ctx) };
+}
+
+#[test]
+fn layout_set_direction_rtl_mirrors_flex_row_children() {
+    // LTR (default, no akar_set_direction call): left child packs at x=0.
+    let ltr_ctx = unsafe { akar_ctx_mock() };
+    let ltr_root = unsafe { akar_new_flex_row(ltr_ctx) };
+    let ltr_left = unsafe { akar_new_fixed_leaf(ltr_ctx, 100.0, 40.0) };
+    let ltr_right = unsafe { akar_new_fixed_leaf(ltr_ctx, 100.0, 40.0) };
+    unsafe { akar_add_child(ltr_ctx, ltr_root, ltr_left) };
+    unsafe { akar_add_child(ltr_ctx, ltr_root, ltr_right) };
+    unsafe { akar_layout_compute(ltr_ctx, ltr_root, 800.0, 600.0) };
+
+    let ltr_left_rect = unsafe { akar_layout_rect(ltr_ctx, ltr_left) };
+    let ltr_right_rect = unsafe { akar_layout_rect(ltr_ctx, ltr_right) };
+    assert!(
+        (ltr_left_rect.x - 0.0).abs() < 1.0,
+        "LTR left.x = {}",
+        ltr_left_rect.x
+    );
+    assert!(
+        (ltr_right_rect.x - 100.0).abs() < 1.0,
+        "LTR right.x = {}",
+        ltr_right_rect.x
+    );
+
+    unsafe { akar_ctx_free(ltr_ctx) };
+
+    // RTL: akar_set_direction must be called before the tree is built, since
+    // direction is stamped at node-creation time (see akar-layout Task 7).
+    let rtl_ctx = unsafe { akar_ctx_mock() };
+    let set_ok = unsafe { akar_set_direction(rtl_ctx, 1) };
+    assert!(set_ok, "akar_set_direction(Rtl) should succeed");
+
+    let rtl_root = unsafe { akar_new_flex_row(rtl_ctx) };
+    let rtl_left = unsafe { akar_new_fixed_leaf(rtl_ctx, 100.0, 40.0) };
+    let rtl_right = unsafe { akar_new_fixed_leaf(rtl_ctx, 100.0, 40.0) };
+    unsafe { akar_add_child(rtl_ctx, rtl_root, rtl_left) };
+    unsafe { akar_add_child(rtl_ctx, rtl_root, rtl_right) };
+    unsafe { akar_layout_compute(rtl_ctx, rtl_root, 800.0, 600.0) };
+
+    let rtl_left_rect = unsafe { akar_layout_rect(rtl_ctx, rtl_left) };
+    let rtl_right_rect = unsafe { akar_layout_rect(rtl_ctx, rtl_right) };
+    assert!(
+        (rtl_left_rect.x - 700.0).abs() < 1.0,
+        "RTL left.x = {}",
+        rtl_left_rect.x
+    );
+    assert!(
+        (rtl_right_rect.x - 600.0).abs() < 1.0,
+        "RTL right.x = {}",
+        rtl_right_rect.x
+    );
+
+    unsafe { akar_ctx_free(rtl_ctx) };
+}
+
+#[test]
+fn set_direction_rejects_unknown_value_and_null_ctx() {
+    let ctx = unsafe { akar_ctx_mock() };
+
+    assert!(!unsafe { akar_set_direction(ctx, 42) });
+    assert!(!unsafe { akar_set_direction(std::ptr::null_mut(), 0) });
 
     unsafe { akar_ctx_free(ctx) };
 }

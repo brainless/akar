@@ -680,6 +680,38 @@ pub unsafe extern "C" fn akar_layout_rect(ctx: *mut AkarCtx, node: u64) -> AkarR
     AkarRect { x, y, w, h }
 }
 
+/// Numeric tag for `akar_set_direction`, matching the existing
+/// `AkarFontFamily`/`AkarFontWeight`/`AkarTextAlign` convention.
+#[repr(C)]
+pub struct AkarDirection {
+    pub value: u32,
+}
+
+fn direction_from_raw(raw: u32) -> Option<akar_layout::AkarDirection> {
+    match raw {
+        0 => Some(akar_layout::AkarDirection::Ltr),
+        1 => Some(akar_layout::AkarDirection::Rtl),
+        _ => None,
+    }
+}
+
+/// Sets the layout direction (LTR/RTL) applied to every node created from
+/// this point forward. Direction is stamped at node-creation time and does
+/// not retroactively affect nodes already created; call this before building
+/// the tree it should apply to. Returns `false` on an unrecognized
+/// `direction` value or a null `ctx`.
+#[no_mangle]
+pub unsafe extern "C" fn akar_set_direction(ctx: *mut AkarCtx, direction: u32) -> bool {
+    let Some(direction) = direction_from_raw(direction) else {
+        return false;
+    };
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return false;
+    };
+    ctx.layout.set_direction(direction);
+    true
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn akar_button(
     ctx: *mut AkarCtx,

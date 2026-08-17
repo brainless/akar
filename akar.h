@@ -322,6 +322,14 @@ typedef struct AkarTextAlign {
     uint32_t value;
 } AkarTextAlign;
 
+/**
+ * Numeric tag for `akar_set_direction`, matching the existing
+ * `AkarFontFamily`/`AkarFontWeight`/`AkarTextAlign` convention.
+ */
+typedef struct AkarDirection {
+    uint32_t value;
+} AkarDirection;
+
 typedef struct AkarHeadingLevel {
     uint32_t value;
 } AkarHeadingLevel;
@@ -404,6 +412,15 @@ void akar_add_child(struct AkarCtx *ctx, uint64_t parent, uint64_t child);
 void akar_layout_compute(struct AkarCtx *ctx, uint64_t root, float width, float height);
 
 struct AkarRect akar_layout_rect(struct AkarCtx *ctx, uint64_t node);
+
+/**
+ * Sets the layout direction (LTR/RTL) applied to every node created from
+ * this point forward. Direction is stamped at node-creation time and does
+ * not retroactively affect nodes already created; call this before building
+ * the tree it should apply to. Returns `false` on an unrecognized
+ * `direction` value or a null `ctx`.
+ */
+bool akar_set_direction(struct AkarCtx *ctx, uint32_t direction);
 
 struct AkarButtonResult akar_button(struct AkarCtx *ctx,
                                     uint64_t node_id,
