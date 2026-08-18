@@ -131,7 +131,7 @@ pub fn text_input_masked(
             } else {
                 match event.key {
                     Key::Left if edit_state.has_selection() => {
-                        let buffer_id = reshape_for_motion(
+                        let shaped = reshape_for_motion(
                             core,
                             id_u64,
                             value,
@@ -139,15 +139,15 @@ pub fn text_input_masked(
                             metrics,
                             max_text_width,
                         );
-                        collapse_selection_visually(
+                        collapse_selection_for_motion(
                             &core.text_pipeline,
-                            buffer_id,
+                            &shaped,
                             edit_state,
                             CaretMotion::Left,
                         );
                     }
                     Key::Left => {
-                        let buffer_id = reshape_for_motion(
+                        let shaped = reshape_for_motion(
                             core,
                             id_u64,
                             value,
@@ -155,15 +155,16 @@ pub fn text_input_masked(
                             metrics,
                             max_text_width,
                         );
-                        edit_state.cursor = core.text_pipeline.move_caret(
-                            buffer_id,
-                            edit_state.cursor,
+                        let display_offset = core.text_pipeline.move_caret(
+                            shaped.buffer_id,
+                            shaped.offsets.to_display(edit_state.cursor),
                             CaretMotion::Left,
                         );
+                        edit_state.cursor = shaped.offsets.to_original(display_offset);
                         edit_state.anchor = edit_state.cursor;
                     }
                     Key::Right if edit_state.has_selection() => {
-                        let buffer_id = reshape_for_motion(
+                        let shaped = reshape_for_motion(
                             core,
                             id_u64,
                             value,
@@ -171,15 +172,15 @@ pub fn text_input_masked(
                             metrics,
                             max_text_width,
                         );
-                        collapse_selection_visually(
+                        collapse_selection_for_motion(
                             &core.text_pipeline,
-                            buffer_id,
+                            &shaped,
                             edit_state,
                             CaretMotion::Right,
                         );
                     }
                     Key::Right => {
-                        let buffer_id = reshape_for_motion(
+                        let shaped = reshape_for_motion(
                             core,
                             id_u64,
                             value,
@@ -187,11 +188,12 @@ pub fn text_input_masked(
                             metrics,
                             max_text_width,
                         );
-                        edit_state.cursor = core.text_pipeline.move_caret(
-                            buffer_id,
-                            edit_state.cursor,
+                        let display_offset = core.text_pipeline.move_caret(
+                            shaped.buffer_id,
+                            shaped.offsets.to_display(edit_state.cursor),
                             CaretMotion::Right,
                         );
+                        edit_state.cursor = shaped.offsets.to_original(display_offset);
                         edit_state.anchor = edit_state.cursor;
                     }
                     Key::Home => {
@@ -260,11 +262,12 @@ pub fn text_input_masked(
         None,
     );
 
+    let offsets = TextOffsetMap::new(value, masked);
     let geometry = core.text_pipeline.geometry(
         buffer_id,
         &display_text,
-        edit_state.cursor,
-        edit_state.anchor,
+        offsets.to_display(edit_state.cursor),
+        offsets.to_display(edit_state.anchor),
     );
     core.draw_list.push_scissor(rect);
     if focused {
@@ -335,20 +338,87 @@ fn reshape_for_motion(
     masked: bool,
     metrics: glyphon::Metrics,
     max_text_width: f32,
-) -> u64 {
+) -> ShapedForMotion {
     let display = if masked && !value.is_empty() {
         "*".repeat(value.chars().count())
     } else {
         value.to_string()
     };
-    core.text_pipeline.set_text(
+    let buffer_id = core.text_pipeline.set_text(
         Some(id_u64),
         &display,
         metrics,
         Some(max_text_width),
         None,
         None,
-    )
+    );
+    ShapedForMotion {
+        buffer_id,
+        offsets: TextOffsetMap::new(value, masked),
+    }
+}
+
+struct ShapedForMotion {
+    buffer_id: u64,
+    offsets: TextOffsetMap,
+}
+
+enum TextOffsetMap {
+    Identity,
+    Masked { original_boundaries: Vec<usize> },
+}
+
+impl TextOffsetMap {
+    fn new(value: &str, masked: bool) -> Self {
+        if !masked {
+            return Self::Identity;
+        }
+        Self::Masked {
+            original_boundaries: value
+                .char_indices()
+                .map(|(offset, _)| offset)
+                .chain(std::iter::once(value.len()))
+                .collect(),
+        }
+    }
+
+    fn to_display(&self, original_offset: usize) -> usize {
+        match self {
+            Self::Identity => original_offset,
+            Self::Masked {
+                original_boundaries,
+            } => original_boundaries
+                .partition_point(|boundary| *boundary <= original_offset)
+                .saturating_sub(1),
+        }
+    }
+
+    fn to_original(&self, display_offset: usize) -> usize {
+        match self {
+            Self::Identity => display_offset,
+            Self::Masked {
+                original_boundaries,
+            } => original_boundaries
+                .get(display_offset)
+                .copied()
+                .unwrap_or_else(|| original_boundaries.last().copied().unwrap_or(0)),
+        }
+    }
+}
+
+fn collapse_selection_for_motion(
+    pipeline: &akar_core::TextPipeline,
+    shaped: &ShapedForMotion,
+    state: &mut TextEditState,
+    direction: CaretMotion,
+) {
+    let mut display_state = TextEditState {
+        cursor: shaped.offsets.to_display(state.cursor),
+        anchor: shaped.offsets.to_display(state.anchor),
+    };
+    collapse_selection_visually(pipeline, shaped.buffer_id, &mut display_state, direction);
+    state.cursor = shaped.offsets.to_original(display_state.cursor);
+    state.anchor = state.cursor;
 }
 
 fn text_edit_quad(rect: [f32; 4], fill: [f32; 4], z: f32, clip: [f32; 4]) -> Option<QuadCall> {
@@ -437,10 +507,22 @@ mod tests {
         edit_state: &mut TextEditState,
         key: Key,
     ) {
+        press_arrow_masked(core, layout, node_id, value, edit_state, key, false);
+    }
+
+    fn press_arrow_masked(
+        core: &mut AkarCore,
+        layout: &Layout,
+        node_id: NodeId,
+        value: &mut String,
+        edit_state: &mut TextEditState,
+        key: Key,
+        masked: bool,
+    ) {
         core.input.begin_frame();
         core.input.focused_id = Some(layout.widget_id(node_id));
         core.input.push_key(key);
-        text_input(
+        text_input_masked(
             core,
             layout,
             node_id,
@@ -449,7 +531,91 @@ mod tests {
             "",
             true,
             &AKAR_THEME_DARK,
+            masked,
         );
+    }
+
+    #[test]
+    fn masked_multibyte_ltr_arrows_preserve_original_utf8_boundaries() {
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field("éa");
+        edit_state.cursor = 2;
+        edit_state.anchor = 2;
+
+        press_arrow_masked(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Left,
+            true,
+        );
+        assert_eq!(edit_state.cursor, 0);
+        assert!(value.is_char_boundary(edit_state.cursor));
+
+        press_arrow_masked(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+            true,
+        );
+        assert_eq!(edit_state.cursor, 2);
+        assert!(value.is_char_boundary(edit_state.cursor));
+    }
+
+    #[test]
+    fn masked_multibyte_rtl_arrows_and_selection_preserve_original_utf8_boundaries() {
+        let text = "שלום";
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field(text);
+        let first_character_end = text.chars().next().unwrap().len_utf8();
+        edit_state.cursor = first_character_end;
+        edit_state.anchor = first_character_end;
+
+        press_arrow_masked(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Right,
+            true,
+        );
+        assert_eq!(edit_state.cursor, first_character_end * 2);
+        assert!(value.is_char_boundary(edit_state.cursor));
+
+        edit_state.anchor = 0;
+        press_arrow_masked(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Left,
+            true,
+        );
+        assert_eq!(edit_state, TextEditState::default());
+    }
+
+    #[test]
+    fn unmasked_multibyte_arrow_motion_keeps_shaped_rtl_behavior() {
+        let text = "שלום";
+        let (mut core, layout, node_id, mut value, mut edit_state) = focused_field(text);
+        edit_state.cursor = 0;
+        edit_state.anchor = 0;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            Key::Left,
+        );
+        assert_ne!(edit_state.cursor, 0);
+        assert!(value.is_char_boundary(edit_state.cursor));
     }
 
     /// ASCII alone cannot distinguish "moved by app layout direction" from

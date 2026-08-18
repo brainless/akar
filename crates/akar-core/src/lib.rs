@@ -17,7 +17,8 @@ pub use font_source::{
 
 pub mod text_pipeline;
 pub use text_pipeline::{
-    CaretMotion, TextGeometry, TextMeasureInput, TextMeasureResult, TextPipeline,
+    CaretMotion, ShapedCaretPosition, TextGeometry, TextMeasureInput, TextMeasureResult,
+    TextPipeline,
 };
 
 pub mod screenshot;

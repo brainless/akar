@@ -21,6 +21,17 @@ pub enum CaretMotion {
     Right,
 }
 
+/// A caret's position in shaped visual order.
+///
+/// `line` identifies the source-text line, `run` identifies a wrapped visual
+/// run within that line, and `x` preserves bidi-aware ordering within the run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ShapedCaretPosition {
+    pub line: usize,
+    pub run: usize,
+    pub x: f32,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TextMeasureInput {
     pub known_width: Option<f32>,
@@ -360,18 +371,33 @@ impl TextPipeline {
         cursor_to_global_offset(&buffer.lines, new_cursor)
     }
 
-    /// The shaped-glyph x position of the caret at `offset`, for comparing
-    /// two selection endpoints visually (see `move_caret`'s direction note —
-    /// this is the same paragraph-direction-aware notion of "left"/"right").
-    /// `None` if `buffer_id` is unknown or the offset's line has no shaped
-    /// run yet.
-    pub fn caret_x(&self, buffer_id: u64, offset: usize) -> Option<f32> {
+    /// The caret's shaped source-line, wrapped-run, and x position. Source
+    /// line and run order make multiline comparisons stable; x retains the
+    /// bidi-aware visual order for endpoints in the same run.
+    pub fn caret_position(&self, buffer_id: u64, offset: usize) -> Option<ShapedCaretPosition> {
         let buffer = self.buffers.get(&buffer_id)?;
         let cursor = global_offset_to_cursor(&buffer.lines, offset);
-        buffer
-            .layout_runs()
-            .find(|run| run.line_i == cursor.line)
-            .and_then(|run| caret_x(&run, cursor.index))
+        let mut run_in_line = 0;
+        for run in buffer.layout_runs() {
+            if run.line_i != cursor.line {
+                continue;
+            }
+            if let Some(x) = caret_x(&run, cursor.index) {
+                return Some(ShapedCaretPosition {
+                    line: cursor.line,
+                    run: run_in_line,
+                    x,
+                });
+            }
+            run_in_line += 1;
+        }
+        None
+    }
+
+    /// The shaped-glyph x position of the caret at `offset`.
+    pub fn caret_x(&self, buffer_id: u64, offset: usize) -> Option<f32> {
+        self.caret_position(buffer_id, offset)
+            .map(|position| position.x)
     }
 
     pub fn prepare(
@@ -1228,6 +1254,44 @@ mod tests {
         let start_x = pipeline.caret_x(id, 0).expect("caret x at start");
         let end_x = pipeline.caret_x(id, 5).expect("caret x at end");
         assert!(end_x > start_x, "LTR caret x must increase toward the end");
+    }
+
+    #[test]
+    fn caret_position_exposes_source_line_order() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let text = "long first line\nx";
+        let id = pipeline.set_text(None, text, metrics, Some(500.0), None, None);
+
+        let first = pipeline.caret_position(id, 10).expect("first-line caret");
+        let second = pipeline
+            .caret_position(id, "long first line\n".len())
+            .expect("second-line caret");
+        assert_eq!((first.line, first.run), (0, 0));
+        assert_eq!((second.line, second.run), (1, 0));
+        assert!(first.x > second.x, "test must exercise misleading x order");
+    }
+
+    #[test]
+    fn caret_position_exposes_wrapped_run_order() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+        let id = pipeline.set_text(
+            None,
+            "one two three four five",
+            metrics,
+            Some(55.0),
+            None,
+            None,
+        );
+
+        let first = pipeline.caret_position(id, 0).expect("first visual run");
+        let last = pipeline
+            .caret_position(id, "one two three four five".len())
+            .expect("last visual run");
+        assert_eq!(first.line, 0);
+        assert_eq!(last.line, 0);
+        assert!(last.run > first.run, "narrow width must wrap the text");
     }
 
     /// `set_text_styled`'s `align` parameter must reach cosmic-text's own

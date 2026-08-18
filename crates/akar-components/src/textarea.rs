@@ -532,6 +532,107 @@ mod tests {
     }
 
     #[test]
+    fn selection_collapse_uses_line_order_in_ltr_textarea() {
+        let text = "long first line\nx";
+        let second_start = "long first line\n".len();
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area(text);
+        edit_state.cursor = second_start;
+        edit_state.anchor = 10;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Left,
+        );
+        assert_eq!(edit_state.cursor, 10);
+
+        edit_state.cursor = 10;
+        edit_state.anchor = second_start;
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Right,
+        );
+        assert_eq!(edit_state.cursor, second_start);
+    }
+
+    #[test]
+    fn selection_collapse_uses_line_order_in_rtl_textarea() {
+        let first_end = "שלום".len();
+        let second_start = first_end + 1;
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area("שלום\nא");
+        edit_state.cursor = second_start;
+        edit_state.anchor = first_end;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Left,
+        );
+        assert_eq!(edit_state.cursor, first_end);
+
+        edit_state.cursor = first_end;
+        edit_state.anchor = second_start;
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Right,
+        );
+        assert_eq!(edit_state.cursor, second_start);
+    }
+
+    #[test]
+    fn selection_collapse_remains_bidi_aware_within_one_rtl_line() {
+        let len = "שלום".len();
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area("שלום");
+        edit_state.cursor = len;
+        edit_state.anchor = 0;
+
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Left,
+        );
+        assert_eq!(edit_state.cursor, len);
+
+        edit_state.cursor = len;
+        edit_state.anchor = 0;
+        press_arrow(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            Key::Right,
+        );
+        assert_eq!(edit_state.cursor, 0);
+    }
+
+    #[test]
     fn vertical_navigation_uses_unicode_character_columns() {
         let value = "aé🙂z\n12345\né🙂";
 

@@ -131,10 +131,9 @@ pub fn next_boundary(value: &str, position: usize) -> usize {
 }
 
 /// Collapses an active selection to whichever endpoint is visually in the
-/// pressed arrow's direction, using each endpoint's shaped caret x position
-/// rather than `min`/`max` byte offsets — a logical collapse is wrong for an
-/// RTL selection, where the anchor can have a *smaller* byte offset than the
-/// cursor while sitting visually to the right of it.
+/// pressed arrow's direction. Source-line and wrapped-run order decide which
+/// endpoint comes first across visual lines; shaped x decides within one run,
+/// where logical byte order is wrong for RTL text.
 ///
 /// `TextEditState::collapse_to_start`/`collapse_to_end` remain logical
 /// helpers for other, non-visual callers; this is the visual counterpart for
@@ -149,19 +148,23 @@ pub(crate) fn collapse_selection_visually(
     direction: akar_core::CaretMotion,
 ) {
     let target = match (
-        pipeline.caret_x(buffer_id, state.cursor),
-        pipeline.caret_x(buffer_id, state.anchor),
+        pipeline.caret_position(buffer_id, state.cursor),
+        pipeline.caret_position(buffer_id, state.anchor),
         direction,
     ) {
-        (Some(cursor_x), Some(anchor_x), akar_core::CaretMotion::Left) => {
-            if cursor_x <= anchor_x {
+        (Some(cursor), Some(anchor), akar_core::CaretMotion::Left) => {
+            if (cursor.line, cursor.run) < (anchor.line, anchor.run)
+                || ((cursor.line, cursor.run) == (anchor.line, anchor.run) && cursor.x <= anchor.x)
+            {
                 state.cursor
             } else {
                 state.anchor
             }
         }
-        (Some(cursor_x), Some(anchor_x), akar_core::CaretMotion::Right) => {
-            if cursor_x >= anchor_x {
+        (Some(cursor), Some(anchor), akar_core::CaretMotion::Right) => {
+            if (cursor.line, cursor.run) > (anchor.line, anchor.run)
+                || ((cursor.line, cursor.run) == (anchor.line, anchor.run) && cursor.x >= anchor.x)
+            {
                 state.cursor
             } else {
                 state.anchor
@@ -277,6 +280,74 @@ mod tests {
             },
             "visual-right of an RTL selection is the logical start"
         );
+    }
+
+    #[test]
+    fn collapse_selection_visually_orders_ltr_endpoints_across_lines() {
+        let text = "long first line\nx";
+        let (core, buffer_id) = shaped_selection_buffer(text);
+        let second_line = "long first line\n".len();
+
+        let mut left = TextEditState {
+            cursor: second_line,
+            anchor: 10,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut left,
+            akar_core::CaretMotion::Left,
+        );
+        assert_eq!(
+            left.cursor, 10,
+            "the earlier line wins despite its larger x"
+        );
+
+        let mut right = TextEditState {
+            cursor: 10,
+            anchor: second_line,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut right,
+            akar_core::CaretMotion::Right,
+        );
+        assert_eq!(right.cursor, second_line);
+    }
+
+    #[test]
+    fn collapse_selection_visually_orders_rtl_endpoints_across_lines() {
+        let first_end = "שלום".len();
+        let second_start = first_end + 1;
+        let (core, buffer_id) = shaped_selection_buffer("שלום\nא");
+
+        let mut left = TextEditState {
+            cursor: second_start,
+            anchor: first_end,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut left,
+            akar_core::CaretMotion::Left,
+        );
+        assert_eq!(
+            left.cursor, first_end,
+            "line order takes precedence over RTL x"
+        );
+
+        let mut right = TextEditState {
+            cursor: first_end,
+            anchor: second_start,
+        };
+        collapse_selection_visually(
+            &core.text_pipeline,
+            buffer_id,
+            &mut right,
+            akar_core::CaretMotion::Right,
+        );
+        assert_eq!(right.cursor, second_start);
     }
 
     #[test]
