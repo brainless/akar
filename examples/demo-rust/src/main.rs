@@ -33,6 +33,7 @@ use winit::{
 };
 
 mod catalog;
+mod cli;
 mod script;
 
 #[derive(serde::Serialize)]
@@ -208,81 +209,45 @@ fn load_i18n_font(core: &mut AkarCore, label: &str, candidates: &[&str]) -> Opti
 }
 
 fn main() {
-    let mut screenshot_path = None;
-    let mut exit_after = false;
-    let mut delay_secs = 5.0;
-    let mut script_path = None;
-    let mut dump_layout = false;
-    let mut dump_frame_path = None;
-    let mut component_name: Option<String> = None;
-    let mut list_components = false;
-    let mut rtl = false;
-    let mut args = std::env::args().peekable();
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "--screenshot" => {
-                screenshot_path = args.next();
-            }
-            "--rtl" => {
-                rtl = true;
-            }
-            "--exit" => {
-                exit_after = true;
-            }
-            "--delay" => {
-                if let Some(secs) = args.next() {
-                    if let Ok(parsed) = secs.parse::<f64>() {
-                        delay_secs = parsed;
-                    }
-                }
-            }
-            "--script" => {
-                script_path = args.next();
-            }
-            "--dump-layout" => {
-                dump_layout = true;
-            }
-            "--dump-frame" => {
-                dump_frame_path = args.next();
-            }
-            "--component" => {
-                component_name = args.next();
-            }
-            "--list-components" => {
-                list_components = true;
-            }
-            _ => {}
+    let config = match cli::parse(std::env::args()) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
         }
-    }
-
-    if list_components {
-        for name in Component::names() {
-            println!("{name}");
-        }
-        std::process::exit(0);
-    }
-
-    if screenshot_path.is_some() && script_path.is_some() {
-        eprintln!("--script and --screenshot are mutually exclusive");
-        std::process::exit(1);
-    }
-
-    let isolated_component = match component_name {
-        Some(name) => match Component::from_name(&name) {
-            Some(c) => Some(c),
-            None => {
-                eprintln!("Unknown component '{name}'. Valid components:");
-                for n in Component::names() {
-                    eprintln!("  {n}");
-                }
-                std::process::exit(1);
-            }
-        },
-        None => None,
     };
 
-    let script_runner = match script_path {
-        Some(path) => match std::fs::read_to_string(&path) {
+    match config.mode {
+        cli::RunMode::Help => {
+            println!("{}", cli::HELP_TEXT);
+            std::process::exit(0);
+        }
+        cli::RunMode::ListComponents => {
+            cli::print_components();
+            std::process::exit(0);
+        }
+        cli::RunMode::ListVariants(ref comp) => {
+            if let Err(e) = cli::print_variants(comp) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+            std::process::exit(0);
+        }
+        cli::RunMode::Run => {}
+    }
+
+    let isolated_component = config.component.as_ref().and_then(|name| {
+        Component::from_name(name).or_else(|| {
+            eprintln!("Unknown component '{name}'. Valid components:");
+            for n in Component::names() {
+                eprintln!("  {n}");
+            }
+            std::process::exit(1);
+        })
+    });
+
+    let script_runner = match config.script {
+        Some(ref path) => match std::fs::read_to_string(path) {
             Ok(contents) => match parse_script(&contents) {
                 Ok(steps) => Some(ScriptRunner::new(steps)),
                 Err(e) => {
@@ -302,14 +267,14 @@ fn main() {
     event_loop
         .run_app(&mut App {
             state: None,
-            screenshot_path,
-            exit_after,
-            delay_secs,
+            screenshot_path: config.screenshot,
+            exit_after: config.exit,
+            delay_secs: config.delay as f64,
             script_runner,
-            dump_layout,
-            dump_frame_path,
+            dump_layout: config.dump_layout,
+            dump_frame_path: config.dump_frame,
             isolated_component,
-            rtl,
+            rtl: config.rtl,
             forced_initial_state: false,
             start_time: None,
             screenshot_taken: false,

@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Task 0 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-1 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -151,7 +151,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
   - Sequencing note, verified 2026-08-24: `cargo clippy --workspace -- -D warnings` halts entirely after `akar-components` fails to compile (its 2 `float_literal_f32_fallback` + 1 closure + 2 `too_many_arguments` errors abort the workspace build) — it never reaches `demo-rust`, `canvas-basic-rust`, or `webpage-rust`, so the rest of the inventory above cannot be reproduced with that exact gate command until `akar-components` is fixed first. Fix `akar-components` first (or survey with plain `cargo clippy --workspace`, which reports warnings from every crate without aborting), then re-run `cargo clippy --workspace -- -D warnings` per crate/incrementally as each downstream crate is cleaned up, and only require the full `-D warnings` gate to pass at the very end (Task 12).
 - The website baseline currently builds and type-checks, but Prettier reports 12 pre-existing files and ESLint reports one unused binding. Resolve those mechanical issues in a separate preflight change before feature edits so final website checks have a clean baseline.
 
-### Task 1 — CLI parsing, catalog variants, and non-GPU tests
+### Task 1 — CLI parsing, catalog variants, and non-GPU tests ✅
 
 - Add `--variant <name>` and implement the registry in Design Decisions.
 - Keep component/variant parsing and validation separate from window/GPU initialization.
