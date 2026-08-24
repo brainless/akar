@@ -4,12 +4,13 @@ use std::time::Instant;
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_card, akar_card_layout, akar_checkbox,
     akar_container, akar_heading, akar_label, akar_link, akar_navbar_layout, akar_paragraph,
-    akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat, akar_steps, akar_switch,
-    akar_tab_bar, akar_text_input, akar_text_input_masked, akar_textarea, akar_tooltip,
-    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
-    toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, CardLayout, CardSlots, CardStyle,
-    DrawerEdge, FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant,
-    TabVariant, TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_progress, akar_radio_group, akar_select, akar_separator, akar_skeleton, akar_slider,
+    akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_text_input_masked,
+    akar_textarea, akar_tooltip, drawer_begin, drawer_end, dropdown_begin, dropdown_end,
+    modal_begin, modal_end, progress_at, toasts, AlertVariant, BadgeVariant, BoxStyle,
+    ButtonVariant, CardLayout, CardSlots, CardStyle, DrawerEdge, FontFamily, HeadingLevel,
+    LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant, TextStyle, ToastItem,
+    ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -236,6 +237,19 @@ struct AppState {
     textarea_cursor: akar_components::TextEditState,
     textarea_scroll_y: f32,
     label_node: akar_layout::NodeId,
+    container_node: akar_layout::NodeId,
+    separator_showcase_root: akar_layout::NodeId,
+    separator_node: akar_layout::NodeId,
+    separator_above_node: akar_layout::NodeId,
+    separator_below_node: akar_layout::NodeId,
+    avatar_node: akar_layout::NodeId,
+    progress_showcase_root: akar_layout::NodeId,
+    progress_30_node: akar_layout::NodeId,
+    progress_100_node: akar_layout::NodeId,
+    steps_showcase_root: akar_layout::NodeId,
+    steps_2of4_node: akar_layout::NodeId,
+    steps_4of4_node: akar_layout::NodeId,
+    stat_node: akar_layout::NodeId,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1210,6 +1224,12 @@ enum Component {
     Select,
     Textarea,
     Label,
+    Container,
+    Separator,
+    Avatar,
+    Progress,
+    Steps,
+    Stat,
 }
 
 fn render_i18n_sample(
@@ -2372,6 +2392,245 @@ impl Component {
                     ..Default::default()
                 },
             ),
+            Self::Container => (
+                state.container_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(400.0_f32),
+                        height: length(120.0_f32),
+                    },
+                    padding: taffy::geometry::Rect {
+                        left: length(16.0_f32),
+                        right: length(16.0_f32),
+                        top: length(16.0_f32),
+                        bottom: length(16.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Separator => {
+                state.layout.set_style(
+                    state.separator_showcase_root,
+                    Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Column,
+                        justify_content: Some(JustifyContent::CENTER),
+                        gap: taffy::geometry::Size {
+                            width: length(0.0_f32),
+                            height: length(12.0_f32),
+                        },
+                        size: Size {
+                            width: length(400.0_f32),
+                            height: length(100.0_f32),
+                        },
+                        padding: taffy::geometry::Rect {
+                            left: length(16.0_f32),
+                            right: length(16.0_f32),
+                            top: length(16.0_f32),
+                            bottom: length(16.0_f32),
+                        },
+                        ..Default::default()
+                    },
+                );
+                for &node in &[
+                    state.separator_above_node,
+                    state.separator_node,
+                    state.separator_below_node,
+                ] {
+                    state.layout.set_style(
+                        node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(368.0_f32),
+                                height: length(20.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                }
+                state.layout.set_children(
+                    state.separator_showcase_root,
+                    &[
+                        state.separator_above_node,
+                        state.separator_node,
+                        state.separator_below_node,
+                    ],
+                );
+                state.layout.compute(
+                    state.separator_showcase_root,
+                    (
+                        Some(size.width as f32 / scale),
+                        Some(size.height as f32 / scale),
+                    ),
+                    |_, _, _, _, _| Size::ZERO,
+                );
+                return;
+            }
+            Self::Avatar => (
+                state.avatar_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(48.0_f32),
+                        height: length(48.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Progress => {
+                if let Some(v) = variant {
+                    let node = match v {
+                        "100" => state.progress_100_node,
+                        _ => state.progress_30_node,
+                    };
+                    state.layout.set_style(
+                        node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(250.0_f32),
+                                height: length(16.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.progress_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            align_items: Some(AlignItems::CENTER),
+                            gap: taffy::geometry::Size {
+                                width: length(24.0_f32),
+                                height: length(0.0_f32),
+                            },
+                            size: Size {
+                                width: length(524.0_f32),
+                                height: length(16.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[state.progress_30_node, state.progress_100_node] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(250.0_f32),
+                                    height: length(16.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.progress_showcase_root,
+                        &[state.progress_30_node, state.progress_100_node],
+                    );
+                    state.layout.compute(
+                        state.progress_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Steps => {
+                if let Some(v) = variant {
+                    let node = match v {
+                        "step4" => state.steps_4of4_node,
+                        _ => state.steps_2of4_node,
+                    };
+                    state.layout.set_style(
+                        node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(500.0_f32),
+                                height: length(56.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.steps_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            gap: taffy::geometry::Size {
+                                width: length(0.0_f32),
+                                height: length(16.0_f32),
+                            },
+                            size: Size {
+                                width: length(500.0_f32),
+                                height: length(128.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[state.steps_2of4_node, state.steps_4of4_node] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(500.0_f32),
+                                    height: length(56.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.steps_showcase_root,
+                        &[state.steps_2of4_node, state.steps_4of4_node],
+                    );
+                    state.layout.compute(
+                        state.steps_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Stat => (
+                state.stat_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(280.0_f32),
+                        height: length(120.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
         };
 
         state.layout.set_style(root, style);
@@ -2415,6 +2674,12 @@ impl Component {
             "select" => Some(Self::Select),
             "textarea" => Some(Self::Textarea),
             "label" => Some(Self::Label),
+            "container" => Some(Self::Container),
+            "separator" => Some(Self::Separator),
+            "avatar" => Some(Self::Avatar),
+            "progress" => Some(Self::Progress),
+            "steps" => Some(Self::Steps),
+            "stat" => Some(Self::Stat),
             _ => None,
         }
     }
@@ -2449,6 +2714,12 @@ impl Component {
             "select",
             "textarea",
             "label",
+            "container",
+            "separator",
+            "avatar",
+            "progress",
+            "steps",
+            "stat",
         ]
     }
 
@@ -3206,6 +3477,159 @@ impl Component {
                     &AKAR_THEME_DARK,
                 );
             }
+            Self::Container => {
+                akar_container(
+                    &mut state.core,
+                    &state.layout,
+                    state.container_node,
+                    &BoxStyle {
+                        fill: AKAR_THEME_DARK.base_200,
+                        border_color: AKAR_THEME_DARK.primary,
+                        border_width: 2.0,
+                        corner_radii: [8.0; 4],
+                        shadow: None,
+                    },
+                );
+                let rect = state.layout.rect(state.container_node);
+                let buf_id = state.core.text_pipeline.set_text(
+                    Some(40000),
+                    "Container content",
+                    glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                    Some(rect[2] - 32.0),
+                    None,
+                    None,
+                );
+                state.core.draw_list.push_text(akar_core::TextCall {
+                    buffer_id: buf_id,
+                    x: rect[0] + 16.0,
+                    y: rect[1] + 16.0,
+                    clip: rect,
+                    color: [0.9, 0.9, 0.92, 1.0],
+                    z: 0.0,
+                });
+            }
+            Self::Separator => {
+                let above_rect = state.layout.rect(state.separator_above_node);
+                let buf_id = state.core.text_pipeline.set_text(
+                    Some(40001),
+                    "Text above separator",
+                    glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                    Some(above_rect[2]),
+                    None,
+                    None,
+                );
+                state.core.draw_list.push_text(akar_core::TextCall {
+                    buffer_id: buf_id,
+                    x: above_rect[0],
+                    y: above_rect[1],
+                    clip: above_rect,
+                    color: [0.8, 0.8, 0.85, 1.0],
+                    z: 0.0,
+                });
+                akar_separator(
+                    &mut state.core,
+                    &state.layout,
+                    state.separator_node,
+                    &AKAR_THEME_DARK,
+                );
+                let below_rect = state.layout.rect(state.separator_below_node);
+                let buf_id = state.core.text_pipeline.set_text(
+                    Some(40002),
+                    "Text below separator",
+                    glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                    Some(below_rect[2]),
+                    None,
+                    None,
+                );
+                state.core.draw_list.push_text(akar_core::TextCall {
+                    buffer_id: buf_id,
+                    x: below_rect[0],
+                    y: below_rect[1],
+                    clip: below_rect,
+                    color: [0.8, 0.8, 0.85, 1.0],
+                    z: 0.0,
+                });
+            }
+            Self::Avatar => {
+                akar_avatar(
+                    &mut state.core,
+                    &state.layout,
+                    state.avatar_node,
+                    "AB",
+                    None,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Progress => {
+                let style = ProgressStyle::from_theme(&AKAR_THEME_DARK);
+                if let Some(v) = variant {
+                    let (node, value) = match v {
+                        "100" => (state.progress_100_node, 1.0),
+                        _ => (state.progress_30_node, 0.3),
+                    };
+                    akar_progress(&mut state.core, &state.layout, node, value, &style);
+                } else {
+                    akar_progress(
+                        &mut state.core,
+                        &state.layout,
+                        state.progress_30_node,
+                        0.3,
+                        &style,
+                    );
+                    akar_progress(
+                        &mut state.core,
+                        &state.layout,
+                        state.progress_100_node,
+                        1.0,
+                        &style,
+                    );
+                }
+            }
+            Self::Steps => {
+                let labels = ["Step 1", "Step 2", "Step 3", "Step 4"];
+                if let Some(v) = variant {
+                    let (node, current) = match v {
+                        "step4" => (state.steps_4of4_node, 3),
+                        _ => (state.steps_2of4_node, 1),
+                    };
+                    akar_steps(
+                        &mut state.core,
+                        &state.layout,
+                        node,
+                        &labels,
+                        current,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_steps(
+                        &mut state.core,
+                        &state.layout,
+                        state.steps_2of4_node,
+                        &labels,
+                        1,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_steps(
+                        &mut state.core,
+                        &state.layout,
+                        state.steps_4of4_node,
+                        &labels,
+                        3,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
+            Self::Stat => {
+                akar_stat(
+                    &mut state.core,
+                    &state.layout,
+                    state.stat_node,
+                    "Revenue",
+                    "$12,345",
+                    Some("+20% from last month"),
+                    &AKAR_THEME_DARK,
+                );
+            }
         }
     }
 
@@ -3285,6 +3709,8 @@ impl Component {
                 state.textarea_scroll_y = 0.0;
             }
             Self::Label => {}
+            Self::Container | Self::Separator | Self::Avatar | Self::Stat => {}
+            Self::Progress | Self::Steps => {}
         }
     }
 }
@@ -3996,6 +4422,33 @@ impl ApplicationHandler for App {
         let label_node = layout.new_leaf(Style::default());
         layout.register_label("label", label_node);
 
+        let container_node = layout.new_leaf(Style::default());
+        layout.register_label("container", container_node);
+
+        let separator_showcase_root = layout.new_leaf(Style::default());
+        let separator_node = layout.new_leaf(Style::default());
+        let separator_above_node = layout.new_leaf(Style::default());
+        let separator_below_node = layout.new_leaf(Style::default());
+        layout.register_label("separator", separator_node);
+
+        let avatar_node = layout.new_leaf(Style::default());
+        layout.register_label("avatar", avatar_node);
+
+        let progress_showcase_root = layout.new_leaf(Style::default());
+        let progress_30_node = layout.new_leaf(Style::default());
+        let progress_100_node = layout.new_leaf(Style::default());
+        layout.register_label("progress_30", progress_30_node);
+        layout.register_label("progress_100", progress_100_node);
+
+        let steps_showcase_root = layout.new_leaf(Style::default());
+        let steps_2of4_node = layout.new_leaf(Style::default());
+        let steps_4of4_node = layout.new_leaf(Style::default());
+        layout.register_label("steps_2of4", steps_2of4_node);
+        layout.register_label("steps_4of4", steps_4of4_node);
+
+        let stat_node = layout.new_leaf(Style::default());
+        layout.register_label("stat", stat_node);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -4145,6 +4598,19 @@ impl ApplicationHandler for App {
             textarea_cursor: akar_components::TextEditState::default(),
             textarea_scroll_y: 0.0,
             label_node,
+            container_node,
+            separator_showcase_root,
+            separator_node,
+            separator_above_node,
+            separator_below_node,
+            avatar_node,
+            progress_showcase_root,
+            progress_30_node,
+            progress_100_node,
+            steps_showcase_root,
+            steps_2of4_node,
+            steps_4of4_node,
+            stat_node,
         });
     }
 
