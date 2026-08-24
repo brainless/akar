@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-2 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-3 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -171,7 +171,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Register stable labels for every interactive fixture and individually targetable variant.
 - Verify `--dump-layout` under each new isolated component reports a non-zero rect for its stable targets where a layout node exists.
 
-### Task 3 — Enum-backed variant showcases
+### Task 3 — Enum-backed variant showcases ✅
 
 - Button: `Solid`, `Outline`, `Ghost`; capture the showcase plus scripted hovered/pressed Outline states.
 - Badge: `Default`, `Primary`, `Success`, `Warning`, `Error`, `Info`; wrap if necessary.

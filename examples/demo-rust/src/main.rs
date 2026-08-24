@@ -171,6 +171,31 @@ struct AppState {
     modal_root: akar_layout::NodeId,
     #[allow(dead_code)] // scaffolding for showcase overlay isolation (Tasks 3-7)
     toasts_root: akar_layout::NodeId,
+    button_showcase_root: akar_layout::NodeId,
+    button_solid_node: akar_layout::NodeId,
+    button_outline_node: akar_layout::NodeId,
+    button_ghost_node: akar_layout::NodeId,
+    badge_showcase_root: akar_layout::NodeId,
+    badge_default_node: akar_layout::NodeId,
+    badge_primary_node: akar_layout::NodeId,
+    badge_success_node: akar_layout::NodeId,
+    badge_warning_node: akar_layout::NodeId,
+    badge_error_node: akar_layout::NodeId,
+    badge_info_node: akar_layout::NodeId,
+    alert_showcase_root: akar_layout::NodeId,
+    alert_info_node: akar_layout::NodeId,
+    alert_success_node: akar_layout::NodeId,
+    alert_warning_node: akar_layout::NodeId,
+    alert_error_node: akar_layout::NodeId,
+    tabs_showcase_root: akar_layout::NodeId,
+    tabs_boxed_node: akar_layout::NodeId,
+    tabs_lifted_node: akar_layout::NodeId,
+    tabs_pills_node: akar_layout::NodeId,
+    tabs_underline_node: akar_layout::NodeId,
+    skeleton_showcase_root: akar_layout::NodeId,
+    skeleton_text_node: akar_layout::NodeId,
+    skeleton_card_node: akar_layout::NodeId,
+    skeleton_circle_node: akar_layout::NodeId,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -281,6 +306,7 @@ fn main() {
             dump_layout: config.dump_layout,
             dump_frame_path: config.dump_frame,
             isolated_component,
+            variant: config.variant,
             rtl: config.rtl,
             forced_initial_state: false,
             start_time: None,
@@ -300,6 +326,7 @@ struct App {
     dump_layout: bool,
     dump_frame_path: Option<String>,
     isolated_component: Option<Component>,
+    variant: Option<String>,
     rtl: bool,
     forced_initial_state: bool,
     start_time: Option<Instant>,
@@ -317,9 +344,10 @@ fn prepare_layout(
     size: PhysicalSize<u32>,
     scale: f32,
     isolated_component: Option<&Component>,
+    variant: Option<&str>,
 ) {
     if let Some(component) = isolated_component {
-        component.prepare_isolated_layout(state, size, scale);
+        component.prepare_isolated_layout(state, size, scale, variant);
         return;
     }
 
@@ -1130,6 +1158,9 @@ enum Component {
     Link,
     Card,
     I18n,
+    Button,
+    Badge,
+    Skeleton,
 }
 
 fn render_i18n_sample(
@@ -1252,7 +1283,13 @@ fn crop_and_write_png(
 }
 
 impl Component {
-    fn prepare_isolated_layout(&self, state: &mut AppState, size: PhysicalSize<u32>, scale: f32) {
+    fn prepare_isolated_layout(
+        &self,
+        state: &mut AppState,
+        size: PhysicalSize<u32>,
+        scale: f32,
+        variant: Option<&str>,
+    ) {
         let (root, style) = match self {
             Self::Navbar => {
                 ensure_navbar_slots(state);
@@ -1270,28 +1307,6 @@ impl Component {
                     },
                 )
             }
-            Self::Alert => (
-                state.alert_node,
-                Style {
-                    flex_shrink: 0.0,
-                    size: Size {
-                        width: length(520.0_f32),
-                        height: length(48.0_f32),
-                    },
-                    ..Default::default()
-                },
-            ),
-            Self::TabBar => (
-                state.tab_bar_node,
-                Style {
-                    flex_shrink: 0.0,
-                    size: Size {
-                        width: length(520.0_f32),
-                        height: length(40.0_f32),
-                    },
-                    ..Default::default()
-                },
-            ),
             Self::ListTab => (
                 state.scroll_container,
                 Style {
@@ -1486,6 +1501,433 @@ impl Component {
                 },
             ),
             Self::Drawer | Self::Modal | Self::Toasts => return,
+            Self::Button => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.button_solid_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(120.0_f32),
+                                height: length(36.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.button_solid_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.button_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            align_items: Some(AlignItems::CENTER),
+                            gap: taffy::geometry::Size {
+                                width: length(16.0_f32),
+                                height: length(0.0_f32),
+                            },
+                            size: Size {
+                                width: length(420.0_f32),
+                                height: length(40.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[
+                        state.button_solid_node,
+                        state.button_outline_node,
+                        state.button_ghost_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(120.0_f32),
+                                    height: length(36.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.button_showcase_root,
+                        &[
+                            state.button_solid_node,
+                            state.button_outline_node,
+                            state.button_ghost_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.button_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Badge => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.badge_default_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(80.0_f32),
+                                height: length(28.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.badge_default_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.badge_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            gap: taffy::geometry::Size {
+                                width: length(0.0_f32),
+                                height: length(8.0_f32),
+                            },
+                            size: Size {
+                                width: length(420.0_f32),
+                                height: length(80.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    let row1 = state.layout.new_leaf(Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: Some(AlignItems::CENTER),
+                        gap: taffy::geometry::Size {
+                            width: length(12.0_f32),
+                            height: length(0.0_f32),
+                        },
+                        ..Default::default()
+                    });
+                    let row2 = state.layout.new_leaf(Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: Some(AlignItems::CENTER),
+                        gap: taffy::geometry::Size {
+                            width: length(12.0_f32),
+                            height: length(0.0_f32),
+                        },
+                        ..Default::default()
+                    });
+                    state
+                        .layout
+                        .set_children(state.badge_showcase_root, &[row1, row2]);
+                    for &node in &[
+                        state.badge_default_node,
+                        state.badge_primary_node,
+                        state.badge_success_node,
+                        state.badge_warning_node,
+                        state.badge_error_node,
+                        state.badge_info_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(80.0_f32),
+                                    height: length(28.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        row1,
+                        &[
+                            state.badge_default_node,
+                            state.badge_primary_node,
+                            state.badge_success_node,
+                        ],
+                    );
+                    state.layout.set_children(
+                        row2,
+                        &[
+                            state.badge_warning_node,
+                            state.badge_error_node,
+                            state.badge_info_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.badge_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Alert => {
+                state.alert_dismissed = false;
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.alert_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(520.0_f32),
+                                height: length(48.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.alert_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.alert_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            gap: taffy::geometry::Size {
+                                width: length(0.0_f32),
+                                height: length(8.0_f32),
+                            },
+                            size: Size {
+                                width: length(520.0_f32),
+                                height: length(224.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[
+                        state.alert_info_node,
+                        state.alert_success_node,
+                        state.alert_warning_node,
+                        state.alert_error_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(520.0_f32),
+                                    height: length(48.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.alert_showcase_root,
+                        &[
+                            state.alert_info_node,
+                            state.alert_success_node,
+                            state.alert_warning_node,
+                            state.alert_error_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.alert_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::TabBar => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.tab_bar_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(520.0_f32),
+                                height: length(40.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.tab_bar_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.tabs_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            gap: taffy::geometry::Size {
+                                width: length(0.0_f32),
+                                height: length(8.0_f32),
+                            },
+                            size: Size {
+                                width: length(520.0_f32),
+                                height: length(192.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[
+                        state.tabs_boxed_node,
+                        state.tabs_lifted_node,
+                        state.tabs_pills_node,
+                        state.tabs_underline_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(520.0_f32),
+                                    height: length(40.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.tabs_showcase_root,
+                        &[
+                            state.tabs_boxed_node,
+                            state.tabs_lifted_node,
+                            state.tabs_pills_node,
+                            state.tabs_underline_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.tabs_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Skeleton => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.skeleton_text_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(200.0_f32),
+                                height: length(20.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.skeleton_text_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.skeleton_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            align_items: Some(AlignItems::CENTER),
+                            gap: taffy::geometry::Size {
+                                width: length(16.0_f32),
+                                height: length(0.0_f32),
+                            },
+                            size: Size {
+                                width: length(480.0_f32),
+                                height: length(120.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.set_style(
+                        state.skeleton_text_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(200.0_f32),
+                                height: length(20.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.set_style(
+                        state.skeleton_card_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(160.0_f32),
+                                height: length(120.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.set_style(
+                        state.skeleton_circle_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(80.0_f32),
+                                height: length(80.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.set_children(
+                        state.skeleton_showcase_root,
+                        &[
+                            state.skeleton_text_node,
+                            state.skeleton_card_node,
+                            state.skeleton_circle_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.skeleton_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
         };
 
         state.layout.set_style(root, style);
@@ -1503,20 +1945,23 @@ impl Component {
         match name {
             "navbar" => Some(Self::Navbar),
             "alert" => Some(Self::Alert),
-            "tab_bar" => Some(Self::TabBar),
+            "tab_bar" | "tabs" => Some(Self::TabBar),
             "list" => Some(Self::ListTab),
             "canvas" => Some(Self::CanvasTab),
             "stats" => Some(Self::StatsTab),
             "form" => Some(Self::FormTab),
             "drawer" => Some(Self::Drawer),
             "modal" => Some(Self::Modal),
-            "toasts" => Some(Self::Toasts),
+            "toasts" | "toast" => Some(Self::Toasts),
             "dropdown" => Some(Self::Dropdown),
             "heading" => Some(Self::Heading),
             "paragraph" => Some(Self::Paragraph),
             "link" => Some(Self::Link),
             "card" => Some(Self::Card),
             "i18n" => Some(Self::I18n),
+            "button" => Some(Self::Button),
+            "badge" => Some(Self::Badge),
+            "skeleton" => Some(Self::Skeleton),
             _ => None,
         }
     }
@@ -1539,21 +1984,174 @@ impl Component {
             "link",
             "card",
             "i18n",
+            "button",
+            "badge",
+            "skeleton",
         ]
     }
 
-    fn render(&self, state: &mut AppState, viewport_rect: [f32; 4]) {
+    fn render(&self, state: &mut AppState, viewport_rect: [f32; 4], variant: Option<&str>) {
         match self {
             Self::Navbar => render_navbar(state, viewport_rect),
-            Self::Alert => render_alert(state),
-            Self::TabBar => render_tab_bar(state),
+            Self::Alert => {
+                if let Some(v) = variant {
+                    let av = match v {
+                        "info" => AlertVariant::Info,
+                        "success" => AlertVariant::Success,
+                        "warning" => AlertVariant::Warning,
+                        "error" => AlertVariant::Error,
+                        _ => AlertVariant::Info,
+                    };
+                    akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_node,
+                        "Alert message",
+                        av,
+                        false,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_info_node,
+                        "Info alert",
+                        AlertVariant::Info,
+                        false,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_success_node,
+                        "Success alert",
+                        AlertVariant::Success,
+                        false,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_warning_node,
+                        "Warning alert",
+                        AlertVariant::Warning,
+                        false,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_alert(
+                        &mut state.core,
+                        &state.layout,
+                        state.alert_error_node,
+                        "Error alert",
+                        AlertVariant::Error,
+                        false,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
+            Self::TabBar => {
+                if let Some(v) = variant {
+                    let tv = match v {
+                        "boxed" => TabVariant::Boxed,
+                        "lifted" => TabVariant::Lifted,
+                        "pills" => TabVariant::Pills,
+                        "underline" => TabVariant::Underline,
+                        _ => TabVariant::Boxed,
+                    };
+                    akar_tab_bar(
+                        &mut state.core,
+                        &state.layout,
+                        state.tab_bar_node,
+                        &["Tab A", "Tab B", "Tab C"],
+                        0,
+                        tv,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_tab_bar(
+                        &mut state.core,
+                        &state.layout,
+                        state.tabs_boxed_node,
+                        &["Tab A", "Tab B", "Tab C"],
+                        0,
+                        TabVariant::Boxed,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_tab_bar(
+                        &mut state.core,
+                        &state.layout,
+                        state.tabs_lifted_node,
+                        &["Tab A", "Tab B", "Tab C"],
+                        0,
+                        TabVariant::Lifted,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_tab_bar(
+                        &mut state.core,
+                        &state.layout,
+                        state.tabs_pills_node,
+                        &["Tab A", "Tab B", "Tab C"],
+                        0,
+                        TabVariant::Pills,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_tab_bar(
+                        &mut state.core,
+                        &state.layout,
+                        state.tabs_underline_node,
+                        &["Tab A", "Tab B", "Tab C"],
+                        0,
+                        TabVariant::Underline,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
             Self::ListTab => render_list_tab(state, viewport_rect),
             Self::CanvasTab => render_canvas_tab(state),
             Self::StatsTab => render_stats_tab(state),
             Self::FormTab => render_form_tab(state, viewport_rect),
             Self::Drawer => render_drawer(state, viewport_rect),
             Self::Modal => render_modal(state, viewport_rect),
-            Self::Toasts => render_toasts(state, viewport_rect),
+            Self::Toasts => {
+                if let Some(v) = variant {
+                    let tv = match v {
+                        "info" => ToastVariant::Info,
+                        "success" => ToastVariant::Success,
+                        "warning" => ToastVariant::Warning,
+                        "error" => ToastVariant::Error,
+                        _ => ToastVariant::Info,
+                    };
+                    state.toasts_list.clear();
+                    state.toasts_list.push(ToastItem {
+                        variant: tv,
+                        message: format!("{v} toast"),
+                        dismiss_on_click: false,
+                    });
+                } else if state.toasts_list.is_empty() {
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Info,
+                        message: "Info toast".to_string(),
+                        dismiss_on_click: false,
+                    });
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Success,
+                        message: "Success toast".to_string(),
+                        dismiss_on_click: false,
+                    });
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Warning,
+                        message: "Warning toast".to_string(),
+                        dismiss_on_click: false,
+                    });
+                    state.toasts_list.push(ToastItem {
+                        variant: ToastVariant::Error,
+                        message: "Error toast".to_string(),
+                        dismiss_on_click: false,
+                    });
+                }
+                render_toasts(state, viewport_rect);
+            }
             Self::Dropdown => render_isolated_dropdown(state, viewport_rect),
             Self::Heading => {
                 akar_heading(
@@ -1645,6 +2243,158 @@ impl Component {
                     "Arabic font unavailable on this machine",
                 );
             }
+            Self::Button => {
+                if let Some(v) = variant {
+                    let bv = match v {
+                        "solid" => ButtonVariant::Solid,
+                        "outline" => ButtonVariant::Outline,
+                        "ghost" => ButtonVariant::Ghost,
+                        _ => ButtonVariant::Solid,
+                    };
+                    akar_button(
+                        &mut state.core,
+                        &state.layout,
+                        state.button_solid_node,
+                        "Button",
+                        bv,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_button(
+                        &mut state.core,
+                        &state.layout,
+                        state.button_solid_node,
+                        "Solid",
+                        ButtonVariant::Solid,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_button(
+                        &mut state.core,
+                        &state.layout,
+                        state.button_outline_node,
+                        "Outline",
+                        ButtonVariant::Outline,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_button(
+                        &mut state.core,
+                        &state.layout,
+                        state.button_ghost_node,
+                        "Ghost",
+                        ButtonVariant::Ghost,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
+            Self::Badge => {
+                if let Some(v) = variant {
+                    let bv = match v {
+                        "default" => BadgeVariant::Default,
+                        "primary" => BadgeVariant::Primary,
+                        "success" => BadgeVariant::Success,
+                        "warning" => BadgeVariant::Warning,
+                        "error" => BadgeVariant::Error,
+                        "info" => BadgeVariant::Info,
+                        _ => BadgeVariant::Default,
+                    };
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_default_node,
+                        v,
+                        bv,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_default_node,
+                        "Default",
+                        BadgeVariant::Default,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_primary_node,
+                        "Primary",
+                        BadgeVariant::Primary,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_success_node,
+                        "Success",
+                        BadgeVariant::Success,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_warning_node,
+                        "Warning",
+                        BadgeVariant::Warning,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_error_node,
+                        "Error",
+                        BadgeVariant::Error,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_badge(
+                        &mut state.core,
+                        &state.layout,
+                        state.badge_info_node,
+                        "Info",
+                        BadgeVariant::Info,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
+            Self::Skeleton => {
+                if let Some(v) = variant {
+                    let sv = match v {
+                        "text" => SkeletonVariant::Text,
+                        "card" => SkeletonVariant::Card,
+                        "circle" => SkeletonVariant::Circle,
+                        _ => SkeletonVariant::Text,
+                    };
+                    akar_skeleton(
+                        &mut state.core,
+                        &state.layout,
+                        state.skeleton_text_node,
+                        sv,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_skeleton(
+                        &mut state.core,
+                        &state.layout,
+                        state.skeleton_text_node,
+                        SkeletonVariant::Text,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_skeleton(
+                        &mut state.core,
+                        &state.layout,
+                        state.skeleton_card_node,
+                        SkeletonVariant::Card,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_skeleton(
+                        &mut state.core,
+                        &state.layout,
+                        state.skeleton_circle_node,
+                        SkeletonVariant::Circle,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+            }
         }
     }
 
@@ -1688,6 +2438,7 @@ impl Component {
                     });
                 }
             }
+            Self::Button | Self::Badge | Self::Skeleton => {}
             Self::Heading
             | Self::Paragraph
             | Self::Link
@@ -2298,6 +3049,56 @@ impl ApplicationHandler for App {
         });
         layout.register_label("toasts", toasts_root);
 
+        let button_showcase_root = layout.new_leaf(Style::default());
+        let button_solid_node = layout.new_leaf(Style::default());
+        let button_outline_node = layout.new_leaf(Style::default());
+        let button_ghost_node = layout.new_leaf(Style::default());
+        layout.register_label("button_solid", button_solid_node);
+        layout.register_label("button_outline", button_outline_node);
+        layout.register_label("button_ghost", button_ghost_node);
+
+        let badge_showcase_root = layout.new_leaf(Style::default());
+        let badge_default_node = layout.new_leaf(Style::default());
+        let badge_primary_node = layout.new_leaf(Style::default());
+        let badge_success_node = layout.new_leaf(Style::default());
+        let badge_warning_node = layout.new_leaf(Style::default());
+        let badge_error_node = layout.new_leaf(Style::default());
+        let badge_info_node = layout.new_leaf(Style::default());
+        layout.register_label("badge_default", badge_default_node);
+        layout.register_label("badge_primary", badge_primary_node);
+        layout.register_label("badge_success", badge_success_node);
+        layout.register_label("badge_warning", badge_warning_node);
+        layout.register_label("badge_error", badge_error_node);
+        layout.register_label("badge_info", badge_info_node);
+
+        let alert_showcase_root = layout.new_leaf(Style::default());
+        let alert_info_node = layout.new_leaf(Style::default());
+        let alert_success_node = layout.new_leaf(Style::default());
+        let alert_warning_node = layout.new_leaf(Style::default());
+        let alert_error_node = layout.new_leaf(Style::default());
+        layout.register_label("alert_info", alert_info_node);
+        layout.register_label("alert_success", alert_success_node);
+        layout.register_label("alert_warning", alert_warning_node);
+        layout.register_label("alert_error", alert_error_node);
+
+        let tabs_showcase_root = layout.new_leaf(Style::default());
+        let tabs_boxed_node = layout.new_leaf(Style::default());
+        let tabs_lifted_node = layout.new_leaf(Style::default());
+        let tabs_pills_node = layout.new_leaf(Style::default());
+        let tabs_underline_node = layout.new_leaf(Style::default());
+        layout.register_label("tabs_boxed", tabs_boxed_node);
+        layout.register_label("tabs_lifted", tabs_lifted_node);
+        layout.register_label("tabs_pills", tabs_pills_node);
+        layout.register_label("tabs_underline", tabs_underline_node);
+
+        let skeleton_showcase_root = layout.new_leaf(Style::default());
+        let skeleton_text_node = layout.new_leaf(Style::default());
+        let skeleton_card_node = layout.new_leaf(Style::default());
+        let skeleton_circle_node = layout.new_leaf(Style::default());
+        layout.register_label("skeleton_text", skeleton_text_node);
+        layout.register_label("skeleton_card", skeleton_card_node);
+        layout.register_label("skeleton_circle", skeleton_circle_node);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -2383,6 +3184,31 @@ impl ApplicationHandler for App {
             drawer_root,
             modal_root,
             toasts_root,
+            button_showcase_root,
+            button_solid_node,
+            button_outline_node,
+            button_ghost_node,
+            badge_showcase_root,
+            badge_default_node,
+            badge_primary_node,
+            badge_success_node,
+            badge_warning_node,
+            badge_error_node,
+            badge_info_node,
+            alert_showcase_root,
+            alert_info_node,
+            alert_success_node,
+            alert_warning_node,
+            alert_error_node,
+            tabs_showcase_root,
+            tabs_boxed_node,
+            tabs_lifted_node,
+            tabs_pills_node,
+            tabs_underline_node,
+            skeleton_showcase_root,
+            skeleton_text_node,
+            skeleton_card_node,
+            skeleton_circle_node,
         });
     }
 
@@ -2463,7 +3289,13 @@ impl ApplicationHandler for App {
                     }
                 }
 
-                prepare_layout(state, size, scale, self.isolated_component.as_ref());
+                prepare_layout(
+                    state,
+                    size,
+                    scale,
+                    self.isolated_component.as_ref(),
+                    self.variant.as_deref(),
+                );
 
                 if self.dump_layout {
                     if !self.dump_layout_written {
@@ -2489,7 +3321,7 @@ impl ApplicationHandler for App {
                             for tab in 0..4 {
                                 state.active_tab = tab;
                                 state.prev_active_tab = tab;
-                                prepare_layout(state, size, scale, None);
+                                prepare_layout(state, size, scale, None, None);
                                 match tab {
                                     0 => render_list_tab(state, viewport_rect),
                                     1 => render_canvas_tab(state),
@@ -2532,7 +3364,7 @@ impl ApplicationHandler for App {
                 };
 
                 if let Some(component) = &self.isolated_component {
-                    component.render(state, viewport_rect);
+                    component.render(state, viewport_rect, self.variant.as_deref());
                 } else {
                     render_all(state, viewport_rect);
                 }
