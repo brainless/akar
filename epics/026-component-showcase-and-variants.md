@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-3 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-4 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -180,7 +180,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Tabs: `Boxed`, `Lifted`, `Pills`, `Underline`; each fixture contains the same labels and active index.
 - Skeleton: `Text`, `Card`, `Circle`; use dimensions that make the semantic shape of each variant visible.
 
-### Task 4 — Other finite catalog modes
+### Task 4 — Other finite catalog modes ✅
 
 - Heading: show H1–H4 together; support single-level `--variant` capture.
 - Drawer: `--component drawer` remains a valid command but intentionally changes from the old single Left fixture to the labeled Left/Right showcase. `--component drawer --variant left` preserves the old forced-open representative state and is the target for the pre-change Drawer pixel baseline; `--variant right` mirrors it.

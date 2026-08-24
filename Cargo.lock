@@ -570,6 +570,7 @@ dependencies = [
  "akar-layout",
  "akar-winit",
  "anyhow",
+ "glam",
  "glyphon",
  "png",
  "pollster",

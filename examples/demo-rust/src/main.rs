@@ -5,11 +5,11 @@ use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_card, akar_card_layout, akar_checkbox,
     akar_container, akar_heading, akar_label, akar_link, akar_navbar_layout, akar_paragraph,
     akar_radio_group, akar_select, akar_skeleton, akar_slider, akar_stat, akar_steps, akar_switch,
-    akar_tab_bar, akar_text_input, akar_textarea, akar_tooltip, drawer_begin, drawer_end,
-    dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at, toasts, AlertVariant,
-    BadgeVariant, BoxStyle, ButtonVariant, CardLayout, CardSlots, CardStyle, DrawerEdge,
-    FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant,
-    TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_tab_bar, akar_text_input, akar_text_input_masked, akar_textarea, akar_tooltip,
+    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
+    toasts, AlertVariant, BadgeVariant, BoxStyle, ButtonVariant, CardLayout, CardSlots, CardStyle,
+    DrawerEdge, FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant,
+    TabVariant, TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
@@ -87,6 +87,7 @@ fn input_snapshot(input: &akar_core::InputState) -> InputSnapshot {
 }
 
 struct AppState {
+    #[allow(dead_code)] // replaced by heading_h1_node..heading_h4_node for showcase
     heading_node: akar_layout::NodeId,
     paragraph_node: akar_layout::NodeId,
     link_node: akar_layout::NodeId,
@@ -196,6 +197,27 @@ struct AppState {
     skeleton_text_node: akar_layout::NodeId,
     skeleton_card_node: akar_layout::NodeId,
     skeleton_circle_node: akar_layout::NodeId,
+    heading_showcase_root: akar_layout::NodeId,
+    heading_h1_node: akar_layout::NodeId,
+    heading_h2_node: akar_layout::NodeId,
+    heading_h3_node: akar_layout::NodeId,
+    heading_h4_node: akar_layout::NodeId,
+    drawer_showcase_root: akar_layout::NodeId,
+    drawer_left_node: akar_layout::NodeId,
+    drawer_right_node: akar_layout::NodeId,
+    tooltip_showcase_root: akar_layout::NodeId,
+    tooltip_trigger_node: akar_layout::NodeId,
+    tooltip_top_node: akar_layout::NodeId,
+    tooltip_bottom_node: akar_layout::NodeId,
+    tooltip_left_node: akar_layout::NodeId,
+    tooltip_right_node: akar_layout::NodeId,
+    text_input_showcase_root: akar_layout::NodeId,
+    text_input_normal_node: akar_layout::NodeId,
+    text_input_masked_node: akar_layout::NodeId,
+    text_input_normal_value: String,
+    text_input_normal_cursor: akar_components::TextEditState,
+    text_input_masked_value: String,
+    text_input_masked_cursor: akar_components::TextEditState,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1161,6 +1183,8 @@ enum Component {
     Button,
     Badge,
     Skeleton,
+    Tooltip,
+    TextInput,
 }
 
 fn render_i18n_sample(
@@ -1385,17 +1409,82 @@ impl Component {
                     ..Default::default()
                 },
             ),
-            Self::Heading => (
-                state.heading_node,
-                Style {
-                    flex_shrink: 0.0,
-                    size: Size {
-                        width: length(600.0_f32),
-                        height: length(60.0_f32),
-                    },
-                    ..Default::default()
-                },
-            ),
+            Self::Heading => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.heading_h1_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(600.0_f32),
+                                height: length(60.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.heading_h1_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.heading_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Column,
+                            gap: taffy::geometry::Size {
+                                width: length(0.0_f32),
+                                height: length(8.0_f32),
+                            },
+                            size: Size {
+                                width: length(600.0_f32),
+                                height: length(280.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[
+                        state.heading_h1_node,
+                        state.heading_h2_node,
+                        state.heading_h3_node,
+                        state.heading_h4_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(600.0_f32),
+                                    height: length(60.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.heading_showcase_root,
+                        &[
+                            state.heading_h1_node,
+                            state.heading_h2_node,
+                            state.heading_h3_node,
+                            state.heading_h4_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.heading_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
             Self::Paragraph => (
                 state.paragraph_node,
                 Style {
@@ -1500,7 +1589,73 @@ impl Component {
                     ..Default::default()
                 },
             ),
-            Self::Drawer | Self::Modal | Self::Toasts => return,
+            Self::Drawer => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.drawer_left_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(350.0_f32),
+                                height: length(300.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.drawer_left_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.drawer_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            gap: taffy::geometry::Size {
+                                width: length(16.0_f32),
+                                height: length(0.0_f32),
+                            },
+                            size: Size {
+                                width: length(716.0_f32),
+                                height: length(300.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[state.drawer_left_node, state.drawer_right_node] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(350.0_f32),
+                                    height: length(300.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.drawer_showcase_root,
+                        &[state.drawer_left_node, state.drawer_right_node],
+                    );
+                    state.layout.compute(
+                        state.drawer_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::Modal | Self::Toasts => return,
             Self::Button => {
                 if variant.is_some() {
                     state.layout.set_style(
@@ -1928,6 +2083,159 @@ impl Component {
                 }
                 return;
             }
+            Self::Tooltip => {
+                if variant.is_some() {
+                    state.layout.set_style(
+                        state.tooltip_trigger_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(120.0_f32),
+                                height: length(36.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        state.tooltip_trigger_node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.tooltip_showcase_root,
+                        Style {
+                            size: Size {
+                                width: length(400.0_f32),
+                                height: length(200.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.set_style(
+                        state.tooltip_trigger_node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(120.0_f32),
+                                height: length(36.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[
+                        state.tooltip_top_node,
+                        state.tooltip_bottom_node,
+                        state.tooltip_left_node,
+                        state.tooltip_right_node,
+                    ] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(80.0_f32),
+                                    height: length(24.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.tooltip_showcase_root,
+                        &[
+                            state.tooltip_trigger_node,
+                            state.tooltip_top_node,
+                            state.tooltip_bottom_node,
+                            state.tooltip_left_node,
+                            state.tooltip_right_node,
+                        ],
+                    );
+                    state.layout.compute(
+                        state.tooltip_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
+            Self::TextInput => {
+                if let Some(v) = variant {
+                    let node = match v {
+                        "masked" => state.text_input_masked_node,
+                        _ => state.text_input_normal_node,
+                    };
+                    state.layout.set_style(
+                        node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(300.0_f32),
+                                height: length(40.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    state.layout.compute(
+                        node,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                } else {
+                    state.layout.set_style(
+                        state.text_input_showcase_root,
+                        Style {
+                            display: Display::Flex,
+                            flex_direction: FlexDirection::Row,
+                            align_items: Some(AlignItems::CENTER),
+                            gap: taffy::geometry::Size {
+                                width: length(16.0_f32),
+                                height: length(0.0_f32),
+                            },
+                            size: Size {
+                                width: length(516.0_f32),
+                                height: length(40.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                    for &node in &[state.text_input_normal_node, state.text_input_masked_node] {
+                        state.layout.set_style(
+                            node,
+                            Style {
+                                flex_shrink: 0.0,
+                                size: Size {
+                                    width: length(250.0_f32),
+                                    height: length(40.0_f32),
+                                },
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    state.layout.set_children(
+                        state.text_input_showcase_root,
+                        &[state.text_input_normal_node, state.text_input_masked_node],
+                    );
+                    state.layout.compute(
+                        state.text_input_showcase_root,
+                        (
+                            Some(size.width as f32 / scale),
+                            Some(size.height as f32 / scale),
+                        ),
+                        |_, _, _, _, _| Size::ZERO,
+                    );
+                }
+                return;
+            }
         };
 
         state.layout.set_style(root, style);
@@ -1962,6 +2270,8 @@ impl Component {
             "button" => Some(Self::Button),
             "badge" => Some(Self::Badge),
             "skeleton" => Some(Self::Skeleton),
+            "tooltip" => Some(Self::Tooltip),
+            "text_input" => Some(Self::TextInput),
             _ => None,
         }
     }
@@ -1987,6 +2297,8 @@ impl Component {
             "button",
             "badge",
             "skeleton",
+            "tooltip",
+            "text_input",
         ]
     }
 
@@ -2111,7 +2423,111 @@ impl Component {
             Self::CanvasTab => render_canvas_tab(state),
             Self::StatsTab => render_stats_tab(state),
             Self::FormTab => render_form_tab(state, viewport_rect),
-            Self::Drawer => render_drawer(state, viewport_rect),
+            Self::Drawer => {
+                let (left_viewport, right_viewport) = if variant.is_some() {
+                    let r = state.layout.rect(state.drawer_left_node);
+                    (r, r)
+                } else {
+                    (
+                        state.layout.rect(state.drawer_left_node),
+                        state.layout.rect(state.drawer_right_node),
+                    )
+                };
+                let edges = if let Some(v) = variant {
+                    match v {
+                        "right" => vec![DrawerEdge::Right],
+                        _ => vec![DrawerEdge::Left],
+                    }
+                } else {
+                    vec![DrawerEdge::Left, DrawerEdge::Right]
+                };
+                let viewports = if variant.is_some() {
+                    vec![left_viewport]
+                } else {
+                    vec![left_viewport, right_viewport]
+                };
+                for (edge, vp) in edges.iter().zip(viewports.iter()) {
+                    let panel_width = vp[2] * 0.6;
+                    let drawer_resp =
+                        drawer_begin(&mut state.core, *vp, *edge, panel_width, &AKAR_THEME_DARK);
+                    let padding = 16.0_f32;
+                    let y_offset = 24.0_f32;
+                    let avatar_rect = [vp[0] + padding, vp[1] + y_offset, 40.0, 40.0];
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: avatar_rect,
+                        fill: [0.23, 0.51, 0.96, 1.0],
+                        border_color: [0.0; 4],
+                        corner_radii: [20.0; 4],
+                        border_width: 0.0,
+                        z: Z_FLOAT,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
+                    let initials_buf = state.core.text_pipeline.set_text(
+                        Some(9001),
+                        "AK",
+                        glyphon::Metrics::new(16.0, 16.0 * 1.2),
+                        Some(40.0),
+                        None,
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id: initials_buf,
+                        x: avatar_rect[0] + 10.0,
+                        y: avatar_rect[1] + 10.0,
+                        clip: avatar_rect,
+                        color: [1.0; 4],
+                        z: Z_FLOAT,
+                    });
+                    let nav_links = ["Dashboard", "Settings", "Profile", "Help"];
+                    let link_start_y = vp[1] + y_offset + 40.0 + 24.0;
+                    for (i, link) in nav_links.iter().enumerate() {
+                        let link_rect = [
+                            vp[0] + padding,
+                            link_start_y + i as f32 * 40.0,
+                            panel_width - 2.0 * padding,
+                            32.0,
+                        ];
+                        state.core.draw_list.push_quad(akar_core::QuadCall {
+                            rect: link_rect,
+                            fill: [0.15, 0.16, 0.17, 1.0],
+                            border_color: [0.0; 4],
+                            corner_radii: [4.0; 4],
+                            border_width: 0.0,
+                            z: Z_FLOAT,
+                            shadow_blur: 0.0,
+                            shadow_spread: 0.0,
+                            shadow_color: [0.0; 4],
+                            shadow_offset: [0.0; 2],
+                            _pad: [0.0; 2],
+                        });
+                        let link_buf = state.core.text_pipeline.set_text(
+                            Some(10000 + i as u64),
+                            link,
+                            glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                            Some(link_rect[2]),
+                            None,
+                            None,
+                        );
+                        state.core.draw_list.push_text(akar_core::TextCall {
+                            buffer_id: link_buf,
+                            x: link_rect[0] + 8.0,
+                            y: link_rect[1] + 6.0,
+                            clip: link_rect,
+                            color: [0.9, 0.9, 0.92, 1.0],
+                            z: Z_FLOAT,
+                        });
+                    }
+                    drawer_end(&mut state.core);
+                    if drawer_resp.close_requested {
+                        state.drawer_open = false;
+                        state.needs_repaint = true;
+                    }
+                }
+            }
             Self::Modal => render_modal(state, viewport_rect),
             Self::Toasts => {
                 if let Some(v) = variant {
@@ -2154,18 +2570,61 @@ impl Component {
             }
             Self::Dropdown => render_isolated_dropdown(state, viewport_rect),
             Self::Heading => {
-                akar_heading(
-                    &mut state.core,
-                    &state.layout,
-                    state.heading_node,
-                    "Heading Level 1",
-                    HeadingLevel::H1,
-                    Some(TextStyle {
-                        font_family: Some(FontFamily::Serif),
-                        ..TextStyle::empty()
-                    }),
-                    &AKAR_THEME_DARK,
-                );
+                if let Some(v) = variant {
+                    let (level, text) = match v {
+                        "h1" => (HeadingLevel::H1, "Heading H1"),
+                        "h2" => (HeadingLevel::H2, "Heading H2"),
+                        "h3" => (HeadingLevel::H3, "Heading H3"),
+                        "h4" => (HeadingLevel::H4, "Heading H4"),
+                        _ => (HeadingLevel::H1, "Heading H1"),
+                    };
+                    akar_heading(
+                        &mut state.core,
+                        &state.layout,
+                        state.heading_h1_node,
+                        text,
+                        level,
+                        None,
+                        &AKAR_THEME_DARK,
+                    );
+                } else {
+                    akar_heading(
+                        &mut state.core,
+                        &state.layout,
+                        state.heading_h1_node,
+                        "Heading H1",
+                        HeadingLevel::H1,
+                        None,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_heading(
+                        &mut state.core,
+                        &state.layout,
+                        state.heading_h2_node,
+                        "Heading H2",
+                        HeadingLevel::H2,
+                        None,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_heading(
+                        &mut state.core,
+                        &state.layout,
+                        state.heading_h3_node,
+                        "Heading H3",
+                        HeadingLevel::H3,
+                        None,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_heading(
+                        &mut state.core,
+                        &state.layout,
+                        state.heading_h4_node,
+                        "Heading H4",
+                        HeadingLevel::H4,
+                        None,
+                        &AKAR_THEME_DARK,
+                    );
+                }
             }
             Self::Paragraph => {
                 akar_paragraph(
@@ -2395,6 +2854,130 @@ impl Component {
                     );
                 }
             }
+            Self::Tooltip => {
+                let trigger_rect = state.layout.rect(state.tooltip_trigger_node);
+                akar_button(
+                    &mut state.core,
+                    &state.layout,
+                    state.tooltip_trigger_node,
+                    "Hover me",
+                    ButtonVariant::Outline,
+                    &AKAR_THEME_DARK,
+                );
+                let sides = if let Some(v) = variant {
+                    match v {
+                        "top" => vec![TooltipSide::Top],
+                        "bottom" => vec![TooltipSide::Bottom],
+                        "left" => vec![TooltipSide::Left],
+                        "right" => vec![TooltipSide::Right],
+                        _ => vec![TooltipSide::Top],
+                    }
+                } else {
+                    vec![
+                        TooltipSide::Top,
+                        TooltipSide::Bottom,
+                        TooltipSide::Left,
+                        TooltipSide::Right,
+                    ]
+                };
+                let label_data: &[(&str, TooltipSide, akar_layout::NodeId, u64)] = &[
+                    ("Top", TooltipSide::Top, state.tooltip_top_node, 11001),
+                    (
+                        "Bottom",
+                        TooltipSide::Bottom,
+                        state.tooltip_bottom_node,
+                        11002,
+                    ),
+                    ("Left", TooltipSide::Left, state.tooltip_left_node, 11003),
+                    ("Right", TooltipSide::Right, state.tooltip_right_node, 11004),
+                ];
+                for &(label, side, node, buf_id) in label_data {
+                    if !sides.contains(&side) {
+                        continue;
+                    }
+                    akar_tooltip(
+                        &mut state.core,
+                        trigger_rect,
+                        label,
+                        side,
+                        &AKAR_THEME_DARK,
+                        viewport_rect,
+                    );
+                    let lr = state.layout.rect(node);
+                    let buf = state.core.text_pipeline.set_text(
+                        Some(buf_id),
+                        label,
+                        glyphon::Metrics::new(12.0, 12.0 * 1.2),
+                        Some(lr[2]),
+                        None,
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id: buf,
+                        x: lr[0],
+                        y: lr[1],
+                        clip: lr,
+                        color: [0.6, 0.6, 0.65, 1.0],
+                        z: 0.0,
+                    });
+                }
+            }
+            Self::TextInput => {
+                state.cursor_tick += 1;
+                let cursor_visible =
+                    state.force_caret_visible || (state.cursor_tick / 30).is_multiple_of(2);
+                if let Some(v) = variant {
+                    match v {
+                        "masked" => {
+                            akar_text_input_masked(
+                                &mut state.core,
+                                &state.layout,
+                                state.text_input_masked_node,
+                                &mut state.text_input_masked_value,
+                                &mut state.text_input_masked_cursor,
+                                "Password",
+                                cursor_visible,
+                                &AKAR_THEME_DARK,
+                                true,
+                            );
+                        }
+                        _ => {
+                            akar_text_input(
+                                &mut state.core,
+                                &state.layout,
+                                state.text_input_normal_node,
+                                &mut state.text_input_normal_value,
+                                &mut state.text_input_normal_cursor,
+                                "Enter text",
+                                cursor_visible,
+                                &AKAR_THEME_DARK,
+                            );
+                        }
+                    }
+                } else {
+                    akar_text_input(
+                        &mut state.core,
+                        &state.layout,
+                        state.text_input_normal_node,
+                        &mut state.text_input_normal_value,
+                        &mut state.text_input_normal_cursor,
+                        "Normal input",
+                        cursor_visible,
+                        &AKAR_THEME_DARK,
+                    );
+                    akar_text_input_masked(
+                        &mut state.core,
+                        &state.layout,
+                        state.text_input_masked_node,
+                        &mut state.text_input_masked_value,
+                        &mut state.text_input_masked_cursor,
+                        "Masked input",
+                        cursor_visible,
+                        &AKAR_THEME_DARK,
+                        true,
+                    );
+                }
+            }
         }
     }
 
@@ -2439,6 +3022,13 @@ impl Component {
                 }
             }
             Self::Button | Self::Badge | Self::Skeleton => {}
+            Self::Tooltip => {
+                state.core.input.mouse_pos = glam::Vec2::new(60.0, 18.0);
+            }
+            Self::TextInput => {
+                state.text_input_normal_value = "Hello world".to_string();
+                state.text_input_masked_value = "secret123".to_string();
+            }
             Self::Heading
             | Self::Paragraph
             | Self::Link
@@ -3099,6 +3689,40 @@ impl ApplicationHandler for App {
         layout.register_label("skeleton_card", skeleton_card_node);
         layout.register_label("skeleton_circle", skeleton_circle_node);
 
+        let heading_showcase_root = layout.new_leaf(Style::default());
+        let heading_h1_node = layout.new_leaf(Style::default());
+        let heading_h2_node = layout.new_leaf(Style::default());
+        let heading_h3_node = layout.new_leaf(Style::default());
+        let heading_h4_node = layout.new_leaf(Style::default());
+        layout.register_label("heading_h1", heading_h1_node);
+        layout.register_label("heading_h2", heading_h2_node);
+        layout.register_label("heading_h3", heading_h3_node);
+        layout.register_label("heading_h4", heading_h4_node);
+
+        let drawer_showcase_root = layout.new_leaf(Style::default());
+        let drawer_left_node = layout.new_leaf(Style::default());
+        let drawer_right_node = layout.new_leaf(Style::default());
+        layout.register_label("drawer_left", drawer_left_node);
+        layout.register_label("drawer_right", drawer_right_node);
+
+        let tooltip_showcase_root = layout.new_leaf(Style::default());
+        let tooltip_trigger_node = layout.new_leaf(Style::default());
+        let tooltip_top_node = layout.new_leaf(Style::default());
+        let tooltip_bottom_node = layout.new_leaf(Style::default());
+        let tooltip_left_node = layout.new_leaf(Style::default());
+        let tooltip_right_node = layout.new_leaf(Style::default());
+        layout.register_label("tooltip_trigger", tooltip_trigger_node);
+        layout.register_label("tooltip_top", tooltip_top_node);
+        layout.register_label("tooltip_bottom", tooltip_bottom_node);
+        layout.register_label("tooltip_left", tooltip_left_node);
+        layout.register_label("tooltip_right", tooltip_right_node);
+
+        let text_input_showcase_root = layout.new_leaf(Style::default());
+        let text_input_normal_node = layout.new_leaf(Style::default());
+        let text_input_masked_node = layout.new_leaf(Style::default());
+        layout.register_label("text_input_normal", text_input_normal_node);
+        layout.register_label("text_input_masked", text_input_masked_node);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -3209,6 +3833,27 @@ impl ApplicationHandler for App {
             skeleton_text_node,
             skeleton_card_node,
             skeleton_circle_node,
+            heading_showcase_root,
+            heading_h1_node,
+            heading_h2_node,
+            heading_h3_node,
+            heading_h4_node,
+            drawer_showcase_root,
+            drawer_left_node,
+            drawer_right_node,
+            tooltip_showcase_root,
+            tooltip_trigger_node,
+            tooltip_top_node,
+            tooltip_bottom_node,
+            tooltip_left_node,
+            tooltip_right_node,
+            text_input_showcase_root,
+            text_input_normal_node,
+            text_input_masked_node,
+            text_input_normal_value: String::new(),
+            text_input_normal_cursor: akar_components::TextEditState::default(),
+            text_input_masked_value: String::new(),
+            text_input_masked_cursor: akar_components::TextEditState::default(),
         });
     }
 

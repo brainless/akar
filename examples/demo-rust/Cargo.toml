@@ -10,6 +10,7 @@ akar-components = { path = "../../crates/akar-components" }
 akar-winit = { path = "../../crates/akar-winit" }
 taffy = { workspace = true }
 glyphon = { workspace = true }
+glam = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }
 pollster = "0.4"
