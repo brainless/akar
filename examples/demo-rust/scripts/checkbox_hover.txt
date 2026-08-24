@@ -1,0 +1,4 @@
+# Hover over checkbox
+hover @checkbox
+delay 0.1
+screenshot /tmp/akar-checkbox-hover.png

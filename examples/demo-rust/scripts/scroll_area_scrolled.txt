@@ -1,0 +1,6 @@
+# Scroll down in scroll area
+hover @scroll_area
+delay 0.1
+scroll 0 -120
+delay 0.2
+screenshot /tmp/akar-scroll-area-scrolled.png

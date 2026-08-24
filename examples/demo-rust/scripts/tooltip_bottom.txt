@@ -1,0 +1,4 @@
+# Hover trigger for bottom tooltip
+hover @tooltip_trigger
+delay 0.2
+screenshot /tmp/akar-tooltip-bottom.png

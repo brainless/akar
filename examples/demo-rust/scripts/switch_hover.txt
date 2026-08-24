@@ -1,0 +1,4 @@
+# Hover over switch
+hover @switch
+delay 0.1
+screenshot /tmp/akar-switch-hover.png

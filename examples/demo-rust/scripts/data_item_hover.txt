@@ -1,0 +1,4 @@
+# Hover over data item
+hover @data_item
+delay 0.1
+screenshot /tmp/akar-data-item-hover.png

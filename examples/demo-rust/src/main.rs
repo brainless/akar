@@ -33,6 +33,8 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+mod capture_manifest;
+mod capture_runner;
 mod catalog;
 mod cli;
 mod script;
@@ -321,6 +323,22 @@ fn main() {
         cli::RunMode::ListVariants(ref comp) => {
             if let Err(e) = cli::print_variants(comp) {
                 eprintln!("{e}");
+                std::process::exit(1);
+            }
+            std::process::exit(0);
+        }
+        cli::RunMode::CaptureAll(ref dir) => {
+            let base = std::path::PathBuf::from(dir);
+            let mut cap_config = capture_runner::CaptureConfig::new(&base);
+            cap_config.output_dir = base.join(".artifacts/epic026/captures");
+            let results = capture_runner::run_capture_all(&cap_config);
+            capture_runner::print_summary(&results);
+            if let Err(e) = capture_runner::verify_managed_dirs(&cap_config) {
+                eprintln!("Managed directory verification failed:\n{e}");
+                std::process::exit(1);
+            }
+            let has_failures = results.iter().any(|r| !r.success);
+            if has_failures {
                 std::process::exit(1);
             }
             std::process::exit(0);

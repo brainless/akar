@@ -1,0 +1,4 @@
+# Open select dropdown
+click @select
+delay 0.2
+screenshot /tmp/akar-select-open.png

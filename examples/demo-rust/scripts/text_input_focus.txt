@@ -1,0 +1,6 @@
+# Focus text input and type
+click @text_input_normal
+delay 0.1
+type "Hello, akar!"
+delay 0.1
+screenshot /tmp/akar-text-input-focused.png

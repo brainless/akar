@@ -1,0 +1,4 @@
+# Hover trigger for left tooltip
+hover @tooltip_trigger
+delay 0.2
+screenshot /tmp/akar-tooltip-left.png

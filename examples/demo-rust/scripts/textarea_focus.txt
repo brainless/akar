@@ -1,0 +1,10 @@
+# Focus textarea and type multiline text
+click @textarea
+delay 0.1
+type "Line one"
+key Enter
+type "Line two"
+key Enter
+type "Line three"
+delay 0.1
+screenshot /tmp/akar-textarea-focused.png

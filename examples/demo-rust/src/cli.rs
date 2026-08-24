@@ -6,6 +6,7 @@ pub enum RunMode {
     Help,
     ListComponents,
     ListVariants(String),
+    CaptureAll(String),
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,7 @@ Options:
   --exit                   Exit after screenshot/script completes
   --list-components        List all available components and exit
   --list-variants <comp>   List variants for a component and exit
+  --capture-all <dir>      Run full capture manifest to directory and exit
   --help                   Show this help message and exit
 
 Discovery modes (--help, --list-components, --list-variants) cannot be combined
@@ -92,6 +94,18 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
                     .next()
                     .ok_or("--list-variants requires a component name")?;
                 mode = Some(RunMode::ListVariants(comp));
+            }
+            "--capture-all" => {
+                if mode.is_some() {
+                    return Err(
+                        "--capture-all cannot be combined with other discovery or rendering options"
+                            .into(),
+                    );
+                }
+                let dir = arg_iter
+                    .next()
+                    .ok_or("--capture-all requires an output directory")?;
+                mode = Some(RunMode::CaptureAll(dir));
             }
             "--component" => {
                 if component.is_some() {
@@ -162,6 +176,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
                 RunMode::Help => "--help",
                 RunMode::ListComponents => "--list-components",
                 RunMode::ListVariants(_) => "--list-variants",
+                RunMode::CaptureAll(_) => "--capture-all",
                 RunMode::Run => unreachable!(),
             };
             return Err(format!(
@@ -503,6 +518,25 @@ mod tests {
     #[test]
     fn list_variants_conflicts_with_rendering() {
         let err = parse_strs(&["demo-rust", "--list-variants", "button", "--exit"]).unwrap_err();
+        assert!(err.contains("cannot be combined"));
+    }
+
+    #[test]
+    fn capture_all_flag() {
+        let cfg = parse_strs(&["demo-rust", "--capture-all", "/tmp/out"]).unwrap();
+        assert_eq!(cfg.mode, RunMode::CaptureAll("/tmp/out".into()));
+    }
+
+    #[test]
+    fn capture_all_requires_dir() {
+        let err = parse_strs(&["demo-rust", "--capture-all"]).unwrap_err();
+        assert!(err.contains("requires an output directory"));
+    }
+
+    #[test]
+    fn capture_all_conflicts_with_rendering() {
+        let err =
+            parse_strs(&["demo-rust", "--capture-all", "/tmp/out", "--exit"]).unwrap_err();
         assert!(err.contains("cannot be combined"));
     }
 

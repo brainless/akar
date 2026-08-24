@@ -1,0 +1,6 @@
+# Press the outline button variant
+hover @button_outline
+delay 0.1
+press left
+delay 0.1
+screenshot /tmp/akar-button-outline-pressed.png

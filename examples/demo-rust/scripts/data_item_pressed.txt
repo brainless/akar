@@ -1,0 +1,6 @@
+# Press data item
+hover @data_item
+delay 0.1
+press left
+delay 0.1
+screenshot /tmp/akar-data-item-pressed.png

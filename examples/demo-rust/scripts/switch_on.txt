@@ -1,0 +1,4 @@
+# Click switch to turn on
+click @switch
+delay 0.1
+screenshot /tmp/akar-switch-on.png

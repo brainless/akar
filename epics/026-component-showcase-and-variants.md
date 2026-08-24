@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-8 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-9 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -214,7 +214,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Confirm every one of the 33 implementation families has a direct catalog entry; composite fixtures do not satisfy this check. Confirm the C ABI metadata still matches generated `akar.h`.
 - Re-run the Task 0 captures and require pixel equality for `form`, `navbar`, `dropdown`, `stats`, and `list`. Compare the old Drawer capture to the new single `drawer --variant left` capture; the new default Drawer showcase is an intentional difference. Variant showcase captures are likewise expected to differ from the old single-instance Alert/Tab/Toast captures.
 
-### Task 9 — Capture manifest, scripts, and screenshot set
+### Task 9 — Capture manifest, scripts, and screenshot set ✅
 
 - Add a checked-in typed manifest and platform-neutral Rust runner covering every family default, all 36 registered single variants, and every named capture in the Design Decisions matrix. Include the retained composite images deliberately selected for README/website/regression use; `i18n` is not a canonical cross-platform asset because it intentionally depends on locally available fonts.
 - Each manifest entry records the canonical family, CLI component/variant, state, command or checked-in script, stable target labels, output filename, whether it is a website-card image, and whether it participates in a pre-change regression comparison.

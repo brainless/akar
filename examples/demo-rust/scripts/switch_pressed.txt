@@ -1,0 +1,6 @@
+# Press switch
+hover @switch
+delay 0.1
+press left
+delay 0.1
+screenshot /tmp/akar-switch-pressed.png

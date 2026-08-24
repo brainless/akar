@@ -1,0 +1,4 @@
+# Hover trigger for top tooltip
+hover @tooltip_trigger
+delay 0.2
+screenshot /tmp/akar-tooltip-top.png

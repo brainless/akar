@@ -1,0 +1,4 @@
+# Hover over the outline button variant
+hover @button_outline
+delay 0.1
+screenshot /tmp/akar-button-outline-hover.png

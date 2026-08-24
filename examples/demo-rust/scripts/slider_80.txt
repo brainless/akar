@@ -1,0 +1,11 @@
+# Drag slider to approximately 80%
+# Slider node is 250px wide; 80% = 200px from left edge
+hover @slider
+delay 0.1
+press left
+delay 0.1
+hover 200 16
+delay 0.1
+release left
+delay 0.1
+screenshot /tmp/akar-slider-80.png

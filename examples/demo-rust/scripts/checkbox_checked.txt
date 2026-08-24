@@ -1,0 +1,4 @@
+# Click checkbox to check it
+click @checkbox
+delay 0.1
+screenshot /tmp/akar-checkbox-checked.png
