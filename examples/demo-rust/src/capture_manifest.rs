@@ -1247,14 +1247,7 @@ mod tests {
     fn no_duplicate_family_variant_state() {
         let mut keys: Vec<String> = MANIFEST
             .iter()
-            .map(|e| {
-                format!(
-                    "{}:{}:{}",
-                    e.family,
-                    e.variant.unwrap_or(""),
-                    e.state
-                )
-            })
+            .map(|e| format!("{}:{}:{}", e.family, e.variant.unwrap_or(""), e.state))
             .collect();
         let len_before = keys.len();
         keys.sort();

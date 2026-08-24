@@ -535,8 +535,7 @@ mod tests {
 
     #[test]
     fn capture_all_conflicts_with_rendering() {
-        let err =
-            parse_strs(&["demo-rust", "--capture-all", "/tmp/out", "--exit"]).unwrap_err();
+        let err = parse_strs(&["demo-rust", "--capture-all", "/tmp/out", "--exit"]).unwrap_err();
         assert!(err.contains("cannot be combined"));
     }
 

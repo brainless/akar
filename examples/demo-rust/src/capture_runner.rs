@@ -132,7 +132,8 @@ fn is_flat_color(path: &Path) -> bool {
 
 fn copy_with_verify(src: &Path, dst: &Path) -> Result<(), String> {
     if let Some(parent) = dst.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("create dir {}: {e}", parent.display()))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("create dir {}: {e}", parent.display()))?;
     }
     std::fs::copy(src, dst).map_err(|e| format!("copy to {}: {e}", dst.display()))?;
     let src_len = std::fs::metadata(src)
@@ -169,9 +170,7 @@ pub fn run_capture_all(config: &CaptureConfig) -> Vec<CaptureResult> {
         }
 
         let cmd_args = build_command(entry, config);
-        let output = Command::new("cargo")
-            .args(&cmd_args)
-            .output();
+        let output = Command::new("cargo").args(&cmd_args).output();
 
         let tmp_path = config.output_dir.join(entry.filename);
 
@@ -182,7 +181,11 @@ pub fn run_capture_all(config: &CaptureConfig) -> Vec<CaptureResult> {
                     CaptureResult {
                         filename: entry.filename.to_string(),
                         success: false,
-                        message: format!("exit code {}: {}", o.status.code().unwrap_or(-1), stderr.trim()),
+                        message: format!(
+                            "exit code {}: {}",
+                            o.status.code().unwrap_or(-1),
+                            stderr.trim()
+                        ),
                     }
                 } else if !tmp_path.exists() {
                     CaptureResult {

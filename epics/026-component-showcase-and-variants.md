@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-11 complete (2026-08-24).
+**Status:** Done — all 13 tasks complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -242,7 +242,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Keep the README concise and link readers to the website for the full 33-component/state catalog.
 - Use only images produced by the canonical capture manifest.
 
-### Task 12 — Final verification and handoff to later epics
+### Task 12 — Final verification and handoff to later epics ✅
 
 - `cargo run --bin demo-rust -- --list-components` prints every implementation family plus the retained composite fixtures, without duplicate aliases; `--help` and `--list-variants` return useful output without creating a GPU/window.
 - CLI validation tests and representative command-line error checks pass without requiring a GPU for parsing failures.
@@ -256,25 +256,27 @@ Pixel-exact regression comparisons require baselines captured before implementat
 
 ## Acceptance Criteria
 
-- [ ] All 33 implementation component families have direct `--component` isolation coverage; composite fixtures remain available but do not substitute for component families.
-- [ ] Every catalog record states whether the family is currently available through generated `akar.h`; Rust-only families are disclosed on the website and missing bindings are not silently implied.
-- [ ] `container`, `scroll_area`, and `data_list` have real standalone fixtures in addition to the components listed in the original draft.
-- [ ] Existing CLI component names remain compatible; `tabs`/`toast` aliases canonicalize without duplicating `--list-components` output.
-- [ ] `--variant` supports every catalog variant in the registry, `--help`/`--list-variants` provide non-GPU discovery, and all parser/conflict errors are covered by non-GPU tests.
-- [ ] Variant showcase nodes are persistent and constructed outside paint; stable script labels and widget identities survive across frames.
-- [ ] Recorded-call bounds, text/scissor culling, and crop AABBs use one physical-pixel coordinate space and pass scale-factor-1/2 tests.
-- [ ] Every default showcase, all 36 single catalog variants, and every named interactive-state capture in the coverage matrix are captured with deterministic manifest-owned filenames.
-- [ ] Tooltip, Toast, Drawer, Select, Dropdown, and Modal captures include their visible overlay content and crop correctly.
-- [ ] `data_list` uses `data_list_begin`/`data_list_end` with stable keys and real data items; the legacy `list` composite is not counted as its coverage.
-- [ ] The paired files under `images/components/` and `website/public/screenshots/components/` are byte-identical, exactly match the typed manifest, and are generated through the checked-in Rust capture runner.
-- [ ] The website implemented catalog matches the 33 implementation families exactly, contains no false implemented Spinner, Kbd, Table, or Tab Panel entries, and discloses C ABI availability.
-- [ ] A typed crosswalk classifies every local DaisyUI/shadcn family as implemented-equivalent, planned, alias, or excluded; the website planned list is derived from it and includes spinner/loading.
-- [ ] Website preview styling displays complete wide/tall showcase images without cropping their variant labels.
-- [ ] README includes a compact subset of the new variant showcases and points to the full website catalog.
-- [ ] Existing visuals (`form`, `navbar`, `dropdown`, `stats`, `list`, and the single Left Drawer variant) are pixel-identical to durable local pre-change baselines; the new default Drawer showcase is documented as intentional.
-- [ ] `cargo fmt --check`, `cargo check --workspace`, `cargo test --workspace`, and `cargo clippy --workspace -- -D warnings` pass.
-- [ ] `npm run build`, `npm run check`, `npm run lint -- --max-warnings 0`, and `npm run format:check` pass in `website/`.
-- [ ] Epic completion records that Epics 024 and 025 must be re-reviewed before implementation; those epics are not modified as part of this work.
+- [x] All 33 implementation component families have direct `--component` isolation coverage; composite fixtures remain available but do not substitute for component families.
+- [x] Every catalog record states whether the family is currently available through generated `akar.h`; Rust-only families are disclosed on the website and missing bindings are not silently implied.
+- [x] `container`, `scroll_area`, and `data_list` have real standalone fixtures in addition to the components listed in the original draft.
+- [x] Existing CLI component names remain compatible; `tabs`/`toast` aliases canonicalize without duplicating `--list-components` output.
+- [x] `--variant` supports every catalog variant in the registry, `--help`/`--list-variants` provide non-GPU discovery, and all parser/conflict errors are covered by non-GPU tests.
+- [x] Variant showcase nodes are persistent and constructed outside paint; stable script labels and widget identities survive across frames.
+- [x] Recorded-call bounds, text/scissor culling, and crop AABBs use one physical-pixel coordinate space and pass scale-factor-1/2 tests.
+- [x] Every default showcase, all 36 single catalog variants, and every named interactive-state capture in the coverage matrix are captured with deterministic manifest-owned filenames.
+- [x] Tooltip, Toast, Drawer, Select, Dropdown, and Modal captures include their visible overlay content and crop correctly.
+- [x] `data_list` uses `data_list_begin`/`data_list_end` with stable keys and real data items; the legacy `list` composite is not counted as its coverage.
+- [x] The paired files under `images/components/` and `website/public/screenshots/components/` are byte-identical, exactly match the typed manifest, and are generated through the checked-in Rust capture runner.
+- [x] The website implemented catalog matches the 33 implementation families exactly, contains no false implemented Spinner, Kbd, Table, or Tab Panel entries, and discloses C ABI availability.
+- [x] A typed crosswalk classifies every local DaisyUI/shadcn family as implemented-equivalent, planned, alias, or excluded; the website planned list is derived from it and includes spinner/loading.
+- [x] Website preview styling displays complete wide/tall showcase images without cropping their variant labels.
+- [x] README includes a compact subset of the new variant showcases and points to the full website catalog.
+- [x] Existing visuals (`form`, `navbar`, `dropdown`, `stats`, `list`, and the single Left Drawer variant) are pixel-identical to durable local pre-change baselines; the new default Drawer showcase is documented as intentional.
+- [x] `cargo fmt --check`, `cargo check --workspace`, `cargo test --workspace`, and `cargo clippy --workspace -- -D warnings` pass.
+- [x] `npm run build`, `npm run check`, `npm run lint -- --max-warnings 0`, and `npm run format:check` pass in `website/`.
+- [x] Epic completion records that Epics 024 and 025 must be re-reviewed before implementation; those epics are not modified as part of this work.
+
+**Completion note (2026-08-24):** Epics 024 and 025 must be re-read and updated before their implementation. Do not make those plan edits inside Epic 026.
 
 ---
 
