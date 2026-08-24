@@ -35,6 +35,7 @@ use winit::{
 mod catalog;
 mod cli;
 mod script;
+mod showcase;
 
 #[derive(serde::Serialize)]
 struct InputSnapshot {
@@ -164,6 +165,12 @@ struct AppState {
     /// blink-off frame and look byte-identical, proving nothing. See epic
     /// 023 Task 13 tooling gotcha 1.
     force_caret_visible: bool,
+    #[allow(dead_code)] // scaffolding for showcase overlay isolation (Tasks 3-7)
+    drawer_root: akar_layout::NodeId,
+    #[allow(dead_code)] // scaffolding for showcase overlay isolation (Tasks 3-7)
+    modal_root: akar_layout::NodeId,
+    #[allow(dead_code)] // scaffolding for showcase overlay isolation (Tasks 3-7)
+    toasts_root: akar_layout::NodeId,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1186,13 +1193,14 @@ fn compute_component_aabb(recorded: &[akar_core::draw_list::RecordedCall]) -> Op
     let mut max_y = f32::MIN;
 
     for call in recorded {
-        let (rect, z) = match &call.call {
-            akar_core::DrawCall::Quad(q) => (q.rect, q.z),
-            akar_core::DrawCall::Text(t) => (t.clip, t.z),
+        let z = match &call.call {
+            akar_core::DrawCall::Quad(q) => q.z,
+            akar_core::DrawCall::Text(t) => t.z,
         };
         if z == akar_core::Z_SCRIM {
             continue;
         }
+        let rect = call.physical_rect;
         if let Some(scissor) = call.scissor {
             if rect[0] + rect[2] <= scissor[0]
                 || rect[1] + rect[3] <= scissor[1]
@@ -2252,6 +2260,44 @@ impl ApplicationHandler for App {
         layout.register_label("i18n_cjk", i18n_cjk_node);
         layout.register_label("i18n_arabic", i18n_arabic_node);
 
+        let navbar_node = page.header.unwrap();
+        layout.register_label("navbar", navbar_node);
+        layout.register_label("list", scroll_container);
+        layout.register_label("canvas", canvas_wrapper);
+        layout.register_label("stats", stats_wrapper);
+        layout.register_label("form", form_container);
+        layout.register_label("dropdown", navbar_dropdown_btn_node);
+
+        let drawer_root = layout.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(400.0_f32),
+                height: length(300.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.register_label("drawer", drawer_root);
+
+        let modal_root = layout.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(400.0_f32),
+                height: length(300.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.register_label("modal", modal_root);
+
+        let toasts_root = layout.new_leaf(Style {
+            display: Display::Flex,
+            size: Size {
+                width: length(320.0_f32),
+                height: length(200.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.register_label("toasts", toasts_root);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -2334,6 +2380,9 @@ impl ApplicationHandler for App {
             },
             needs_repaint: false,
             force_caret_visible: self.script_runner.is_some(),
+            drawer_root,
+            modal_root,
+            toasts_root,
         });
     }
 
@@ -2582,14 +2631,15 @@ impl ApplicationHandler for App {
                             let mut cropped = false;
                             if let Some(_component) = &self.isolated_component {
                                 let recorded = state.core.draw_list.recorded_calls();
+                                let scale = state.window.scale_factor() as f32;
                                 let crop_params = compute_component_aabb(recorded).map(|aabb| {
-                                    const PAD: f32 = 16.0;
-                                    let x = (aabb[0] - PAD).max(0.0) as u32;
-                                    let y = (aabb[1] - PAD).max(0.0) as u32;
+                                    let pad = 16.0 * scale;
+                                    let x = (aabb[0] - pad).max(0.0) as u32;
+                                    let y = (aabb[1] - pad).max(0.0) as u32;
                                     let right =
-                                        (aabb[0] + aabb[2] + PAD).min(frame.width as f32) as u32;
+                                        (aabb[0] + aabb[2] + pad).min(frame.width as f32) as u32;
                                     let bottom =
-                                        (aabb[1] + aabb[3] + PAD).min(frame.height as f32) as u32;
+                                        (aabb[1] + aabb[3] + pad).min(frame.height as f32) as u32;
                                     let w = right.saturating_sub(x);
                                     let h = bottom.saturating_sub(y);
                                     (x, y, w, h)
@@ -2673,5 +2723,173 @@ impl ApplicationHandler for App {
         if !matches!(event, WindowEvent::RedrawRequested) {
             state.window.request_redraw();
         }
+    }
+}
+
+#[cfg(test)]
+mod aabb_tests {
+    use super::compute_component_aabb;
+    use akar_core::draw_list::{QuadCall, RecordedCall, TextCall};
+    use akar_core::{DrawCall, Z_SCRIM};
+
+    fn quad_call(x: f32, y: f32, w: f32, h: f32, z: f32) -> RecordedCall {
+        let q = QuadCall {
+            rect: [x, y, w, h],
+            fill: [1.0, 0.0, 0.0, 1.0],
+            border_color: [0.0; 4],
+            corner_radii: [0.0; 4],
+            border_width: 0.0,
+            z,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        };
+        RecordedCall {
+            call: DrawCall::Quad(q),
+            scissor: None,
+            physical_rect: [x, y, w, h],
+        }
+    }
+
+    fn text_call(x: f32, y: f32, w: f32, h: f32, z: f32) -> RecordedCall {
+        let t = TextCall {
+            buffer_id: 0,
+            x,
+            y,
+            clip: [x, y, w, h],
+            color: [1.0; 4],
+            z,
+        };
+        RecordedCall {
+            call: DrawCall::Text(t),
+            scissor: None,
+            physical_rect: [x, y, w, h],
+        }
+    }
+
+    fn with_scissor(mut rc: RecordedCall, scissor: [f32; 4]) -> RecordedCall {
+        rc.scissor = Some(scissor);
+        rc
+    }
+
+    fn with_physical_rect(mut rc: RecordedCall, pr: [f32; 4]) -> RecordedCall {
+        rc.physical_rect = pr;
+        rc
+    }
+
+    #[test]
+    fn empty_returns_none() {
+        assert!(compute_component_aabb(&[]).is_none());
+    }
+
+    #[test]
+    fn single_quad_scale_1() {
+        let calls = [quad_call(10.0, 20.0, 30.0, 40.0, 0.0)];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [10.0, 20.0, 30.0, 40.0]);
+    }
+
+    #[test]
+    fn single_quad_scale_2() {
+        let calls = [with_physical_rect(
+            quad_call(10.0, 20.0, 30.0, 40.0, 0.0),
+            [20.0, 40.0, 60.0, 80.0],
+        )];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [20.0, 40.0, 60.0, 80.0]);
+    }
+
+    #[test]
+    fn single_text_scale_1() {
+        let calls = [text_call(5.0, 10.0, 50.0, 20.0, 0.0)];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [5.0, 10.0, 50.0, 20.0]);
+    }
+
+    #[test]
+    fn single_text_scale_2() {
+        let calls = [with_physical_rect(
+            text_call(5.0, 10.0, 50.0, 20.0, 0.0),
+            [10.0, 20.0, 100.0, 40.0],
+        )];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [10.0, 20.0, 100.0, 40.0]);
+    }
+
+    #[test]
+    fn mixed_quad_and_text() {
+        let calls = [
+            quad_call(10.0, 10.0, 20.0, 20.0, 0.0),
+            text_call(50.0, 50.0, 30.0, 10.0, 0.0),
+        ];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb[0], 10.0);
+        assert_eq!(aabb[1], 10.0);
+        assert_eq!(aabb[2], 70.0);
+        assert_eq!(aabb[3], 50.0);
+    }
+
+    #[test]
+    fn mixed_at_scale_2() {
+        let calls = [
+            with_physical_rect(
+                quad_call(10.0, 10.0, 20.0, 20.0, 0.0),
+                [20.0, 20.0, 40.0, 40.0],
+            ),
+            with_physical_rect(
+                text_call(50.0, 50.0, 30.0, 10.0, 0.0),
+                [100.0, 100.0, 60.0, 20.0],
+            ),
+        ];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb[0], 20.0);
+        assert_eq!(aabb[1], 20.0);
+        assert_eq!(aabb[2], 140.0);
+        assert_eq!(aabb[3], 100.0);
+    }
+
+    #[test]
+    fn scissored_out_excluded() {
+        let calls = [with_scissor(
+            quad_call(200.0, 200.0, 50.0, 50.0, 0.0),
+            [0.0, 0.0, 100.0, 100.0],
+        )];
+        assert!(compute_component_aabb(&calls).is_none());
+    }
+
+    #[test]
+    fn scissored_partial_included() {
+        let calls = [with_scissor(
+            quad_call(80.0, 80.0, 50.0, 50.0, 0.0),
+            [0.0, 0.0, 200.0, 200.0],
+        )];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [80.0, 80.0, 50.0, 50.0]);
+    }
+
+    #[test]
+    fn scrim_filtered() {
+        let calls = [
+            quad_call(10.0, 10.0, 20.0, 20.0, 0.0),
+            quad_call(0.0, 0.0, 800.0, 600.0, Z_SCRIM),
+        ];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [10.0, 10.0, 20.0, 20.0]);
+    }
+
+    #[test]
+    fn all_scrim_returns_none() {
+        let calls = [quad_call(0.0, 0.0, 800.0, 600.0, Z_SCRIM)];
+        assert!(compute_component_aabb(&calls).is_none());
+    }
+
+    #[test]
+    fn uses_physical_rect_not_inner_call() {
+        let mut rc = quad_call(10.0, 20.0, 30.0, 40.0, 0.0);
+        rc.physical_rect = [100.0, 200.0, 300.0, 400.0];
+        let aabb = compute_component_aabb(&[rc]).unwrap();
+        assert_eq!(aabb, [100.0, 200.0, 300.0, 400.0]);
     }
 }

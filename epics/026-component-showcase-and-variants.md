@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-1 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-2 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -161,7 +161,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Add unit tests for help output, every canonical component name, aliases, every valid variant, variant discovery, unknown variants/flags, missing and invalid values, duplicate/conflicting flags, `--variant` without `--component`, and `--variant` on a non-variant component.
 - Add a coverage test asserting that every catalog entry has a canonical name and isolation adapter, that canonical names are unique, and that every registered variant has a renderer mapping.
 
-### Task 2 — Persistent showcase layout and stable labels
+### Task 2 — Persistent showcase layout and stable labels ✅
 
 - Add persistent demo-owned showcase nodes/roots constructed once before compute/paint.
 - Implement row, wrapped-grid, stack, and bounded-mini-viewport adapters as needed; do not require every component to fit one generic row abstraction.

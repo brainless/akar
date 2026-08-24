@@ -31,6 +31,7 @@ const _: () = assert!(std::mem::size_of::<QuadCall>() == 112);
 pub struct RecordedCall {
     pub call: DrawCall,
     pub scissor: Option<[f32; 4]>,
+    pub physical_rect: [f32; 4],
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -129,9 +130,11 @@ impl DrawList {
         call.shadow_offset[0] *= self.scale_factor;
         call.shadow_offset[1] *= self.scale_factor;
         if self.recording {
+            let physical_rect = call.rect;
             self.recorded.push(RecordedCall {
                 call: DrawCall::Quad(call),
                 scissor: self.active_scissor(),
+                physical_rect,
             });
         }
         if let Some(scissor) = self.active_scissor() {
@@ -144,9 +147,17 @@ impl DrawList {
 
     pub fn push_text(&mut self, call: TextCall) {
         if self.recording {
+            let sf = self.scale_factor;
+            let physical_rect = [
+                call.clip[0] * sf,
+                call.clip[1] * sf,
+                call.clip[2] * sf,
+                call.clip[3] * sf,
+            ];
             self.recorded.push(RecordedCall {
                 call: DrawCall::Text(call.clone()),
                 scissor: self.active_scissor(),
+                physical_rect,
             });
         }
         if let Some(scissor) = self.active_scissor() {
@@ -325,5 +336,64 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert!(value.is_array());
         assert_eq!(value.as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn physical_rect_quad_at_scale_1() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(1.0);
+        dl.start_recording();
+        dl.push_quad(quad_at(10.0, 20.0, 30.0, 40.0));
+        dl.stop_recording();
+        let r = &dl.recorded_calls()[0];
+        assert_eq!(r.physical_rect, [10.0, 20.0, 30.0, 40.0]);
+    }
+
+    #[test]
+    fn physical_rect_quad_at_scale_2() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.start_recording();
+        dl.push_quad(quad_at(10.0, 20.0, 30.0, 40.0));
+        dl.stop_recording();
+        let r = &dl.recorded_calls()[0];
+        assert_eq!(r.physical_rect, [20.0, 40.0, 60.0, 80.0]);
+    }
+
+    #[test]
+    fn physical_rect_text_at_scale_1() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(1.0);
+        dl.start_recording();
+        dl.push_text(text_at(10.0, 20.0, 30.0, 40.0));
+        dl.stop_recording();
+        let r = &dl.recorded_calls()[0];
+        assert_eq!(r.physical_rect, [10.0, 20.0, 30.0, 40.0]);
+    }
+
+    #[test]
+    fn physical_rect_text_at_scale_2() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.start_recording();
+        dl.push_text(text_at(10.0, 20.0, 30.0, 40.0));
+        dl.stop_recording();
+        let r = &dl.recorded_calls()[0];
+        assert_eq!(r.physical_rect, [20.0, 40.0, 60.0, 80.0]);
+    }
+
+    #[test]
+    fn physical_rect_text_preserves_logical_clip() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.start_recording();
+        dl.push_text(text_at(10.0, 20.0, 30.0, 40.0));
+        dl.stop_recording();
+        let r = &dl.recorded_calls()[0];
+        match &r.call {
+            DrawCall::Text(t) => assert_eq!(t.clip, [10.0, 20.0, 30.0, 40.0]),
+            _ => panic!("expected text"),
+        }
+        assert_eq!(r.physical_rect, [20.0, 40.0, 60.0, 80.0]);
     }
 }
