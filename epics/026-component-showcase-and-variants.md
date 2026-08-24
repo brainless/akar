@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-9 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-10 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -224,7 +224,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Visually inspect the complete capture set, not only file existence. Use `--dump-frame` for unexpected clipping, empty tooltip/overlay captures, or crop errors.
 - Reproduced 2026-08-24: an isolated `--component` capture using the default 5s delay occasionally returned an all-black PNG on the first `cargo run` after a fresh build (a cold-start window/GPU-surface race), while the identical command with an explicit `--delay` or a warm rerun succeeded. This was not consistently reproducible and does not block implementation, but because the runner performs dozens of unattended captures, it should reject/retry a capture whose output is a single flat color (a cheap check: sampled pixel variance near zero) rather than trusting file existence alone.
 
-### Task 10 — Reconcile `website/src/pages/components.astro`
+### Task 10 — Reconcile `website/src/pages/components.astro` ✅
 
 - Move the catalog data out of the page body into a typed website data module so inventory, C ABI availability, descriptions, categories, aliases, and screenshot names can be reviewed independently from markup.
 - Make the implemented list match the 33 implementation families exactly, and display or otherwise clearly disclose any `c_abi: false` entry rather than implying universal C ABI availability.

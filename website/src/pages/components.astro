@@ -6,75 +6,15 @@ import Container from '@/components/ui/Container.astro';
 import GlassCard from '@/components/ui/GlassCard.astro';
 import Badge from '@/components/ui/Badge.astro';
 import Section from '@/components/ui/Section.astro';
+import { categories, implementedByCategory } from '@/lib/components';
+import { plannedComponents } from '@/lib/component-crosswalk';
 
-interface Component {
-  name: string;
-  category: string;
-  status: 'implemented' | 'planned';
-  description: string;
-  screenshot?: string;
-}
-
-const implemented: Component[] = [
-  { name: 'Button', category: 'Primitives', status: 'implemented', description: 'Primary action element with glass, solid, outline, and ghost variants.' },
-  { name: 'Badge', category: 'Primitives', status: 'implemented', description: 'Status indicators and labels with accent, success, warning, and error variants.' },
-  { name: 'Label', category: 'Primitives', status: 'implemented', description: 'Text labels for form fields and UI elements.' },
-  { name: 'Link', category: 'Primitives', status: 'implemented', description: 'Navigation links with hover states and external link support.' },
-  { name: 'Separator', category: 'Primitives', status: 'implemented', description: 'Visual dividers between content sections.' },
-  { name: 'Spinner', category: 'Primitives', status: 'implemented', description: 'Loading indicators for async operations.' },
-  { name: 'Kbd', category: 'Primitives', status: 'implemented', description: 'Keyboard shortcut display elements.' },
-  { name: 'Input', category: 'Inputs', status: 'implemented', description: 'Text input fields with validation states.' },
-  { name: 'Textarea', category: 'Inputs', status: 'implemented', description: 'Multi-line text input for longer content.' },
-  { name: 'Checkbox', category: 'Inputs', status: 'implemented', description: 'Binary toggle for multi-select options.' },
-  { name: 'Radio', category: 'Inputs', status: 'implemented', description: 'Single-select from a group of options.' },
-  { name: 'Switch', category: 'Inputs', status: 'implemented', description: 'Toggle between two states with smooth animation.' },
-  { name: 'Slider', category: 'Inputs', status: 'implemented', description: 'Range input for numeric values within bounds.' },
-  { name: 'Select', category: 'Inputs', status: 'implemented', description: 'Dropdown selection from a list of options.' },
-  { name: 'Alert', category: 'Feedback', status: 'implemented', description: 'Status messages for success, warning, error, and info states.', screenshot: '/screenshots/akar-form.png' },
-  { name: 'Tooltip', category: 'Feedback', status: 'implemented', description: 'Contextual information on hover or focus.' },
-  { name: 'Toast', category: 'Feedback', status: 'implemented', description: 'Non-blocking notifications that auto-dismiss.', screenshot: '/screenshots/akar-toasts.png' },
-  { name: 'Card', category: 'Layout', status: 'implemented', description: 'Container for grouping related content.', screenshot: '/screenshots/akar-card.png' },
-  { name: 'Table', category: 'Layout', status: 'implemented', description: 'Structured data display with rows and columns.' },
-  { name: 'Tab Bar', category: 'Layout', status: 'implemented', description: 'Navigation between content panels.' },
-  { name: 'Tab Panel', category: 'Layout', status: 'implemented', description: 'Content area switched by tab selection.' },
-  { name: 'Scroll Area', category: 'Layout', status: 'implemented', description: 'Custom scrollbar for overflow content.' },
-  { name: 'Data List', category: 'Layout', status: 'implemented', description: 'Key-value pair display.', screenshot: '/screenshots/akar-stats.png' },
-  { name: 'Modal', category: 'Overlay/Navigation', status: 'implemented', description: 'Dialog overlay for focused interactions.', screenshot: '/screenshots/akar-modal.png' },
-  { name: 'Drawer', category: 'Overlay/Navigation', status: 'implemented', description: 'Slide-in panel from screen edges.', screenshot: '/screenshots/akar-drawer.png' },
-  { name: 'Dropdown', category: 'Overlay/Navigation', status: 'implemented', description: 'Context menu or action list.', screenshot: '/screenshots/akar-dropdown.png' },
-  { name: 'Navbar', category: 'Overlay/Navigation', status: 'implemented', description: 'Top navigation bar with responsive menu.', screenshot: '/screenshots/akar-navbar.png' },
-  { name: 'Heading', category: 'Typography', status: 'implemented', description: 'Section headings with consistent hierarchy.', screenshot: '/screenshots/akar-heading.png' },
-  { name: 'Paragraph', category: 'Typography', status: 'implemented', description: 'Body text with proper line height and spacing.' },
-  { name: 'Canvas', category: 'Special', status: 'implemented', description: 'LOD rendering with portals for interactive detail.' },
-  { name: 'Data Item', category: 'Special', status: 'implemented', description: 'Individual data point display.' },
-];
-
-const planned: Component[] = [
-  { name: 'Accordion/Collapse', category: 'Layout', status: 'planned', description: 'Expandable content sections.' },
-  { name: 'Breadcrumb', category: 'Navigation', status: 'planned', description: 'Hierarchical navigation trail.' },
-  { name: 'Pagination', category: 'Navigation', status: 'planned', description: 'Page navigation for lists.' },
-  { name: 'Command Palette', category: 'Overlay', status: 'planned', description: 'Keyboard-driven command interface.' },
-  { name: 'Popover', category: 'Overlay', status: 'planned', description: 'Floating content triggered by a button.' },
-  { name: 'Skeleton', category: 'Feedback', status: 'planned', description: 'Loading placeholder content.' },
-  { name: 'Avatar', category: 'Primitives', status: 'planned', description: 'User profile image display.' },
-  { name: 'Calendar', category: 'Inputs', status: 'planned', description: 'Date picker with month view.' },
-  { name: 'DatePicker', category: 'Inputs', status: 'planned', description: 'Date selection with calendar popup.' },
-  { name: 'Toast Stack', category: 'Feedback', status: 'planned', description: 'Stacked notification queue.' },
-  { name: 'Snackbar', category: 'Feedback', status: 'planned', description: 'Bottom-aligned notification.' },
-  { name: 'Bottom Sheet', category: 'Overlay', status: 'planned', description: 'Mobile-friendly slide-up panel.' },
-  { name: 'Split Pane', category: 'Layout', status: 'planned', description: 'Resizable two-panel layout.' },
-  { name: 'Resizable Panels', category: 'Layout', status: 'planned', description: 'Multi-panel adjustable layout.' },
-  { name: 'Combobox', category: 'Inputs', status: 'planned', description: 'Searchable dropdown with filtering.' },
-  { name: 'Date Range Picker', category: 'Inputs', status: 'planned', description: 'Start and end date selection.' },
-  { name: 'File Input', category: 'Inputs', status: 'planned', description: 'File upload with drag and drop.' },
-];
-
-const categories = [...new Set(implemented.map(c => c.category))];
+const planned = plannedComponents();
 ---
 
 <BaseLayout
   title="Components - akar"
-  description="30+ GPU-accelerated UI components ready to use"
+  description="33 GPU-accelerated UI components with C ABI bindings"
 >
   <Header />
 
@@ -84,57 +24,74 @@ const categories = [...new Set(implemented.map(c => c.category))];
         <div class="hero-content">
           <h1 class="hero-title">Components</h1>
           <p class="hero-description">
-            30+ components ready to use. Targeting parity with shadcn/ui and daisyUI.
+            33 implemented component families. Targeting parity with shadcn/ui and daisyUI.
           </p>
         </div>
       </Container>
     </section>
 
-    {categories.map((category) => (
-      <Section
-        eyebrow={category}
-        container="xl"
-      >
-        <div class="components-grid">
-          {implemented.filter(c => c.category === category).map((component) => (
-            <GlassCard padding="none" radius="lg" class="component-card">
-              {component.screenshot && (
+    {categories.map((category) => {
+      const items = implementedByCategory(category);
+      if (items.length === 0) return null;
+      return (
+        <Section
+          eyebrow={category}
+          container="xl"
+        >
+          <div class="components-grid">
+            {items.map((component) => (
+              <GlassCard padding="none" radius="lg" class="component-card">
                 <div class="component-preview">
                   <img
-                    src={component.screenshot}
-                    alt={`${component.name} preview`}
+                    src={`/screenshots/components/${component.screenshot}`}
+                    alt={`${component.name} showcase`}
                     class="component-image"
                     loading="lazy"
                   />
                 </div>
-              )}
-              <div class="component-info">
-                <div class="component-header">
-                  <h3 class="component-name">{component.name}</h3>
-                  <Badge variant="success" size="sm">Implemented</Badge>
+                <div class="component-info">
+                  <div class="component-header">
+                    <h3 class="component-name">{component.name}</h3>
+                    <div class="component-badges">
+                      <Badge variant="success" size="sm">Implemented</Badge>
+                      {!component.cAbi && (
+                        <Badge variant="neutral" size="sm">Rust only</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <p class="component-description">{component.description}</p>
+                  {component.variants.length > 0 && (
+                    <div class="component-variants">
+                      {component.variants.map((v) => (
+                        <span class="variant-tag">{v}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p class="component-description">{component.description}</p>
-              </div>
-            </GlassCard>
-          ))}
-        </div>
-      </Section>
-    ))}
+              </GlassCard>
+            ))}
+          </div>
+        </Section>
+      );
+    })}
 
     <Section
       eyebrow="Roadmap"
       title="Coming next."
-      subtitle="These components are planned and will be added to the library."
+      subtitle="Components planned for future releases, derived from daisyUI and shadcn/ui parity analysis."
       container="xl"
     >
       <div class="components-grid">
-        {planned.map((component) => (
+        {planned.map((entry) => (
           <GlassCard padding="lg" radius="lg" class="component-card component-card--compact">
             <div class="component-header">
-              <h3 class="component-name">{component.name}</h3>
-              <Badge variant="neutral" size="sm">Planned</Badge>
+              <h3 class="component-name">{entry.name}</h3>
+              <div class="component-badges">
+                <Badge variant="neutral" size="sm">Planned</Badge>
+                <Badge variant="neutral" size="sm">{entry.source}</Badge>
+              </div>
             </div>
-            <p class="component-description">{component.description}</p>
+            <p class="component-description">{entry.reason}</p>
           </GlassCard>
         ))}
       </div>
@@ -145,7 +102,7 @@ const categories = [...new Set(implemented.map(c => c.category))];
         <GlassCard padding="xl" radius="lg">
           <h2>Contributing</h2>
           <p>
-            akar is open source. Contributions are welcome — whether it's implementing
+            akar is open source. Contributions are welcome -- whether it's implementing
             a planned component, fixing a bug, or improving documentation.
           </p>
           <div class="cta-actions">
@@ -216,16 +173,20 @@ const categories = [...new Set(implemented.map(c => c.category))];
   }
 
   .component-preview {
-    aspect-ratio: 16 / 10;
-    overflow: hidden;
     background: var(--glass-bg);
+    padding: var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
   }
 
   .component-image {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    max-width: 100%;
+    height: auto;
+    max-height: 240px;
+    object-fit: contain;
   }
 
   .component-info {
@@ -242,6 +203,12 @@ const categories = [...new Set(implemented.map(c => c.category))];
     gap: var(--space-sm);
   }
 
+  .component-badges {
+    display: flex;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
   .component-name {
     font-size: var(--text-lg);
     font-weight: 700;
@@ -253,6 +220,22 @@ const categories = [...new Set(implemented.map(c => c.category))];
     font-size: var(--text-sm);
     line-height: 1.5;
     margin: 0;
+  }
+
+  .component-variants {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    margin-top: var(--space-xs);
+  }
+
+  .variant-tag {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    background: var(--glass-bg);
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--glass-border);
   }
 
   .components-cta {
