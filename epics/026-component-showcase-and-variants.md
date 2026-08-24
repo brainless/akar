@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-6 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-7 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -200,7 +200,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Progress and Steps get the two required representative levels.
 - Keep samples visually meaningful: Container needs visible fill/border/content context; Separator needs surrounding space; Avatar needs initials; Stat needs title/value/description.
 
-### Task 7 — Data and scrolling standalone fixtures
+### Task 7 — Data and scrolling standalone fixtures ✅
 
 - Add direct isolation adapters for `data_item`, `scroll_area`, and `data_list`.
 - `data_item` uses the real `akar_data_item` surface with caller-rendered child content and scripted idle/hovered/pressed states.

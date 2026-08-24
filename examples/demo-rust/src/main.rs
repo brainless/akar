@@ -3,16 +3,16 @@ use std::time::Instant;
 
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_card, akar_card_layout, akar_checkbox,
-    akar_container, akar_heading, akar_label, akar_link, akar_navbar_layout, akar_paragraph,
-    akar_progress, akar_radio_group, akar_select, akar_separator, akar_skeleton, akar_slider,
-    akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input, akar_text_input_masked,
-    akar_textarea, akar_tooltip, drawer_begin, drawer_end, dropdown_begin, dropdown_end,
-    modal_begin, modal_end, progress_at, toasts, AlertVariant, BadgeVariant, BoxStyle,
-    ButtonVariant, CardLayout, CardSlots, CardStyle, DrawerEdge, FontFamily, HeadingLevel,
-    LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant, TextStyle, ToastItem,
-    ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    akar_container, akar_data_item, akar_heading, akar_label, akar_link, akar_navbar_layout,
+    akar_paragraph, akar_progress, akar_radio_group, akar_select, akar_separator, akar_skeleton,
+    akar_slider, akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input,
+    akar_text_input_masked, akar_textarea, akar_tooltip, data_list_begin, data_list_end,
+    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
+    scroll_area_begin, scroll_area_end, toasts, AlertVariant, BadgeVariant, BoxStyle,
+    ButtonVariant, CardLayout, CardSlots, CardStyle, DataItemStyle, DataListState, DrawerEdge,
+    FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant,
+    TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
-use akar_components::{scroll_area_begin, scroll_area_end};
 use akar_core::list_clip;
 use akar_core::AkarCore;
 use akar_core::Z_FLOAT;
@@ -250,6 +250,12 @@ struct AppState {
     steps_2of4_node: akar_layout::NodeId,
     steps_4of4_node: akar_layout::NodeId,
     stat_node: akar_layout::NodeId,
+    data_item_node: akar_layout::NodeId,
+    scroll_area_container: akar_layout::NodeId,
+    scroll_area_scroll_y: f32,
+    data_list_node: akar_layout::NodeId,
+    data_list_state: DataListState,
+    data_list_item_nodes: [akar_layout::NodeId; 20],
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1230,6 +1236,9 @@ enum Component {
     Progress,
     Steps,
     Stat,
+    DataItem,
+    ScrollArea,
+    DataList,
 }
 
 fn render_i18n_sample(
@@ -2631,6 +2640,39 @@ impl Component {
                     ..Default::default()
                 },
             ),
+            Self::DataItem => (
+                state.data_item_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(320.0_f32),
+                        height: length(56.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::ScrollArea => (
+                state.scroll_area_container,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(400.0_f32),
+                        height: length(300.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::DataList => (
+                state.data_list_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(400.0_f32),
+                        height: length(300.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
         };
 
         state.layout.set_style(root, style);
@@ -2680,6 +2722,9 @@ impl Component {
             "progress" => Some(Self::Progress),
             "steps" => Some(Self::Steps),
             "stat" => Some(Self::Stat),
+            "data_item" => Some(Self::DataItem),
+            "scroll_area" => Some(Self::ScrollArea),
+            "data_list" => Some(Self::DataList),
             _ => None,
         }
     }
@@ -2720,6 +2765,9 @@ impl Component {
             "progress",
             "steps",
             "stat",
+            "data_item",
+            "scroll_area",
+            "data_list",
         ]
     }
 
@@ -3630,6 +3678,163 @@ impl Component {
                     &AKAR_THEME_DARK,
                 );
             }
+            Self::DataItem => {
+                let rect = state.layout.rect(state.data_item_node);
+                let style = DataItemStyle::from_theme(&AKAR_THEME_DARK);
+                let resp = akar_data_item(
+                    &mut state.core,
+                    &state.layout,
+                    state.data_item_node,
+                    1001,
+                    &style,
+                );
+                let label = if resp.pressed {
+                    "Pressed"
+                } else if resp.hovered {
+                    "Hovered"
+                } else {
+                    "Idle"
+                };
+                let text = format!("Data Item \u{2014} {label}");
+                let buf_id = state.core.text_pipeline.set_text(
+                    Some(50000),
+                    &text,
+                    glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                    Some(rect[2] - style.padding_x * 2.0),
+                    None,
+                    None,
+                );
+                state.core.draw_list.push_text(akar_core::TextCall {
+                    buffer_id: buf_id,
+                    x: rect[0] + style.padding_x,
+                    y: rect[1] + style.padding_y,
+                    clip: rect,
+                    color: [0.9, 0.9, 0.92, 1.0],
+                    z: 0.0,
+                });
+            }
+            Self::ScrollArea => {
+                let scroll_rect = state.layout.rect(state.scroll_area_container);
+                let total_items = 20_usize;
+                let item_height = 48.0_f32;
+                let content_height = total_items as f32 * item_height;
+
+                let resp = scroll_area_begin(
+                    &mut state.core,
+                    scroll_rect,
+                    &mut state.scroll_area_scroll_y,
+                    content_height,
+                );
+                let visible = akar_core::list_clip(
+                    total_items,
+                    item_height,
+                    state.scroll_area_scroll_y,
+                    scroll_rect[3],
+                );
+
+                for i in visible {
+                    let y = resp.content_y + i as f32 * item_height;
+                    let item_rect = [
+                        scroll_rect[0] + 4.0,
+                        y + 4.0,
+                        scroll_rect[2] - 8.0,
+                        item_height - 8.0,
+                    ];
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: item_rect,
+                        fill: [0.12, 0.13, 0.15, 1.0],
+                        border_color: [0.2, 0.22, 0.25, 1.0],
+                        corner_radii: [6.0; 4],
+                        border_width: 1.0,
+                        z: 0.0,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
+                    let label_text = format!("Scroll item {}", i + 1);
+                    let buffer_id = state.core.text_pipeline.set_text(
+                        Some(51000 + i as u64),
+                        &label_text,
+                        glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                        Some(item_rect[2] - 16.0),
+                        None,
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id,
+                        x: item_rect[0] + 8.0,
+                        y: item_rect[1] + 8.0,
+                        clip: item_rect,
+                        color: [0.9, 0.9, 0.92, 1.0],
+                        z: 0.0,
+                    });
+                }
+                scroll_area_end(&mut state.core);
+            }
+            Self::DataList => {
+                let total_items = 20_usize;
+                let item_height = 48.0_f32;
+                let keys: Vec<u64> = (0..total_items as u64).map(|i| (i + 1) * 1000).collect();
+
+                let resp = data_list_begin(
+                    &mut state.core,
+                    &state.layout,
+                    state.data_list_node,
+                    &mut state.data_list_state,
+                    total_items,
+                    item_height,
+                    &keys,
+                );
+
+                let style = DataItemStyle::from_theme(&AKAR_THEME_DARK);
+                for (vis_idx, i) in resp.visible_range.clone().enumerate() {
+                    let key = keys[i];
+                    let item_node =
+                        state.data_list_item_nodes[vis_idx % state.data_list_item_nodes.len()];
+                    let y = resp.content_origin[1] + i as f32 * item_height;
+                    let item_rect = [
+                        resp.viewport_rect[0] + 4.0,
+                        y + 4.0,
+                        resp.viewport_rect[2] - 8.0,
+                        item_height - 8.0,
+                    ];
+                    state.core.draw_list.push_quad(akar_core::QuadCall {
+                        rect: item_rect,
+                        fill: style.surface,
+                        border_color: style.border_color,
+                        corner_radii: [style.corner_radius; 4],
+                        border_width: style.border_width,
+                        z: 0.0,
+                        shadow_blur: 0.0,
+                        shadow_spread: 0.0,
+                        shadow_color: [0.0; 4],
+                        shadow_offset: [0.0; 2],
+                        _pad: [0.0; 2],
+                    });
+                    let label_text = format!("Item {} (key {})", i + 1, key);
+                    let buffer_id = state.core.text_pipeline.set_text(
+                        Some(52000 + i as u64),
+                        &label_text,
+                        glyphon::Metrics::new(14.0, 14.0 * 1.2),
+                        Some(item_rect[2] - 16.0),
+                        None,
+                        None,
+                    );
+                    state.core.draw_list.push_text(akar_core::TextCall {
+                        buffer_id,
+                        x: item_rect[0] + 8.0,
+                        y: item_rect[1] + 8.0,
+                        clip: item_rect,
+                        color: [0.9, 0.9, 0.92, 1.0],
+                        z: 0.0,
+                    });
+                    let _ = item_node;
+                }
+
+                data_list_end(&mut state.core);
+            }
         }
     }
 
@@ -3711,6 +3916,13 @@ impl Component {
             Self::Label => {}
             Self::Container | Self::Separator | Self::Avatar | Self::Stat => {}
             Self::Progress | Self::Steps => {}
+            Self::DataItem => {}
+            Self::ScrollArea => {
+                state.scroll_area_scroll_y = 0.0;
+            }
+            Self::DataList => {
+                state.data_list_state.scroll_y = 0.0;
+            }
         }
     }
 }
@@ -4449,6 +4661,17 @@ impl ApplicationHandler for App {
         let stat_node = layout.new_leaf(Style::default());
         layout.register_label("stat", stat_node);
 
+        let data_item_node = layout.new_leaf(Style::default());
+        layout.register_label("data_item", data_item_node);
+
+        let scroll_area_container = layout.new_leaf(Style::default());
+        layout.register_label("scroll_area", scroll_area_container);
+
+        let data_list_node = layout.new_leaf(Style::default());
+        layout.register_label("data_list", data_list_node);
+        let data_list_item_nodes: [akar_layout::NodeId; 20] =
+            std::array::from_fn(|_| layout.new_leaf(Style::default()));
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -4611,6 +4834,12 @@ impl ApplicationHandler for App {
             steps_2of4_node,
             steps_4of4_node,
             stat_node,
+            data_item_node,
+            scroll_area_container,
+            scroll_area_scroll_y: 0.0,
+            data_list_node,
+            data_list_state: DataListState { scroll_y: 0.0 },
+            data_list_item_nodes,
         });
     }
 
