@@ -218,6 +218,24 @@ struct AppState {
     text_input_normal_cursor: akar_components::TextEditState,
     text_input_masked_value: String,
     text_input_masked_cursor: akar_components::TextEditState,
+    checkbox_node: akar_layout::NodeId,
+    checkbox_checked: bool,
+    radio_showcase_root: akar_layout::NodeId,
+    radio_dark_node: akar_layout::NodeId,
+    radio_light_node: akar_layout::NodeId,
+    radio_selected: usize,
+    switch_node: akar_layout::NodeId,
+    switch_on: bool,
+    slider_node: akar_layout::NodeId,
+    slider_value: f32,
+    select_node: akar_layout::NodeId,
+    select_idx: usize,
+    select_open: bool,
+    textarea_node: akar_layout::NodeId,
+    textarea_value: String,
+    textarea_cursor: akar_components::TextEditState,
+    textarea_scroll_y: f32,
+    label_node: akar_layout::NodeId,
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1185,6 +1203,13 @@ enum Component {
     Skeleton,
     Tooltip,
     TextInput,
+    Checkbox,
+    Radio,
+    Switch,
+    Slider,
+    Select,
+    Textarea,
+    Label,
 }
 
 fn render_i18n_sample(
@@ -2236,6 +2261,117 @@ impl Component {
                 }
                 return;
             }
+            Self::Checkbox => (
+                state.checkbox_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(250.0_f32),
+                        height: length(32.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Radio => {
+                state.layout.set_style(
+                    state.radio_showcase_root,
+                    Style {
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Row,
+                        align_items: Some(AlignItems::CENTER),
+                        gap: taffy::geometry::Size {
+                            width: length(16.0_f32),
+                            height: length(0.0_f32),
+                        },
+                        size: Size {
+                            width: length(300.0_f32),
+                            height: length(32.0_f32),
+                        },
+                        ..Default::default()
+                    },
+                );
+                for &node in &[state.radio_dark_node, state.radio_light_node] {
+                    state.layout.set_style(
+                        node,
+                        Style {
+                            flex_shrink: 0.0,
+                            size: Size {
+                                width: length(140.0_f32),
+                                height: length(32.0_f32),
+                            },
+                            ..Default::default()
+                        },
+                    );
+                }
+                state.layout.set_children(
+                    state.radio_showcase_root,
+                    &[state.radio_dark_node, state.radio_light_node],
+                );
+                state.layout.compute(
+                    state.radio_showcase_root,
+                    (
+                        Some(size.width as f32 / scale),
+                        Some(size.height as f32 / scale),
+                    ),
+                    |_, _, _, _, _| Size::ZERO,
+                );
+                return;
+            }
+            Self::Switch => (
+                state.switch_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(48.0_f32),
+                        height: length(28.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Slider => (
+                state.slider_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(250.0_f32),
+                        height: length(32.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Select => (
+                state.select_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(250.0_f32),
+                        height: length(40.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Textarea => (
+                state.textarea_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(300.0_f32),
+                        height: length(100.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
+            Self::Label => (
+                state.label_node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(200.0_f32),
+                        height: length(28.0_f32),
+                    },
+                    ..Default::default()
+                },
+            ),
         };
 
         state.layout.set_style(root, style);
@@ -2272,6 +2408,13 @@ impl Component {
             "skeleton" => Some(Self::Skeleton),
             "tooltip" => Some(Self::Tooltip),
             "text_input" => Some(Self::TextInput),
+            "checkbox" => Some(Self::Checkbox),
+            "radio" => Some(Self::Radio),
+            "switch" => Some(Self::Switch),
+            "slider" => Some(Self::Slider),
+            "select" => Some(Self::Select),
+            "textarea" => Some(Self::Textarea),
+            "label" => Some(Self::Label),
             _ => None,
         }
     }
@@ -2299,6 +2442,13 @@ impl Component {
             "skeleton",
             "tooltip",
             "text_input",
+            "checkbox",
+            "radio",
+            "switch",
+            "slider",
+            "select",
+            "textarea",
+            "label",
         ]
     }
 
@@ -2978,6 +3128,84 @@ impl Component {
                     );
                 }
             }
+            Self::Checkbox => {
+                let _ = akar_checkbox(
+                    &mut state.core,
+                    &state.layout,
+                    state.checkbox_node,
+                    &mut state.checkbox_checked,
+                    "Accept terms",
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Radio => {
+                let _ = akar_radio_group(
+                    &mut state.core,
+                    &state.layout,
+                    &[state.radio_dark_node, state.radio_light_node],
+                    &["Dark", "Light"],
+                    &mut state.radio_selected,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Switch => {
+                let _ = akar_switch(
+                    &mut state.core,
+                    &state.layout,
+                    state.switch_node,
+                    &mut state.switch_on,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Slider => {
+                let _ = akar_slider(
+                    &mut state.core,
+                    &state.layout,
+                    state.slider_node,
+                    &mut state.slider_value,
+                    0.0,
+                    1.0,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Select => {
+                let _ = akar_select(
+                    &mut state.core,
+                    &state.layout,
+                    state.select_node,
+                    &["Option A", "Option B", "Option C"],
+                    &mut state.select_idx,
+                    &mut state.select_open,
+                    &AKAR_THEME_DARK,
+                    viewport_rect,
+                );
+            }
+            Self::Textarea => {
+                state.cursor_tick += 1;
+                let cursor_visible =
+                    state.force_caret_visible || (state.cursor_tick / 30).is_multiple_of(2);
+                let _ = akar_textarea(
+                    &mut state.core,
+                    &state.layout,
+                    state.textarea_node,
+                    &mut state.textarea_value,
+                    &mut state.textarea_cursor,
+                    &mut state.textarea_scroll_y,
+                    "Enter notes...",
+                    cursor_visible,
+                    &AKAR_THEME_DARK,
+                );
+            }
+            Self::Label => {
+                akar_label(
+                    &mut state.core,
+                    &state.layout,
+                    state.label_node,
+                    "Label text",
+                    AKAR_THEME_DARK.base_content,
+                    &AKAR_THEME_DARK,
+                );
+            }
         }
     }
 
@@ -3036,6 +3264,27 @@ impl Component {
             | Self::I18n
             | Self::Navbar
             | Self::TabBar => {}
+            Self::Checkbox => {
+                state.checkbox_checked = false;
+            }
+            Self::Radio => {
+                state.radio_selected = 0;
+            }
+            Self::Switch => {
+                state.switch_on = false;
+            }
+            Self::Slider => {
+                state.slider_value = 0.5;
+            }
+            Self::Select => {
+                state.select_idx = 0;
+                state.select_open = false;
+            }
+            Self::Textarea => {
+                state.textarea_value.clear();
+                state.textarea_scroll_y = 0.0;
+            }
+            Self::Label => {}
         }
     }
 }
@@ -3723,6 +3972,30 @@ impl ApplicationHandler for App {
         layout.register_label("text_input_normal", text_input_normal_node);
         layout.register_label("text_input_masked", text_input_masked_node);
 
+        let checkbox_node = layout.new_leaf(Style::default());
+        layout.register_label("checkbox", checkbox_node);
+
+        let radio_showcase_root = layout.new_leaf(Style::default());
+        let radio_dark_node = layout.new_leaf(Style::default());
+        let radio_light_node = layout.new_leaf(Style::default());
+        layout.register_label("radio_dark", radio_dark_node);
+        layout.register_label("radio_light", radio_light_node);
+
+        let switch_node = layout.new_leaf(Style::default());
+        layout.register_label("switch", switch_node);
+
+        let slider_node = layout.new_leaf(Style::default());
+        layout.register_label("slider", slider_node);
+
+        let select_node = layout.new_leaf(Style::default());
+        layout.register_label("select", select_node);
+
+        let textarea_node = layout.new_leaf(Style::default());
+        layout.register_label("textarea", textarea_node);
+
+        let label_node = layout.new_leaf(Style::default());
+        layout.register_label("label", label_node);
+
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
         }
@@ -3854,6 +4127,24 @@ impl ApplicationHandler for App {
             text_input_normal_cursor: akar_components::TextEditState::default(),
             text_input_masked_value: String::new(),
             text_input_masked_cursor: akar_components::TextEditState::default(),
+            checkbox_node,
+            checkbox_checked: false,
+            radio_showcase_root,
+            radio_dark_node,
+            radio_light_node,
+            radio_selected: 0,
+            switch_node,
+            switch_on: false,
+            slider_node,
+            slider_value: 0.5,
+            select_node,
+            select_idx: 0,
+            select_open: false,
+            textarea_node,
+            textarea_value: String::new(),
+            textarea_cursor: akar_components::TextEditState::default(),
+            textarea_scroll_y: 0.0,
+            label_node,
         });
     }
 

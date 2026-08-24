@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-4 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-5 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -187,7 +187,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Tooltip: show Top, Bottom, Left, and Right around a real hovered trigger; also capture the hidden-trigger idle state.
 - Text input: show Normal and Masked with deterministic values; keep focus/edit-state ownership separate for the two instances.
 
-### Task 5 — Form-control standalone fixtures and states
+### Task 5 — Form-control standalone fixtures and states ✅
 
 - Add direct isolation adapters for `checkbox`, `radio`, `switch`, `slider`, `select`, `text_input`, `textarea`, and `label`.
 - Reuse existing persistent form nodes/state where that does not mutate the composite Form tree; otherwise create dedicated persistent isolation nodes rather than reparenting shared nodes each frame.
