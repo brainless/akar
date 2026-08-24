@@ -32,6 +32,7 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+mod catalog;
 mod script;
 
 #[derive(serde::Serialize)]
@@ -1289,8 +1290,8 @@ impl Component {
                         flex_direction: FlexDirection::Row,
                         align_items: Some(AlignItems::CENTER),
                         size: Size {
-                            width: length(600.0),
-                            height: length(48.0),
+                            width: length(600.0_f32),
+                            height: length(48.0_f32),
                         },
                         ..Default::default()
                     },
@@ -1301,8 +1302,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(520.0),
-                        height: length(48.0),
+                        width: length(520.0_f32),
+                        height: length(48.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1312,8 +1313,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(520.0),
-                        height: length(40.0),
+                        width: length(520.0_f32),
+                        height: length(40.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1328,8 +1329,8 @@ impl Component {
                         y: taffy::style::Overflow::Clip,
                     },
                     size: Size {
-                        width: length(600.0),
-                        height: length(480.0),
+                        width: length(600.0_f32),
+                        height: length(480.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1341,8 +1342,8 @@ impl Component {
                     align_items: Some(AlignItems::CENTER),
                     justify_content: Some(JustifyContent::CENTER),
                     size: Size {
-                        width: length(600.0),
-                        height: length(360.0),
+                        width: length(600.0_f32),
+                        height: length(360.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1353,12 +1354,12 @@ impl Component {
                     display: Display::Flex,
                     flex_direction: FlexDirection::Column,
                     gap: taffy::geometry::Size {
-                        width: length(0.0),
-                        height: length(8.0),
+                        width: length(0.0_f32),
+                        height: length(8.0_f32),
                     },
                     size: Size {
-                        width: length(600.0),
-                        height: length(228.0),
+                        width: length(600.0_f32),
+                        height: length(228.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1369,18 +1370,18 @@ impl Component {
                     display: Display::Flex,
                     flex_direction: FlexDirection::Column,
                     size: Size {
-                        width: length(450.0),
-                        height: length(500.0),
+                        width: length(450.0_f32),
+                        height: length(500.0_f32),
                     },
                     padding: taffy::geometry::Rect {
-                        left: length(16.0),
-                        right: length(16.0),
-                        top: length(16.0),
-                        bottom: length(16.0),
+                        left: length(16.0_f32),
+                        right: length(16.0_f32),
+                        top: length(16.0_f32),
+                        bottom: length(16.0_f32),
                     },
                     gap: taffy::geometry::Size {
-                        width: length(0.0),
-                        height: length(12.0),
+                        width: length(0.0_f32),
+                        height: length(12.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1390,8 +1391,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(160.0),
-                        height: length(32.0),
+                        width: length(160.0_f32),
+                        height: length(32.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1401,8 +1402,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(600.0),
-                        height: length(60.0),
+                        width: length(600.0_f32),
+                        height: length(60.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1412,8 +1413,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(600.0),
-                        height: length(120.0),
+                        width: length(600.0_f32),
+                        height: length(120.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1423,8 +1424,8 @@ impl Component {
                 Style {
                     flex_shrink: 0.0,
                     size: Size {
-                        width: length(300.0),
-                        height: length(32.0),
+                        width: length(300.0_f32),
+                        height: length(32.0_f32),
                     },
                     ..Default::default()
                 },
@@ -1436,18 +1437,18 @@ impl Component {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Column,
                         size: Size {
-                            width: length(400.0),
-                            height: length(280.0),
+                            width: length(400.0_f32),
+                            height: length(280.0_f32),
                         },
                         padding: taffy::geometry::Rect {
-                            left: length(16.0),
-                            right: length(16.0),
-                            top: length(16.0),
-                            bottom: length(16.0),
+                            left: length(16.0_f32),
+                            right: length(16.0_f32),
+                            top: length(16.0_f32),
+                            bottom: length(16.0_f32),
                         },
                         gap: taffy::geometry::Size {
-                            width: length(0.0),
-                            height: length(8.0),
+                            width: length(0.0_f32),
+                            height: length(8.0_f32),
                         },
                         ..Default::default()
                     },
@@ -1458,7 +1459,7 @@ impl Component {
                         flex_shrink: 0.0,
                         size: Size {
                             width: Dimension::percent(1.0),
-                            height: length(32.0),
+                            height: length(32.0_f32),
                         },
                         ..Default::default()
                     },
@@ -1469,7 +1470,7 @@ impl Component {
                         flex_grow: 1.0,
                         size: Size {
                             width: Dimension::percent(1.0),
-                            height: length(120.0),
+                            height: length(120.0_f32),
                         },
                         ..Default::default()
                     },
@@ -1480,7 +1481,7 @@ impl Component {
                         flex_shrink: 0.0,
                         size: Size {
                             width: Dimension::percent(1.0),
-                            height: length(28.0),
+                            height: length(28.0_f32),
                         },
                         ..Default::default()
                     },
@@ -1788,8 +1789,8 @@ impl ApplicationHandler for App {
                 flex_direction: FlexDirection::Column,
                 flex_grow: 1.0,
                 gap: taffy::geometry::Size {
-                    width: length(0.0),
-                    height: length(8.0),
+                    width: length(0.0_f32),
+                    height: length(8.0_f32),
                 },
                 ..Default::default()
             },
@@ -1799,7 +1800,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(48.0),
+                height: length(48.0_f32),
             },
             ..Default::default()
         });
@@ -1808,7 +1809,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(40.0),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -1828,17 +1829,17 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(100.0),
+                height: length(100.0_f32),
             },
             gap: taffy::geometry::Size {
-                width: length(8.0),
-                height: length(0.0),
+                width: length(8.0_f32),
+                height: length(0.0_f32),
             },
             padding: taffy::geometry::Rect {
-                left: length(8.0),
-                right: length(8.0),
-                top: length(4.0),
-                bottom: length(4.0),
+                left: length(8.0_f32),
+                right: length(8.0_f32),
+                top: length(4.0_f32),
+                bottom: length(4.0_f32),
             },
             ..Default::default()
         });
@@ -1876,7 +1877,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(56.0),
+                height: length(56.0_f32),
             },
             ..Default::default()
         });
@@ -1888,17 +1889,17 @@ impl ApplicationHandler for App {
             align_items: Some(AlignItems::CENTER),
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(56.0),
+                height: length(56.0_f32),
             },
             gap: taffy::geometry::Size {
-                width: length(8.0),
-                height: length(0.0),
+                width: length(8.0_f32),
+                height: length(0.0_f32),
             },
             padding: taffy::geometry::Rect {
-                left: length(8.0),
-                right: length(0.0),
-                top: length(0.0),
-                bottom: length(0.0),
+                left: length(8.0_f32),
+                right: length(0.0_f32),
+                top: length(0.0_f32),
+                bottom: length(0.0_f32),
             },
             ..Default::default()
         });
@@ -1906,24 +1907,24 @@ impl ApplicationHandler for App {
         let avatar_1 = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(40.0),
-                height: length(40.0),
+                width: length(40.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
         let avatar_2 = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(40.0),
-                height: length(40.0),
+                width: length(40.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
         let avatar_3 = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(40.0),
-                height: length(40.0),
+                width: length(40.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -1935,8 +1936,8 @@ impl ApplicationHandler for App {
         let skeleton_toggle_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(140.0),
-                height: length(32.0),
+                width: length(140.0_f32),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
@@ -1971,8 +1972,8 @@ impl ApplicationHandler for App {
                 display: Display::Flex,
                 flex_direction: FlexDirection::Column,
                 gap: taffy::geometry::Size {
-                    width: length(0.0),
-                    height: length(8.0),
+                    width: length(0.0_f32),
+                    height: length(8.0_f32),
                 },
                 ..Default::default()
             },
@@ -1982,40 +1983,40 @@ impl ApplicationHandler for App {
         let navbar_title_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(80.0),
-                height: length(48.0),
+                width: length(80.0_f32),
+                height: length(48.0_f32),
             },
             ..Default::default()
         });
         let navbar_badge_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(32.0),
-                height: length(24.0),
+                width: length(32.0_f32),
+                height: length(24.0_f32),
             },
             ..Default::default()
         });
         let navbar_btn_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(120.0),
-                height: length(32.0),
+                width: length(120.0_f32),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
         let navbar_new_btn_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(80.0),
-                height: length(32.0),
+                width: length(80.0_f32),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
         let navbar_dropdown_btn_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(100.0),
-                height: length(32.0),
+                width: length(100.0_f32),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
@@ -2025,14 +2026,14 @@ impl ApplicationHandler for App {
             display: Display::Flex,
             flex_direction: FlexDirection::Column,
             padding: taffy::geometry::Rect {
-                left: length(16.0),
-                right: length(16.0),
-                top: length(16.0),
-                bottom: length(16.0),
+                left: length(16.0_f32),
+                right: length(16.0_f32),
+                top: length(16.0_f32),
+                bottom: length(16.0_f32),
             },
             gap: taffy::geometry::Size {
-                width: length(0.0),
-                height: length(12.0),
+                width: length(0.0_f32),
+                height: length(12.0_f32),
             },
             ..Default::default()
         });
@@ -2041,13 +2042,13 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(40.0),
+                height: length(40.0_f32),
             },
             margin: taffy::geometry::Rect {
-                top: length(20.0),
-                right: length(0.0),
-                bottom: length(0.0),
-                left: length(0.0),
+                top: length(20.0_f32),
+                right: length(0.0_f32),
+                bottom: length(0.0_f32),
+                left: length(0.0_f32),
             },
             ..Default::default()
         });
@@ -2056,13 +2057,13 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(100.0),
+                height: length(100.0_f32),
             },
             margin: taffy::geometry::Rect {
-                top: length(20.0),
-                right: length(0.0),
-                bottom: length(0.0),
-                left: length(0.0),
+                top: length(20.0_f32),
+                right: length(0.0_f32),
+                bottom: length(0.0_f32),
+                left: length(0.0_f32),
             },
             ..Default::default()
         });
@@ -2071,7 +2072,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(32.0),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
@@ -2082,11 +2083,11 @@ impl ApplicationHandler for App {
             flex_direction: FlexDirection::Row,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(32.0),
+                height: length(32.0_f32),
             },
             gap: taffy::geometry::Size {
-                width: length(16.0),
-                height: length(0.0),
+                width: length(16.0_f32),
+                height: length(0.0_f32),
             },
             ..Default::default()
         });
@@ -2112,7 +2113,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(32.0),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
@@ -2121,7 +2122,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(32.0),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
@@ -2130,7 +2131,7 @@ impl ApplicationHandler for App {
             flex_shrink: 0.0,
             size: Size {
                 width: Dimension::percent(1.0),
-                height: length(40.0),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -2138,8 +2139,8 @@ impl ApplicationHandler for App {
         let form_submit_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(120.0),
-                height: length(36.0),
+                width: length(120.0_f32),
+                height: length(36.0_f32),
             },
             align_self: Some(AlignSelf::CENTER),
             ..Default::default()
@@ -2164,42 +2165,42 @@ impl ApplicationHandler for App {
         let heading_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(600.0),
-                height: length(60.0),
+                width: length(600.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
         let paragraph_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(600.0),
-                height: length(120.0),
+                width: length(600.0_f32),
+                height: length(120.0_f32),
             },
             ..Default::default()
         });
         let link_node = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(300.0),
-                height: length(32.0),
+                width: length(300.0_f32),
+                height: length(32.0_f32),
             },
             ..Default::default()
         });
         let card_root = layout.new_leaf(Style {
             flex_shrink: 0.0,
             size: Size {
-                width: length(400.0),
-                height: length(280.0),
+                width: length(400.0_f32),
+                height: length(280.0_f32),
             },
             padding: taffy::geometry::Rect {
-                left: length(16.0),
-                right: length(16.0),
-                top: length(16.0),
-                bottom: length(16.0),
+                left: length(16.0_f32),
+                right: length(16.0_f32),
+                top: length(16.0_f32),
+                bottom: length(16.0_f32),
             },
             gap: taffy::geometry::Size {
-                width: length(0.0),
-                height: length(8.0),
+                width: length(0.0_f32),
+                height: length(8.0_f32),
             },
             ..Default::default()
         });

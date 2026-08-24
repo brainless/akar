@@ -144,7 +144,7 @@ pub fn button_styled(
         None,
     );
 
-    let text_color = style.content_color.unwrap_or_else(|| match variant {
+    let text_color = style.content_color.unwrap_or(match variant {
         ButtonVariant::Solid => theme.primary_content,
         _ => theme.base_content,
     });

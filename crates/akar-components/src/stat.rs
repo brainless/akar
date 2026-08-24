@@ -51,6 +51,7 @@ pub fn stat(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn stat_styled(
     core: &mut AkarCore,
     layout: &Layout,

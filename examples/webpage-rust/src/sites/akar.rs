@@ -106,10 +106,6 @@ impl AkarSite {
 }
 
 impl Site for AkarSite {
-    fn name(&self) -> &str {
-        "akar"
-    }
-
     fn root(&self) -> NodeId {
         self.root
     }
@@ -700,11 +696,11 @@ impl Site for AkarSite {
             layout.register_label(&format!("card_{}", i), card_roots[i]);
         }
         layout.register_label("why_h2", why_h2);
-        for i in 0..4 {
-            layout.register_label(&format!("why_h4_{}", i), why_h4s[i]);
+        for (i, item) in why_h4s.iter().enumerate().take(4) {
+            layout.register_label(&format!("why_h4_{}", i), *item);
         }
-        for i in 0..7 {
-            layout.register_label(&format!("badge_{}", i), badge_nodes[i]);
+        for (i, item) in badge_nodes.iter().enumerate().take(7) {
+            layout.register_label(&format!("badge_{}", i), *item);
         }
         layout.register_label("btn_solid", btn_solid);
         layout.register_label("btn_outline", btn_outline);
@@ -1003,12 +999,12 @@ impl Site for AkarSite {
         akar_separator(core, layout, self.separator_node, &THEME);
 
         let col_headings = ["Product", "Resources", "Community"];
-        for i in 0..3 {
+        for (i, heading) in col_headings.iter().enumerate() {
             akar_heading(
                 core,
                 layout,
                 self.footer_col_headings[i],
-                col_headings[i],
+                heading,
                 HeadingLevel::H4,
                 None,
                 &THEME,
@@ -1022,15 +1018,8 @@ impl Site for AkarSite {
             "Documentation",
             "MIT License",
         ];
-        for i in 0..6 {
-            let _ = akar_link(
-                core,
-                layout,
-                self.footer_link_nodes[i],
-                link_texts[i],
-                None,
-                &THEME,
-            );
+        for (i, text) in link_texts.iter().enumerate() {
+            let _ = akar_link(core, layout, self.footer_link_nodes[i], text, None, &THEME);
         }
 
         akar_paragraph(

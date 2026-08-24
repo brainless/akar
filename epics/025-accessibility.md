@@ -1,6 +1,6 @@
 # Epic 025: Accessibility
 
-**Status:** Research Complete and Verified — Implementation Not Started (Tasks 1-6 researched and re-verified 2026-08-12; Task 7 is independently ready, while Tasks 8-14 are blocked by the semantic/action contract and sequencing recorded in the readiness audit below)
+**Status:** Deferred (2026-08-24) — in favor of Epic 026, worked on immediately. Research Complete and Verified, Implementation Not Started when resumed: Tasks 1-6 researched and re-verified 2026-08-12; Task 7 is independently ready, while Tasks 8-14 are blocked by the semantic/action contract and sequencing recorded in the readiness audit below.
 **Goal:** Establish a path for akar UIs to be usable with screen readers and other assistive technology, despite akar being a pure GPU draw-list renderer with no OS-level accessibility tree today.
 
 **Prerequisite:** Epic 021 is `Status: Done`. Independent of [[022]], [[023]], and [[024]] — this epic can be researched in parallel with those, but should not be blocked by or block them.

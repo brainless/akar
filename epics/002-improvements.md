@@ -1,5 +1,7 @@
 # Epic 002 — Improvements Before Epic 003
 
+**Status:** Done
+
 These are real issues found during post-epic review. All are small fixes. None require architectural changes. Fix these before starting Epic 003.
 
 ---

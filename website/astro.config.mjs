@@ -1,19 +1,16 @@
-import { defineConfig } from 'astro/config';
-import sitemap from '@astrojs/sitemap';
-import mdx from '@astrojs/mdx';
-import siteConfig from './src/site.config.ts';
+import { defineConfig } from "astro/config";
+import sitemap from "@astrojs/sitemap";
+import mdx from "@astrojs/mdx";
+import siteConfig from "./src/site.config.ts";
 
 export default defineConfig({
-  site: 'https://akar.dev',
-  integrations: [
-    mdx(),
-    ...(siteConfig.features.sitemap ? [sitemap()] : []),
-  ],
-  output: 'static',
-  trailingSlash: 'always',
+  site: "https://akar.dev",
+  integrations: [mdx(), ...(siteConfig.features.sitemap ? [sitemap()] : [])],
+  output: "static",
+  trailingSlash: "always",
   build: {
-    format: 'directory',
-    inlineStylesheets: 'auto',
+    format: "directory",
+    inlineStylesheets: "auto",
   },
   vite: {
     build: {
@@ -22,9 +19,9 @@ export default defineConfig({
   },
   image: {
     service: {
-      entrypoint: 'astro/assets/services/sharp',
+      entrypoint: "astro/assets/services/sharp",
     },
-    format: ['avif', 'webp'],
+    format: ["avif", "webp"],
   },
   server: {
     port: 3000,

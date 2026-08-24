@@ -18,7 +18,7 @@ export interface SiteConfig {
   // Theme settings
   theme: {
     accentColor: string;
-    defaultColorMode: 'light' | 'dark' | 'system';
+    defaultColorMode: "light" | "dark" | "system";
     showThemeToggle: boolean;
   };
 
@@ -75,27 +75,28 @@ export interface SiteConfig {
 }
 
 const siteConfig: SiteConfig = {
-  name: 'akar',
-  title: 'akar - GPU-Accelerated UI Components',
-  description: 'A GPU-accelerated, language-neutral UI component library for agents and developers',
-  author: 'akar',
-  url: 'https://akar.dev',
-  ogImage: '/og-image.png',
-  twitterHandle: '',
-  lang: 'en',
-  ogLocale: 'en_US',
+  name: "akar",
+  title: "akar - GPU-Accelerated UI Components",
+  description:
+    "A GPU-accelerated, language-neutral UI component library for agents and developers",
+  author: "akar",
+  url: "https://akar.dev",
+  ogImage: "/og-image.png",
+  twitterHandle: "",
+  lang: "en",
+  ogLocale: "en_US",
 
   theme: {
-    accentColor: 'hsl(280, 70%, 60%)',
-    defaultColorMode: 'dark',
+    accentColor: "hsl(280, 70%, 60%)",
+    defaultColorMode: "dark",
     showThemeToggle: true,
   },
 
   nav: {
     main: [
-      { name: 'Home', href: '/' },
-      { name: 'Components', href: '/components/' },
-      { name: 'Blog', href: '/blog/' },
+      { name: "Home", href: "/" },
+      { name: "Components", href: "/components/" },
+      { name: "Blog", href: "/blog/" },
     ],
   },
 
@@ -109,7 +110,7 @@ const siteConfig: SiteConfig = {
   },
 
   social: {
-    github: 'https://github.com/brainless/akar',
+    github: "https://github.com/brainless/akar",
   },
 
   blog: {
@@ -135,24 +136,24 @@ const siteConfig: SiteConfig = {
 // used so common cases like 'en' or 'ja' derive a real og:locale value
 // ('en_US', 'ja_JP') instead of duplicating the language code.
 const COMMON_REGIONS: Record<string, string> = {
-  en: 'US',
-  ja: 'JP',
-  zh: 'CN',
-  fr: 'FR',
-  de: 'DE',
-  es: 'ES',
-  pt: 'PT',
-  ko: 'KR',
-  it: 'IT',
-  ru: 'RU',
-  ar: 'SA',
-  nl: 'NL',
-  pl: 'PL',
-  tr: 'TR',
-  vi: 'VN',
-  th: 'TH',
-  id: 'ID',
-  hi: 'IN',
+  en: "US",
+  ja: "JP",
+  zh: "CN",
+  fr: "FR",
+  de: "DE",
+  es: "ES",
+  pt: "PT",
+  ko: "KR",
+  it: "IT",
+  ru: "RU",
+  ar: "SA",
+  nl: "NL",
+  pl: "PL",
+  tr: "TR",
+  vi: "VN",
+  th: "TH",
+  id: "ID",
+  hi: "IN",
 };
 
 // Derives an og:locale-shaped value ('language_REGION') from a BCP47 lang
@@ -161,7 +162,7 @@ const COMMON_REGIONS: Record<string, string> = {
 // language code (e.g. 'sv' -> 'sv_SV'). Best-effort only — set `ogLocale`
 // explicitly for exact control.
 export function deriveOgLocale(lang: string): string {
-  const [language, region] = lang.split('-');
+  const [language, region] = lang.split("-");
   const fallbackRegion = COMMON_REGIONS[language.toLowerCase()] ?? language;
   return `${language}_${(region ?? fallbackRegion).toUpperCase()}`;
 }

@@ -69,7 +69,7 @@ pub fn modal_begin(
 
     let close_requested = core.input.is_clicked(viewport_rect);
 
-    let header_height = 40.0;
+    let header_height = 40.0_f32;
 
     let title_node = layout.new_leaf(Style {
         flex_grow: 1.0,
@@ -81,7 +81,7 @@ pub fn modal_begin(
         flex_grow: 0.0,
         flex_shrink: 0.0,
         size: Size {
-            width: length(32.0),
+            width: length(32.0_f32),
             height: Dimension::percent(1.0),
         },
         ..Default::default()

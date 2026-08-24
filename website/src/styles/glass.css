@@ -30,7 +30,7 @@
 
 /* Noise texture overlay for depth */
 .glass-panel::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
@@ -94,7 +94,7 @@
 }
 
 .glass-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;

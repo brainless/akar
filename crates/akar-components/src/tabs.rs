@@ -55,6 +55,7 @@ pub fn tab_bar(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn tab_bar_styled(
     core: &mut AkarCore,
     layout: &Layout,

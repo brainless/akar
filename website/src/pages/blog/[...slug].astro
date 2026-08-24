@@ -20,7 +20,7 @@ export const getStaticPaths = (async () => {
 }) satisfies GetStaticPaths;
 
 const { post } = Astro.props;
-const { Content, headings } = await render(post);
+const { Content } = await render(post);
 
 const minutes = readingTime(post.body);
 const formattedDate = formatDate(post.data.pubDate);

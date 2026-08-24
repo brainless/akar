@@ -129,7 +129,7 @@ impl MimoSite {
         let mut row = 0u64;
         let mut y = start_y;
         while y < hero_rect[1] + hero_rect[3] - 20.0 {
-            let x_offset = if row % 2 == 0 { 0.0 } else { -40.0 };
+            let x_offset = if row.is_multiple_of(2) { 0.0 } else { -40.0 };
             let buf = core.text_pipeline.set_text(
                 Some(3000 + row),
                 pattern_text,
@@ -565,10 +565,6 @@ impl MimoSite {
 }
 
 impl Site for MimoSite {
-    fn name(&self) -> &str {
-        "mimo"
-    }
-
     fn root(&self) -> NodeId {
         self.root
     }

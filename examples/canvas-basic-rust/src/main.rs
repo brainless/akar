@@ -428,7 +428,7 @@ impl ApplicationHandler for App {
                         let label_node = pl.new_leaf(Style {
                             size: Size {
                                 width: akar_layout::Dimension::percent(1.0),
-                                height: length(24.0),
+                                height: length(24.0_f32),
                             },
                             ..Default::default()
                         });
@@ -436,7 +436,7 @@ impl ApplicationHandler for App {
                         let button_node = pl.new_leaf(Style {
                             size: Size {
                                 width: akar_layout::Dimension::percent(1.0),
-                                height: length(32.0),
+                                height: length(32.0_f32),
                             },
                             ..Default::default()
                         });
@@ -444,7 +444,7 @@ impl ApplicationHandler for App {
                         let input_node = pl.new_leaf(Style {
                             size: Size {
                                 width: akar_layout::Dimension::percent(1.0),
-                                height: length(32.0),
+                                height: length(32.0_f32),
                             },
                             ..Default::default()
                         });
@@ -473,10 +473,10 @@ impl ApplicationHandler for App {
                                 height: length(portal_h),
                             },
                             padding: akar_layout::Rect {
-                                top: length(8.0),
-                                right: length(8.0),
-                                bottom: length(8.0),
-                                left: length(8.0),
+                                top: length(8.0_f32),
+                                right: length(8.0_f32),
+                                bottom: length(8.0_f32),
+                                left: length(8.0_f32),
                             },
                             ..Default::default()
                         },

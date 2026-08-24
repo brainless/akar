@@ -1,6 +1,6 @@
 /* Global Styles - Astro Haze Theme */
-@import './tokens.css';
-@import './glass.css';
+@import "./tokens.css";
+@import "./glass.css";
 
 /* Reset and base styles */
 *,

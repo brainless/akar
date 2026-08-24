@@ -1,6 +1,6 @@
-import { getCollection, type CollectionEntry } from 'astro:content';
+import { getCollection, type CollectionEntry } from "astro:content";
 
-export type Post = CollectionEntry<'blog'>;
+export type Post = CollectionEntry<"blog">;
 
 /** Words-per-minute used for the reading-time estimate. */
 const WORDS_PER_MINUTE = 200;
@@ -14,7 +14,7 @@ const WORDS_PER_MINUTE = 200;
  * misleading "1 min read".
  */
 export function readingTime(body: string | undefined): number {
-  const words = (body ?? '').split(/\s+/).filter(Boolean).length;
+  const words = (body ?? "").split(/\s+/).filter(Boolean).length;
   if (words === 0) return 0;
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
 }
@@ -24,7 +24,7 @@ export function readingTime(body: string | undefined): number {
  * but excluded from production builds.
  */
 export async function getPublishedPosts(): Promise<Post[]> {
-  const posts = await getCollection('blog', ({ data }) =>
+  const posts = await getCollection("blog", ({ data }) =>
     import.meta.env.PROD ? data.draft !== true : true,
   );
   return posts.sort(
@@ -69,8 +69,8 @@ export function tagSlug(tag: string): string {
   return tag
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 /**
