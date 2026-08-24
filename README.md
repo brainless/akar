@@ -36,10 +36,12 @@ This is a proof of concept that a small team of agents can build a production-qu
 
 | | | |
 |:---:|:---:|:---:|
-| ![Form controls](images/akar-form.png) | ![Card](images/akar-card.png) | ![Navbar](images/akar-navbar.png) |
-| Form | Card | Navbar |
-| ![Drawer](images/akar-drawer.png) | ![Stats](images/akar-stats.png) | ![Virtualized list](images/akar-list.png) |
-| Drawer | Stats | List |
+| ![Button variants](images/components/akar-button.png) | ![Badge variants](images/components/akar-badge.png) | ![Navbar](images/components/akar-navbar.png) |
+| Button | Badge | Navbar |
+| ![Form controls](images/components/akar-form.png) | ![Drawer](images/components/akar-drawer.png) | ![Stats](images/components/akar-stats.png) |
+| Form | Drawer | Stats |
+
+See the [full component catalog](https://akar.dev/components) for all 33 components, variants, and interactive states.
 
 ## The akar marketing page
 

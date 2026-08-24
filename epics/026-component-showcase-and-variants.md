@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-10 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-11 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -236,7 +236,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Verify categories remain coherent across Primitives, Inputs, Feedback, Layout, Overlay/Navigation, Typography, and Special.
 - Test the preview CSS with wide and tall auto-cropped images. The current fixed 16:10 `object-fit: cover` may crop variant labels or edge variants; use a contained/padded presentation or per-image treatment that keeps the complete showcase visible.
 
-### Task 11 — Update README component showcase
+### Task 11 — Update README component showcase ✅
 
 - Add the Button and Badge variant showcases, or a similarly compact subset, to the existing README grid.
 - Keep the README concise and link readers to the website for the full 33-component/state catalog.
