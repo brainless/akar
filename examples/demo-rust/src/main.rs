@@ -5356,3 +5356,50 @@ mod aabb_tests {
         assert_eq!(aabb, [100.0, 200.0, 300.0, 400.0]);
     }
 }
+
+#[cfg(test)]
+mod catalog_coverage {
+    use super::{catalog, Component};
+
+    #[test]
+    fn every_standalone_family_has_component_variant() {
+        for entry in catalog::CATALOG {
+            if entry.is_composite {
+                continue;
+            }
+            assert!(
+                Component::from_name(entry.canonical_cli_name).is_some(),
+                "Standalone family '{}' has no Component::from_name mapping",
+                entry.canonical_cli_name
+            );
+        }
+    }
+
+    #[test]
+    fn every_alias_resolves_to_component() {
+        for entry in catalog::CATALOG {
+            if entry.is_composite {
+                continue;
+            }
+            for alias in entry.aliases {
+                assert!(
+                    Component::from_name(alias).is_some(),
+                    "Alias '{}' for family '{}' has no Component::from_name mapping",
+                    alias,
+                    entry.canonical_cli_name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn component_names_match_catalog_standalone_count() {
+        let component_names = Component::names();
+        let standalone = catalog::standalone_names();
+        assert_eq!(
+            component_names.len(),
+            standalone.len() + 4,
+            "Component::names() should include 33 standalone + 4 composite entries"
+        );
+    }
+}

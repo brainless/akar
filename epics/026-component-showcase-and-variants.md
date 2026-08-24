@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** In Progress — Tasks 0-7 complete (2026-08-24).
+**Status:** In Progress — Tasks 0-8 complete (2026-08-24).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
@@ -208,7 +208,7 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - `data_list` uses the real `data_list_begin`/`data_list_end` API, stable keys, visible-range rendering, and real data items. Do not use the existing manually rendered `list` composite as a substitute.
 - Retain `--component list` as the existing composite fixture unless a visual-neutral internal refactor can be proven pixel-identical.
 
-### Task 8 — Audit and preserve existing standalone fixtures
+### Task 8 — Audit and preserve existing standalone fixtures ✅
 
 - Confirm direct isolation remains valid for `navbar`, `canvas`, `card`, `link`, `paragraph`, `modal`, and `dropdown`, plus the variant-bearing existing fixtures handled above.
 - Confirm every one of the 33 implementation families has a direct catalog entry; composite fixtures do not satisfy this check. Confirm the C ABI metadata still matches generated `akar.h`.
