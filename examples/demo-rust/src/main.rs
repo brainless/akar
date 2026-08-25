@@ -1897,9 +1897,7 @@ impl Component {
                     state
                         .layout
                         .set_style(state.badge_row1_node, row_style.clone());
-                    state
-                        .layout
-                        .set_style(state.badge_row2_node, row_style);
+                    state.layout.set_style(state.badge_row2_node, row_style);
                     for &node in &[
                         state.badge_default_node,
                         state.badge_primary_node,
@@ -3854,13 +3852,8 @@ impl Component {
                     let key = keys[i];
                     let item_node =
                         state.data_list_item_nodes[vis_idx % state.data_list_item_nodes.len()];
-                    let _resp = akar_data_item(
-                        &mut state.core,
-                        &state.layout,
-                        item_node,
-                        key,
-                        &style,
-                    );
+                    let _resp =
+                        akar_data_item(&mut state.core, &state.layout, item_node, key, &style);
                     let item_rect = state.layout.rect(item_node);
                     let label_text = format!("Item {} (key {})", i + 1, key);
                     let buffer_id = state.core.text_pipeline.set_text(

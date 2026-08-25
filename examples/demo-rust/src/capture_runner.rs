@@ -149,10 +149,8 @@ fn copy_with_verify(src: &Path, dst: &Path) -> Result<(), String> {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("create dir {}: {e}", parent.display()))?;
     }
-    let src_bytes =
-        std::fs::read(src).map_err(|e| format!("read {}: {e}", src.display()))?;
-    std::fs::write(dst, &src_bytes)
-        .map_err(|e| format!("write {}: {e}", dst.display()))?;
+    let src_bytes = std::fs::read(src).map_err(|e| format!("read {}: {e}", src.display()))?;
+    std::fs::write(dst, &src_bytes).map_err(|e| format!("write {}: {e}", dst.display()))?;
     let dst_bytes =
         std::fs::read(dst).map_err(|e| format!("read verify {}: {e}", dst.display()))?;
     if src_bytes != dst_bytes {
@@ -174,10 +172,7 @@ fn compare_against_baseline(
 ) -> Result<(), String> {
     let baseline = baseline_dir.join(filename);
     if !baseline.exists() {
-        return Err(format!(
-            "baseline not found: {}",
-            baseline.display()
-        ));
+        return Err(format!("baseline not found: {}", baseline.display()));
     }
     let status = Command::new("akar-diff")
         .args([
@@ -299,19 +294,11 @@ pub fn run_capture_all(config: &CaptureConfig) -> Vec<CaptureResult> {
                         parse_script_screenshot_path(&script_path)
                     });
 
-                    let mut result = process_capture_result(
-                        entry,
-                        config,
-                        &tmp_path,
-                        script_output.as_deref(),
-                    );
+                    let mut result =
+                        process_capture_result(entry, config, &tmp_path, script_output.as_deref());
 
-                    if !result.success
-                        && result.message.contains("flat color")
-                    {
-                        let retry_output = Command::new("cargo")
-                            .args(&cmd_args)
-                            .output();
+                    if !result.success && result.message.contains("flat color") {
+                        let retry_output = Command::new("cargo").args(&cmd_args).output();
 
                         if let Ok(retry_o) = retry_output {
                             if retry_o.status.success() {
@@ -494,7 +481,10 @@ mod tests {
     fn parse_script_screenshot_path_single() {
         let path = PathBuf::from("scripts/button_outline_hover.txt");
         let result = parse_script_screenshot_path(&path);
-        assert_eq!(result, Some(PathBuf::from("/tmp/akar-button-outline-hover.png")));
+        assert_eq!(
+            result,
+            Some(PathBuf::from("/tmp/akar-button-outline-hover.png"))
+        );
     }
 
     #[test]

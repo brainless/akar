@@ -1,6 +1,6 @@
 # Epic 026: Component Showcase and Variant Screenshots
 
-**Status:** Done — all 13 tasks complete (2026-08-24).
+**Status:** Done — all 13 tasks complete (2026-08-24). Review fixes applied (2026-08-25).
 **Goal:** Bring `demo-rust` and the website's components page up to the standard of a DaisyUI/shadcn-style component catalog: every implemented akar component family individually isolable and screenshot-able, every registered finite visual variant captured, representative interactive states documented, and the website reconciled with the implementation catalog and C ABI availability.
 
 **Prerequisite:** Epic 021 is `Status: Done` (website and screenshot-sharing convention exist).
