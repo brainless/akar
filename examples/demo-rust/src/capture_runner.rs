@@ -31,6 +31,15 @@ impl CaptureConfig {
     }
 }
 
+fn parse_script_screenshot_path(script_path: &Path) -> Option<PathBuf> {
+    let content = std::fs::read_to_string(script_path).ok()?;
+    content
+        .lines()
+        .filter(|line| line.starts_with("screenshot "))
+        .filter_map(|line| line.strip_prefix("screenshot ").map(PathBuf::from))
+        .next_back()
+}
+
 fn build_command(entry: &CaptureEntry, config: &CaptureConfig) -> Vec<String> {
     let mut args = vec![
         "run".to_string(),
@@ -50,11 +59,11 @@ fn build_command(entry: &CaptureEntry, config: &CaptureConfig) -> Vec<String> {
         let script_path = config.scripts_dir.join(script);
         args.push("--script".to_string());
         args.push(script_path.to_string_lossy().to_string());
+    } else {
+        let tmp_path = config.output_dir.join(entry.filename);
+        args.push("--screenshot".to_string());
+        args.push(tmp_path.to_string_lossy().to_string());
     }
-
-    let tmp_path = config.output_dir.join(entry.filename);
-    args.push("--screenshot".to_string());
-    args.push(tmp_path.to_string_lossy().to_string());
 
     args.push("--delay".to_string());
     args.push(config.delay.to_string());
@@ -187,37 +196,82 @@ pub fn run_capture_all(config: &CaptureConfig) -> Vec<CaptureResult> {
                             stderr.trim()
                         ),
                     }
-                } else if !tmp_path.exists() {
-                    CaptureResult {
-                        filename: entry.filename.to_string(),
-                        success: false,
-                        message: "output file not created".to_string(),
-                    }
-                } else if is_flat_color(&tmp_path) {
-                    let _ = std::fs::remove_file(&tmp_path);
-                    CaptureResult {
-                        filename: entry.filename.to_string(),
-                        success: false,
-                        message: "rejected: single flat color (variance near zero)".to_string(),
-                    }
                 } else {
-                    let images_dst = config.images_dir.join(entry.filename);
-                    let website_dst = config.website_dir.join(entry.filename);
+                    let script_output = entry.script.and_then(|script| {
+                        let script_path = config.scripts_dir.join(script);
+                        parse_script_screenshot_path(&script_path)
+                    });
 
-                    let copy_result = copy_with_verify(&tmp_path, &images_dst)
-                        .and_then(|()| copy_with_verify(&tmp_path, &website_dst));
+                    if let Some(script_src) = script_output {
+                        if let Err(e) = copy_with_verify(&script_src, &tmp_path) {
+                            CaptureResult {
+                                filename: entry.filename.to_string(),
+                                success: false,
+                                message: format!(
+                                    "copy script output from {}: {e}",
+                                    script_src.display()
+                                ),
+                            }
+                        } else if is_flat_color(&tmp_path) {
+                            let _ = std::fs::remove_file(&tmp_path);
+                            CaptureResult {
+                                filename: entry.filename.to_string(),
+                                success: false,
+                                message: "rejected: single flat color (variance near zero)"
+                                    .to_string(),
+                            }
+                        } else {
+                            let images_dst = config.images_dir.join(entry.filename);
+                            let website_dst = config.website_dir.join(entry.filename);
 
-                    match copy_result {
-                        Ok(()) => CaptureResult {
-                            filename: entry.filename.to_string(),
-                            success: true,
-                            message: "ok".to_string(),
-                        },
-                        Err(e) => CaptureResult {
+                            let copy_result = copy_with_verify(&tmp_path, &images_dst)
+                                .and_then(|()| copy_with_verify(&tmp_path, &website_dst));
+
+                            match copy_result {
+                                Ok(()) => CaptureResult {
+                                    filename: entry.filename.to_string(),
+                                    success: true,
+                                    message: "ok".to_string(),
+                                },
+                                Err(e) => CaptureResult {
+                                    filename: entry.filename.to_string(),
+                                    success: false,
+                                    message: format!("copy failed: {e}"),
+                                },
+                            }
+                        }
+                    } else if !tmp_path.exists() {
+                        CaptureResult {
                             filename: entry.filename.to_string(),
                             success: false,
-                            message: format!("copy failed: {e}"),
-                        },
+                            message: "output file not created".to_string(),
+                        }
+                    } else if is_flat_color(&tmp_path) {
+                        let _ = std::fs::remove_file(&tmp_path);
+                        CaptureResult {
+                            filename: entry.filename.to_string(),
+                            success: false,
+                            message: "rejected: single flat color (variance near zero)".to_string(),
+                        }
+                    } else {
+                        let images_dst = config.images_dir.join(entry.filename);
+                        let website_dst = config.website_dir.join(entry.filename);
+
+                        let copy_result = copy_with_verify(&tmp_path, &images_dst)
+                            .and_then(|()| copy_with_verify(&tmp_path, &website_dst));
+
+                        match copy_result {
+                            Ok(()) => CaptureResult {
+                                filename: entry.filename.to_string(),
+                                success: true,
+                                message: "ok".to_string(),
+                            },
+                            Err(e) => CaptureResult {
+                                filename: entry.filename.to_string(),
+                                success: false,
+                                message: format!("copy failed: {e}"),
+                            },
+                        }
                     }
                 }
             }
@@ -342,5 +396,20 @@ mod tests {
             .expect("should have scripted entry");
         let cmd = build_command(entry, &config);
         assert!(cmd.contains(&"--script".to_string()));
+        assert!(!cmd.contains(&"--screenshot".to_string()));
+    }
+
+    #[test]
+    fn parse_script_screenshot_path_single() {
+        let path = PathBuf::from("scripts/button_outline_hover.txt");
+        let result = parse_script_screenshot_path(&path);
+        assert_eq!(result, Some(PathBuf::from("/tmp/akar-button-outline-hover.png")));
+    }
+
+    #[test]
+    fn parse_script_screenshot_path_multiple() {
+        let path = PathBuf::from("scripts/text_edit_paste.txt");
+        let result = parse_script_screenshot_path(&path);
+        assert_eq!(result, Some(PathBuf::from("/tmp/form-notes-pasted.png")));
     }
 }
