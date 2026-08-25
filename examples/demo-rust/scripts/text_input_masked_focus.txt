@@ -1,0 +1,6 @@
+# Focus masked text input and type
+click @text_input_masked
+delay 0.1
+type "Secret!"
+delay 0.1
+screenshot /tmp/akar-text-input-masked-focused.png

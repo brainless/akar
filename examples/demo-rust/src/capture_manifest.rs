@@ -951,7 +951,7 @@ pub static MANIFEST: &[CaptureEntry] = &[
         component: "text_input",
         variant: None,
         state: "masked-focused",
-        script: Some("text_input_focus.txt"),
+        script: Some("text_input_masked_focus.txt"),
         labels: &["text_input_masked"],
         filename: "akar-text-input-masked-focused.png",
         is_website_card: false,
@@ -1030,7 +1030,7 @@ pub static MANIFEST: &[CaptureEntry] = &[
     CaptureEntry {
         family: "progress",
         component: "progress",
-        variant: None,
+        variant: Some("100"),
         state: "100%",
         script: None,
         labels: &[],
@@ -1042,7 +1042,7 @@ pub static MANIFEST: &[CaptureEntry] = &[
     CaptureEntry {
         family: "steps",
         component: "steps",
-        variant: None,
+        variant: Some("step4"),
         state: "step4",
         script: None,
         labels: &[],
@@ -1225,7 +1225,7 @@ mod tests {
             .iter()
             .filter(|e| e.variant.is_some() && e.script.is_none())
             .count();
-        assert_eq!(variant_count, 37);
+        assert_eq!(variant_count, 39);
     }
 
     #[test]

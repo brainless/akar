@@ -171,6 +171,12 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Register stable labels for every interactive fixture and individually targetable variant.
 - Verify `--dump-layout` under each new isolated component reports a non-zero rect for its stable targets where a layout node exists.
 
+**Review (2026-08-25) — reopen:**
+
+- **[P1] Text scissor culling is still wrong above scale factor 1.** `DrawList::push_text` records a scaled `physical_rect`, but its live cull still calls `intersects(call.clip, scissor)` with a logical `TextCall::clip` and the physical-pixel active scissor (`crates/akar-core/src/draw_list.rs:148-168`). At scale factor 2 this can both drop partially visible text and retain text that is physically outside the scissor, so the core HiDPI requirement and the corresponding acceptance criterion are not satisfied. The added scale-2 tests assert only the recorded rectangle; none exercises text/scissor intersection at scale 2.
+- **[P2] The crop AABB does not clip partially visible calls to their scissor.** `compute_component_aabb` excludes only fully disjoint calls, then unions the entire `physical_rect` (`examples/demo-rust/src/main.rs:1316-1344`). A call extending past a scroll/portal scissor therefore expands the crop into invisible content. The test named `scissored_partial_included` uses a call wholly inside its scissor (`main.rs:5343-5351`) and does not cover this case.
+- **[P2] The Badge showcase still constructs layout nodes during frame preparation.** Every redraw without a single Badge variant creates fresh `row1` and `row2` nodes and replaces the showcase children (`examples/demo-rust/src/main.rs:1844-1902`). `prepare_layout` invokes this path on every redraw (`main.rs:4941-4947`), violating this task's persistent-node requirement and growing the Taffy tree during scripted/multi-frame runs.
+
 ### Task 3 — Enum-backed variant showcases ✅
 
 - Button: `Solid`, `Outline`, `Ghost`; capture the showcase plus scripted hovered/pressed Outline states.
@@ -208,6 +214,10 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - `data_list` uses the real `data_list_begin`/`data_list_end` API, stable keys, visible-range rendering, and real data items. Do not use the existing manually rendered `list` composite as a substitute.
 - Retain `--component list` as the existing composite fixture unless a visual-neutral internal refactor can be proven pixel-identical.
 
+**Review (2026-08-25) — reopen:**
+
+- **[P1] The standalone Data List does not render real data items.** The fixture calls `data_list_begin`, but each visible row is still a manually submitted quad and text call; the selected `item_node` is discarded and `akar_data_item` is never called (`examples/demo-rust/src/main.rs:3794-3854`). This is the exact substitute this task and the acceptance criteria rule out, so the fixture does not demonstrate Data List + stable-keyed Data Item composition.
+
 ### Task 8 — Audit and preserve existing standalone fixtures ✅
 
 - Confirm direct isolation remains valid for `navbar`, `canvas`, `card`, `link`, `paragraph`, `modal`, and `dropdown`, plus the variant-bearing existing fixtures handled above.
@@ -224,6 +234,13 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Visually inspect the complete capture set, not only file existence. Use `--dump-frame` for unexpected clipping, empty tooltip/overlay captures, or crop errors.
 - Reproduced 2026-08-24: an isolated `--component` capture using the default 5s delay occasionally returned an all-black PNG on the first `cargo run` after a fresh build (a cold-start window/GPU-surface race), while the identical command with an explicit `--delay` or a warm rerun succeeded. This was not consistently reproducible and does not block implementation, but because the runner performs dozens of unattended captures, it should reject/retry a capture whose output is a single flat color (a cheap check: sampled pixel variance near zero) rather than trusting file existence alone.
 
+**Review (2026-08-25) — reopen:**
+
+- **[P1] All 20 scripted manifest entries are unexecutable through the runner.** `build_command` appends `--script` and then unconditionally appends `--screenshot` (`examples/demo-rust/src/capture_runner.rs:49-62`), while the CLI deliberately rejects that pair as mutually exclusive. Reproduced with the generated Button hover command: it exits 1 with `--script and --screenshot are mutually exclusive`. The checked-in scripts already contain their own fixed `screenshot /tmp/...` step, but the runner neither rewrites that destination nor copies from it to the manifest filename.
+- **[P1] The managed screenshot deliverable is absent.** `git ls-files 'images/components/*.png' 'website/public/screenshots/components/*.png'` returns zero files, and both managed directories are empty in the repository. Consequently all 33 website preview URLs and the six README showcase image paths added by this epic resolve to missing assets. Directory creation is not a substitute for the required generated, paired PNG set.
+- **[P1] Several required state entries cannot produce the state named by their filename.** `CaptureEntry.state` is never used by `build_command`; only component, variant, and script affect rendering. Thus `akar-alert-info-closable.png` renders the same non-closable `--component alert --variant info` path as the ordinary Info variant, `akar-radio-second.png`, `akar-progress-100.png`, `akar-steps-4of4.png`, `akar-text-input-empty.png`, and `akar-tooltip-hidden.png` invoke the same default command as their family showcase, and the masked-focused entry reuses a script that targets `@text_input_normal`. These entries are metadata aliases, not deterministic state captures.
+- **[P1] Regression verification is not implemented.** Seven entries set `is_regression: true`, but `run_capture_all` never reads that field and never invokes `akar-diff` or a baseline comparison. Flat-color output is rejected once rather than retried (`capture_runner.rs:196-202`), and `copy_with_verify` compares only file lengths rather than bytes (`capture_runner.rs:133-152`). The Task 8/9 regression, retry, and byte-verification requirements therefore remain open.
+
 ### Task 10 — Reconcile `website/src/pages/components.astro` ✅
 
 - Move the catalog data out of the page body into a typed website data module so inventory, C ABI availability, descriptions, categories, aliases, and screenshot names can be reviewed independently from markup.
@@ -236,11 +253,19 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - Verify categories remain coherent across Primitives, Inputs, Feedback, Layout, Overlay/Navigation, Typography, and Special.
 - Test the preview CSS with wide and tall auto-cropped images. The current fixed 16:10 `object-fit: cover` may crop variant labels or edge variants; use a contained/padded presentation or per-image treatment that keeps the complete showcase visible.
 
+**Review (2026-08-25) — reopen:**
+
+- **[P2] The catalog still advertises capabilities that the implementation does not have.** For example, Container is described as a centered max-width wrapper with breakpoints (`website/src/lib/components.ts:90-99`) although `container` only paints the caller-resolved rectangle and `BoxStyle`; Avatar claims profile images and mask-shape variants (`components.ts:24-33`) although its API renders initials in a circle; Toast claims auto-dismiss (`components.ts:348-357`) although the component has no timer/lifetime API. Text Input also claims validation states and Switch claims smooth animation without corresponding component surfaces. These descriptions need another source-level reconciliation.
+
 ### Task 11 — Update README component showcase ✅
 
 - Add the Button and Badge variant showcases, or a similarly compact subset, to the existing README grid.
 - Keep the README concise and link readers to the website for the full 33-component/state catalog.
 - Use only images produced by the canonical capture manifest.
+
+**Review (2026-08-25) — reopen:**
+
+- **[P1] The updated README showcase is entirely broken in a fresh checkout.** It references six files under `images/components/` (`README.md:37-42`), but no PNGs in that directory are tracked. The prose and table landed without the manifest-produced assets they depend on.
 
 ### Task 12 — Final verification and handoff to later epics ✅
 
@@ -251,6 +276,10 @@ Pixel-exact regression comparisons require baselines captured before implementat
 - `cargo fmt --check`, `cargo check --workspace`, `cargo test --workspace`, and `cargo clippy --workspace -- -D warnings` pass.
 - Record Epic 026 as Done only after visual inspection and pixel-regression checks succeed.
 - Add a completion note that Epics 024 and 025 must be re-read and updated before their implementation. Do not make those plan edits inside Epic 026.
+
+**Review (2026-08-25) — reopen:**
+
+- **[P1] The final handoff marked capture-specific gates complete without a viable capture run or its outputs.** The ordinary workspace tests, Clippy gate, and four website commands pass on the review machine, but they do not validate static image existence, scripted runner command compatibility, named state distinctness, or regression comparison. The Task 9 failures above directly contradict the checked capture/asset/regression acceptance criteria, so this epic is not ready to remain `Status: Done` until Tasks 2, 7, 9, 10, and 11 are corrected and the full visual sweep is rerun.
 
 ---
 

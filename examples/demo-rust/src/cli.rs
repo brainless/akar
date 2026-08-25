@@ -15,6 +15,7 @@ pub struct CliConfig {
     pub component: Option<String>,
     #[allow(dead_code)] // used by variant showcase rendering in Task 2+
     pub variant: Option<String>,
+    pub state: Option<String>,
     pub script: Option<String>,
     pub screenshot: Option<String>,
     pub dump_layout: bool,
@@ -29,6 +30,7 @@ pub const HELP_TEXT: &str = r#"Usage: demo-rust [OPTIONS]
 Options:
   --component <name>       Isolate a single component by canonical name or alias
   --variant <name>         Render a specific variant (requires --component)
+  --state <name>           Render a specific state (requires --component)
   --screenshot <path>      Capture screenshot to path, then exit
   --script <path>          Run input script from path
   --dump-layout            Print layout node positions and exit
@@ -42,8 +44,8 @@ Options:
   --help                   Show this help message and exit
 
 Discovery modes (--help, --list-components, --list-variants) cannot be combined
-with rendering/capture options (--component, --variant, --screenshot, --script,
---dump-layout, --dump-frame, --delay, --rtl, --exit).
+with rendering/capture options (--component, --variant, --state, --screenshot,
+--script, --dump-layout, --dump-frame, --delay, --rtl, --exit).
 
 --variant requires --component. The component must have registered variants.
 
@@ -53,6 +55,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
     let mut mode: Option<RunMode> = None;
     let mut component: Option<String> = None;
     let mut variant: Option<String> = None;
+    let mut state: Option<String> = None;
     let mut script: Option<String> = None;
     let mut screenshot: Option<String> = None;
     let mut dump_layout = false;
@@ -123,6 +126,13 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
                 let name = arg_iter.next().ok_or("--variant requires a variant name")?;
                 variant = Some(name);
             }
+            "--state" => {
+                if state.is_some() {
+                    return Err("--state specified more than once".into());
+                }
+                let name = arg_iter.next().ok_or("--state requires a state name")?;
+                state = Some(name);
+            }
             "--screenshot" => {
                 let path = arg_iter.next().ok_or("--screenshot requires a file path")?;
                 screenshot = Some(path);
@@ -162,6 +172,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
 
     let has_rendering = component.is_some()
         || variant.is_some()
+        || state.is_some()
         || script.is_some()
         || screenshot.is_some()
         || dump_layout
@@ -185,8 +196,8 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
         }
     }
 
-    if variant.is_some() && component.is_none() {
-        return Err("--variant requires --component".into());
+    if (variant.is_some() || state.is_some()) && component.is_none() {
+        return Err("--variant and --state require --component".into());
     }
 
     if let Some(ref comp_name) = component {
@@ -226,6 +237,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
         mode,
         component,
         variant,
+        state,
         script,
         screenshot,
         dump_layout,
@@ -276,6 +288,7 @@ mod tests {
         assert!(HELP_TEXT.contains("Usage:"));
         assert!(HELP_TEXT.contains("--component"));
         assert!(HELP_TEXT.contains("--variant"));
+        assert!(HELP_TEXT.contains("--state"));
         assert!(HELP_TEXT.contains("--list-components"));
         assert!(HELP_TEXT.contains("--list-variants"));
         assert!(HELP_TEXT.contains("--screenshot"));
@@ -293,6 +306,7 @@ mod tests {
         assert_eq!(cfg.mode, RunMode::Run);
         assert!(cfg.component.is_none());
         assert!(cfg.variant.is_none());
+        assert!(cfg.state.is_none());
         assert!(cfg.script.is_none());
         assert!(cfg.screenshot.is_none());
         assert!(!cfg.dump_layout);
@@ -474,7 +488,41 @@ mod tests {
     #[test]
     fn variant_without_component_errors() {
         let err = parse_strs(&["demo-rust", "--variant", "solid"]).unwrap_err();
-        assert!(err.contains("--variant requires --component"));
+        assert!(err.contains("--variant and --state require --component"));
+    }
+
+    #[test]
+    fn state_without_component_errors() {
+        let err = parse_strs(&["demo-rust", "--state", "closable"]).unwrap_err();
+        assert!(err.contains("--variant and --state require --component"));
+    }
+
+    #[test]
+    fn state_flag_parses() {
+        let cfg =
+            parse_strs(&["demo-rust", "--component", "alert", "--state", "closable"]).unwrap();
+        assert_eq!(cfg.state.as_deref(), Some("closable"));
+    }
+
+    #[test]
+    fn duplicate_state_errors() {
+        let err = parse_strs(&[
+            "demo-rust",
+            "--component",
+            "alert",
+            "--state",
+            "closable",
+            "--state",
+            "default",
+        ])
+        .unwrap_err();
+        assert!(err.contains("more than once"));
+    }
+
+    #[test]
+    fn missing_state_value_errors() {
+        let err = parse_strs(&["demo-rust", "--state"]).unwrap_err();
+        assert!(err.contains("requires a state name"));
     }
 
     #[test]
@@ -547,6 +595,8 @@ mod tests {
             "button",
             "--variant",
             "outline",
+            "--state",
+            "hover",
             "--screenshot",
             "/tmp/out.png",
             "--delay",
@@ -557,6 +607,7 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.component.as_deref(), Some("button"));
         assert_eq!(cfg.variant.as_deref(), Some("outline"));
+        assert_eq!(cfg.state.as_deref(), Some("hover"));
         assert_eq!(cfg.screenshot.as_deref(), Some("/tmp/out.png"));
         assert_eq!(cfg.delay, 2.5);
         assert!(cfg.rtl);

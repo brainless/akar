@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use akar_components::{
     akar_alert, akar_avatar, akar_badge, akar_button, akar_card, akar_card_layout, akar_checkbox,
@@ -29,7 +29,7 @@ use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalSize},
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
 
@@ -387,6 +387,7 @@ fn main() {
             dump_frame_path: config.dump_frame,
             isolated_component,
             variant: config.variant,
+            component_state: config.state,
             rtl: config.rtl,
             forced_initial_state: false,
             start_time: None,
@@ -407,12 +408,41 @@ struct App {
     dump_frame_path: Option<String>,
     isolated_component: Option<Component>,
     variant: Option<String>,
+    component_state: Option<String>,
     rtl: bool,
     forced_initial_state: bool,
     start_time: Option<Instant>,
     screenshot_taken: bool,
     dump_frame_written: bool,
     dump_layout_written: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ScreenshotSchedule {
+    Idle,
+    WaitUntil(Instant),
+    RedrawNow,
+}
+
+fn screenshot_schedule(
+    screenshot_path: Option<&str>,
+    screenshot_taken: bool,
+    start_time: Option<Instant>,
+    delay_secs: f64,
+    now: Instant,
+) -> ScreenshotSchedule {
+    if screenshot_path.is_none() || screenshot_taken {
+        return ScreenshotSchedule::Idle;
+    }
+    let Some(start_time) = start_time else {
+        return ScreenshotSchedule::Idle;
+    };
+    let deadline = start_time + Duration::from_secs_f64(delay_secs);
+    if now >= deadline {
+        ScreenshotSchedule::RedrawNow
+    } else {
+        ScreenshotSchedule::WaitUntil(deadline)
+    }
 }
 
 fn ease_out_cubic(t: f32) -> f32 {
@@ -2795,10 +2825,17 @@ impl Component {
         ]
     }
 
-    fn render(&self, state: &mut AppState, viewport_rect: [f32; 4], variant: Option<&str>) {
+    fn render(
+        &self,
+        state: &mut AppState,
+        viewport_rect: [f32; 4],
+        variant: Option<&str>,
+        component_state: Option<&str>,
+    ) {
         match self {
             Self::Navbar => render_navbar(state, viewport_rect),
             Self::Alert => {
+                let closable = component_state == Some("closable");
                 if let Some(v) = variant {
                     let av = match v {
                         "info" => AlertVariant::Info,
@@ -2813,7 +2850,7 @@ impl Component {
                         state.alert_node,
                         "Alert message",
                         av,
-                        false,
+                        closable,
                         &AKAR_THEME_DARK,
                     );
                 } else {
@@ -3849,7 +3886,7 @@ impl Component {
         }
     }
 
-    fn force_state_initial(&self, state: &mut AppState) {
+    fn force_state_initial(&self, state: &mut AppState, component_state: Option<&str>) {
         match self {
             Self::Alert => {
                 state.alert_dismissed = false;
@@ -3891,10 +3928,14 @@ impl Component {
             }
             Self::Button | Self::Badge | Self::Skeleton => {}
             Self::Tooltip => {
-                state.core.input.mouse_pos = glam::Vec2::new(60.0, 18.0);
+                if component_state != Some("hidden-trigger") {
+                    state.core.input.mouse_pos = glam::Vec2::new(60.0, 18.0);
+                }
             }
             Self::TextInput => {
-                state.text_input_normal_value = "Hello world".to_string();
+                if component_state != Some("normal-empty") {
+                    state.text_input_normal_value = "Hello world".to_string();
+                }
                 state.text_input_masked_value = "secret123".to_string();
             }
             Self::Heading
@@ -3908,7 +3949,11 @@ impl Component {
                 state.checkbox_checked = false;
             }
             Self::Radio => {
-                state.radio_selected = 0;
+                if component_state == Some("second-selected") {
+                    state.radio_selected = 1;
+                } else {
+                    state.radio_selected = 0;
+                }
             }
             Self::Switch => {
                 state.switch_on = false;
@@ -4856,6 +4901,10 @@ impl ApplicationHandler for App {
             data_list_state: DataListState { scroll_y: 0.0 },
             data_list_item_nodes,
         });
+
+        if let Some(state) = &self.state {
+            state.window.request_redraw();
+        }
     }
 
     fn window_event(
@@ -4927,7 +4976,7 @@ impl ApplicationHandler for App {
 
                 if let Some(component) = &self.isolated_component {
                     if !self.forced_initial_state {
-                        component.force_state_initial(state);
+                        component.force_state_initial(state, self.component_state.as_deref());
                         self.forced_initial_state = true;
                     }
                     if matches!(component, Component::Navbar) {
@@ -5010,7 +5059,12 @@ impl ApplicationHandler for App {
                 };
 
                 if let Some(component) = &self.isolated_component {
-                    component.render(state, viewport_rect, self.variant.as_deref());
+                    component.render(
+                        state,
+                        viewport_rect,
+                        self.variant.as_deref(),
+                        self.component_state.as_deref(),
+                    );
                 } else {
                     render_all(state, viewport_rect);
                 }
@@ -5201,6 +5255,74 @@ impl ApplicationHandler for App {
         if !matches!(event, WindowEvent::RedrawRequested) {
             state.window.request_redraw();
         }
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        match screenshot_schedule(
+            self.screenshot_path.as_deref(),
+            self.screenshot_taken,
+            self.start_time,
+            self.delay_secs,
+            Instant::now(),
+        ) {
+            ScreenshotSchedule::Idle => event_loop.set_control_flow(ControlFlow::Wait),
+            ScreenshotSchedule::WaitUntil(deadline) => {
+                event_loop.set_control_flow(ControlFlow::WaitUntil(deadline));
+            }
+            ScreenshotSchedule::RedrawNow => {
+                event_loop.set_control_flow(ControlFlow::Wait);
+                if let Some(state) = &self.state {
+                    state.window.request_redraw();
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod screenshot_schedule_tests {
+    use super::{screenshot_schedule, ScreenshotSchedule};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn pending_screenshot_waits_until_its_deadline() {
+        let start = Instant::now();
+        let deadline = start + Duration::from_secs(5);
+
+        assert_eq!(
+            screenshot_schedule(Some("out.png"), false, Some(start), 5.0, start),
+            ScreenshotSchedule::WaitUntil(deadline)
+        );
+    }
+
+    #[test]
+    fn elapsed_screenshot_requests_a_redraw() {
+        let start = Instant::now();
+
+        assert_eq!(
+            screenshot_schedule(
+                Some("out.png"),
+                false,
+                Some(start),
+                5.0,
+                start + Duration::from_secs(5),
+            ),
+            ScreenshotSchedule::RedrawNow
+        );
+    }
+
+    #[test]
+    fn inactive_screenshot_does_not_schedule_a_wakeup() {
+        let now = Instant::now();
+
+        assert_eq!(
+            screenshot_schedule(None, false, Some(now), 5.0, now),
+            ScreenshotSchedule::Idle
+        );
+        assert_eq!(
+            screenshot_schedule(Some("out.png"), true, Some(now), 5.0, now),
+            ScreenshotSchedule::Idle
+        );
     }
 }
 
