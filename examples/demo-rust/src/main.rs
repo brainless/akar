@@ -3817,26 +3817,14 @@ impl Component {
                     let key = keys[i];
                     let item_node =
                         state.data_list_item_nodes[vis_idx % state.data_list_item_nodes.len()];
-                    let y = resp.content_origin[1] + i as f32 * item_height;
-                    let item_rect = [
-                        resp.viewport_rect[0] + 4.0,
-                        y + 4.0,
-                        resp.viewport_rect[2] - 8.0,
-                        item_height - 8.0,
-                    ];
-                    state.core.draw_list.push_quad(akar_core::QuadCall {
-                        rect: item_rect,
-                        fill: style.surface,
-                        border_color: style.border_color,
-                        corner_radii: [style.corner_radius; 4],
-                        border_width: style.border_width,
-                        z: 0.0,
-                        shadow_blur: 0.0,
-                        shadow_spread: 0.0,
-                        shadow_color: [0.0; 4],
-                        shadow_offset: [0.0; 2],
-                        _pad: [0.0; 2],
-                    });
+                    let _resp = akar_data_item(
+                        &mut state.core,
+                        &state.layout,
+                        item_node,
+                        key,
+                        &style,
+                    );
+                    let item_rect = state.layout.rect(item_node);
                     let label_text = format!("Item {} (key {})", i + 1, key);
                     let buffer_id = state.core.text_pipeline.set_text(
                         Some(52000 + i as u64),
@@ -3854,7 +3842,6 @@ impl Component {
                         color: [0.9, 0.9, 0.92, 1.0],
                         z: 0.0,
                     });
-                    let _ = item_node;
                 }
 
                 data_list_end(&mut state.core);
