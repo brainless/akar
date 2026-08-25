@@ -146,22 +146,22 @@ impl DrawList {
     }
 
     pub fn push_text(&mut self, call: TextCall) {
+        let sf = self.scale_factor;
+        let physical_clip = [
+            call.clip[0] * sf,
+            call.clip[1] * sf,
+            call.clip[2] * sf,
+            call.clip[3] * sf,
+        ];
         if self.recording {
-            let sf = self.scale_factor;
-            let physical_rect = [
-                call.clip[0] * sf,
-                call.clip[1] * sf,
-                call.clip[2] * sf,
-                call.clip[3] * sf,
-            ];
             self.recorded.push(RecordedCall {
                 call: DrawCall::Text(call.clone()),
                 scissor: self.active_scissor(),
-                physical_rect,
+                physical_rect: physical_clip,
             });
         }
         if let Some(scissor) = self.active_scissor() {
-            if !intersects(call.clip, scissor) {
+            if !intersects(physical_clip, scissor) {
                 return;
             }
         }
@@ -380,6 +380,33 @@ mod tests {
         dl.stop_recording();
         let r = &dl.recorded_calls()[0];
         assert_eq!(r.physical_rect, [20.0, 40.0, 60.0, 80.0]);
+    }
+
+    #[test]
+    fn text_culled_outside_scissor_at_scale_2() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
+        dl.push_text(text_at(200.0, 200.0, 50.0, 50.0));
+        assert!(dl.text_calls().is_empty());
+    }
+
+    #[test]
+    fn text_partial_inside_scissor_retained_at_scale_2() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
+        dl.push_text(text_at(80.0, 80.0, 50.0, 50.0));
+        assert_eq!(dl.text_calls().len(), 1);
+    }
+
+    #[test]
+    fn text_inside_scissor_retained_at_scale_2() {
+        let mut dl = DrawList::new();
+        dl.begin_frame(2.0);
+        dl.push_scissor([0.0, 0.0, 100.0, 100.0]);
+        dl.push_text(text_at(10.0, 10.0, 50.0, 50.0));
+        assert_eq!(dl.text_calls().len(), 1);
     }
 
     #[test]
