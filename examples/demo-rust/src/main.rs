@@ -1328,7 +1328,7 @@ fn compute_component_aabb(recorded: &[akar_core::draw_list::RecordedCall]) -> Op
             continue;
         }
         let rect = call.physical_rect;
-        if let Some(scissor) = call.scissor {
+        let (rx, ry, rw, rh) = if let Some(scissor) = call.scissor {
             if rect[0] + rect[2] <= scissor[0]
                 || rect[1] + rect[3] <= scissor[1]
                 || rect[0] >= scissor[0] + scissor[2]
@@ -1336,11 +1336,18 @@ fn compute_component_aabb(recorded: &[akar_core::draw_list::RecordedCall]) -> Op
             {
                 continue;
             }
-        }
-        min_x = min_x.min(rect[0]);
-        min_y = min_y.min(rect[1]);
-        max_x = max_x.max(rect[0] + rect[2]);
-        max_y = max_y.max(rect[1] + rect[3]);
+            let sx = rect[0].max(scissor[0]);
+            let sy = rect[1].max(scissor[1]);
+            let sr = (rect[0] + rect[2]).min(scissor[0] + scissor[2]);
+            let sb = (rect[1] + rect[3]).min(scissor[1] + scissor[3]);
+            (sx, sy, sr - sx, sb - sy)
+        } else {
+            (rect[0], rect[1], rect[2], rect[3])
+        };
+        min_x = min_x.min(rx);
+        min_y = min_y.min(ry);
+        max_x = max_x.max(rx + rw);
+        max_y = max_y.max(ry + rh);
     }
 
     if min_x == f32::MAX {
@@ -5348,6 +5355,16 @@ mod aabb_tests {
         )];
         let aabb = compute_component_aabb(&calls).unwrap();
         assert_eq!(aabb, [80.0, 80.0, 50.0, 50.0]);
+    }
+
+    #[test]
+    fn scissored_call_clipped_to_scissor() {
+        let calls = [with_scissor(
+            quad_call(0.0, 0.0, 200.0, 200.0, 0.0),
+            [50.0, 50.0, 100.0, 100.0],
+        )];
+        let aabb = compute_component_aabb(&calls).unwrap();
+        assert_eq!(aabb, [50.0, 50.0, 100.0, 100.0]);
     }
 
     #[test]
