@@ -26,7 +26,7 @@ export const implemented: ComponentEntry[] = [
     name: "Avatar",
     category: "Primitives",
     description:
-      "User profile image or initials display with rounded and mask shape variants.",
+      "Initials display in a circle with deterministic background color derived from the initials.",
     cAbi: true,
     variants: [],
     screenshot: "akar-avatar.png",
@@ -92,7 +92,7 @@ export const implemented: ComponentEntry[] = [
     name: "Container",
     category: "Layout",
     description:
-      "Centered max-width wrapper with configurable size breakpoints and padding.",
+      "Visual container that paints a caller-resolved rectangle with fill, border, corner radii, and optional shadow via BoxStyle.",
     cAbi: true,
     variants: [],
     screenshot: "akar-container.png",
@@ -306,7 +306,7 @@ export const implemented: ComponentEntry[] = [
     name: "Switch",
     category: "Inputs",
     description:
-      "Toggle between two states with smooth animation, on/off, hover, and pressed states.",
+      "Toggle between on and off states with on/off and hover visual states.",
     cAbi: true,
     variants: [],
     screenshot: "akar-switch.png",
@@ -328,7 +328,7 @@ export const implemented: ComponentEntry[] = [
     name: "Text Input",
     category: "Inputs",
     description:
-      "Single-line text input with Normal and Masked (password) variants, validation states, and focus handling.",
+      "Single-line text input with Normal and Masked (password) variants, focus handling, selection, and clipboard support.",
     cAbi: true,
     variants: ["normal", "masked"],
     screenshot: "akar-text-input.png",
@@ -350,7 +350,7 @@ export const implemented: ComponentEntry[] = [
     name: "Toast",
     category: "Feedback",
     description:
-      "Non-blocking notifications that auto-dismiss with Info, Success, Warning, and Error variants.",
+      "Non-blocking notifications with Info, Success, Warning, and Error variants. Supports click-to-dismiss; dismiss lifecycle is caller-owned.",
     cAbi: true,
     variants: ["info", "success", "warning", "error"],
     screenshot: "akar-toast.png",
