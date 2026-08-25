@@ -186,6 +186,8 @@ struct AppState {
     badge_warning_node: akar_layout::NodeId,
     badge_error_node: akar_layout::NodeId,
     badge_info_node: akar_layout::NodeId,
+    badge_row1_node: akar_layout::NodeId,
+    badge_row2_node: akar_layout::NodeId,
     alert_showcase_root: akar_layout::NodeId,
     alert_info_node: akar_layout::NodeId,
     alert_success_node: akar_layout::NodeId,
@@ -1848,7 +1850,11 @@ impl Component {
                             ..Default::default()
                         },
                     );
-                    let row1 = state.layout.new_leaf(Style {
+                    state.layout.set_children(
+                        state.badge_showcase_root,
+                        &[state.badge_row1_node, state.badge_row2_node],
+                    );
+                    let row_style = Style {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row,
                         align_items: Some(AlignItems::CENTER),
@@ -1857,20 +1863,13 @@ impl Component {
                             height: length(0.0_f32),
                         },
                         ..Default::default()
-                    });
-                    let row2 = state.layout.new_leaf(Style {
-                        display: Display::Flex,
-                        flex_direction: FlexDirection::Row,
-                        align_items: Some(AlignItems::CENTER),
-                        gap: taffy::geometry::Size {
-                            width: length(12.0_f32),
-                            height: length(0.0_f32),
-                        },
-                        ..Default::default()
-                    });
+                    };
                     state
                         .layout
-                        .set_children(state.badge_showcase_root, &[row1, row2]);
+                        .set_style(state.badge_row1_node, row_style.clone());
+                    state
+                        .layout
+                        .set_style(state.badge_row2_node, row_style);
                     for &node in &[
                         state.badge_default_node,
                         state.badge_primary_node,
@@ -1892,7 +1891,7 @@ impl Component {
                         );
                     }
                     state.layout.set_children(
-                        row1,
+                        state.badge_row1_node,
                         &[
                             state.badge_default_node,
                             state.badge_primary_node,
@@ -1900,7 +1899,7 @@ impl Component {
                         ],
                     );
                     state.layout.set_children(
-                        row2,
+                        state.badge_row2_node,
                         &[
                             state.badge_warning_node,
                             state.badge_error_node,
@@ -4572,6 +4571,8 @@ impl ApplicationHandler for App {
         layout.register_label("badge_warning", badge_warning_node);
         layout.register_label("badge_error", badge_error_node);
         layout.register_label("badge_info", badge_info_node);
+        let badge_row1_node = layout.new_leaf(Style::default());
+        let badge_row2_node = layout.new_leaf(Style::default());
 
         let alert_showcase_root = layout.new_leaf(Style::default());
         let alert_info_node = layout.new_leaf(Style::default());
@@ -4793,6 +4794,8 @@ impl ApplicationHandler for App {
             badge_warning_node,
             badge_error_node,
             badge_info_node,
+            badge_row1_node,
+            badge_row2_node,
             alert_showcase_root,
             alert_info_node,
             alert_success_node,
