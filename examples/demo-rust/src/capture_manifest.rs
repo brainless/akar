@@ -1030,7 +1030,7 @@ pub static MANIFEST: &[CaptureEntry] = &[
     CaptureEntry {
         family: "progress",
         component: "progress",
-        variant: Some("100"),
+        variant: None,
         state: "100%",
         script: None,
         labels: &[],
@@ -1042,7 +1042,7 @@ pub static MANIFEST: &[CaptureEntry] = &[
     CaptureEntry {
         family: "steps",
         component: "steps",
-        variant: Some("step4"),
+        variant: None,
         state: "step4",
         script: None,
         labels: &[],
@@ -1220,12 +1220,46 @@ mod tests {
     }
 
     #[test]
-    fn variant_count_is_36() {
+    fn registered_variant_count_is_36() {
         let variant_count = MANIFEST
             .iter()
-            .filter(|e| e.variant.is_some() && e.script.is_none())
+            .filter(|e| e.variant.is_some() && e.state == "default" && e.script.is_none())
             .count();
-        assert_eq!(variant_count, 39);
+        assert_eq!(variant_count, 36);
+    }
+
+    #[test]
+    fn every_manifest_variant_is_registered_in_the_catalog() {
+        for entry in MANIFEST {
+            let Some(variant) = entry.variant else {
+                continue;
+            };
+            let catalog_entry = crate::catalog::resolve(entry.component)
+                .unwrap_or_else(|| panic!("unknown manifest component '{}'", entry.component));
+            assert!(
+                catalog_entry.variants.contains(&variant),
+                "manifest variant '{}' is not registered for component '{}'",
+                variant,
+                entry.component
+            );
+        }
+    }
+
+    #[test]
+    fn every_manifest_state_is_registered_in_the_catalog() {
+        for entry in MANIFEST {
+            if entry.state == "default" {
+                continue;
+            }
+            let catalog_entry = crate::catalog::resolve(entry.component)
+                .unwrap_or_else(|| panic!("unknown manifest component '{}'", entry.component));
+            assert!(
+                crate::catalog::is_valid_state(catalog_entry, entry.state),
+                "manifest state '{}' is not registered for component '{}'",
+                entry.state,
+                entry.component
+            );
+        }
     }
 
     #[test]

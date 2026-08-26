@@ -9,9 +9,9 @@ use akar_components::{
     akar_text_input_masked, akar_textarea, akar_tooltip, data_list_begin, data_list_end,
     drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
     scroll_area_begin, scroll_area_end, toasts, AlertVariant, BadgeVariant, BoxStyle,
-    ButtonVariant, CardLayout, CardSlots, CardStyle, DataItemStyle, DataListState, DrawerEdge,
-    FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle, SkeletonVariant, TabVariant,
-    TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
+    ButtonVariant, CardLayout, CardSlots, CardStyle, DataItemStyle, DataListResponse,
+    DataListState, DrawerEdge, FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle,
+    SkeletonVariant, TabVariant, TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
 use akar_core::list_clip;
 use akar_core::AkarCore;
@@ -262,6 +262,110 @@ struct AppState {
     data_list_item_nodes: [akar_layout::NodeId; 20],
 }
 
+const DATA_LIST_ITEM_COUNT: usize = 20;
+const DATA_LIST_ITEM_HEIGHT: f32 = 48.0;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DataListItemBinding {
+    node: akar_layout::NodeId,
+    item_index: usize,
+    key: u64,
+}
+
+fn data_list_keys() -> [u64; DATA_LIST_ITEM_COUNT] {
+    std::array::from_fn(|index| (index as u64 + 1) * 1000)
+}
+
+fn data_list_layout_response(
+    viewport_rect: [f32; 4],
+    scroll_y: f32,
+    keys: &[u64],
+) -> DataListResponse {
+    let visible_range = akar_core::list_clip(
+        DATA_LIST_ITEM_COUNT,
+        DATA_LIST_ITEM_HEIGHT,
+        scroll_y,
+        viewport_rect[3],
+    );
+    let visible_keys = keys.get(visible_range.clone()).unwrap_or(&[]).to_vec();
+    DataListResponse {
+        viewport_rect,
+        content_origin: [0.0, viewport_rect[1] - scroll_y],
+        visible_range,
+        visible_keys,
+    }
+}
+
+fn update_data_list_scroll_before_layout(
+    input: &mut akar_core::InputState,
+    state: &mut DataListState,
+    viewport_rect: [f32; 4],
+) {
+    if input.is_hovering(viewport_rect) {
+        state.scroll_y -= input.scroll_delta.y;
+        input.scroll_delta.y = 0.0;
+    }
+    let content_height = DATA_LIST_ITEM_COUNT as f32 * DATA_LIST_ITEM_HEIGHT;
+    let max_scroll = (content_height - viewport_rect[3]).max(0.0);
+    state.scroll_y = state.scroll_y.clamp(0.0, max_scroll);
+}
+
+fn data_list_item_bindings(
+    item_nodes: &[akar_layout::NodeId],
+    response: &DataListResponse,
+) -> Vec<DataListItemBinding> {
+    response
+        .visible_range
+        .clone()
+        .zip(response.visible_keys.iter().copied())
+        .zip(item_nodes.iter().copied())
+        .map(|((item_index, key), node)| DataListItemBinding {
+            node,
+            item_index,
+            key,
+        })
+        .collect()
+}
+
+fn prepare_data_list_item_layout(
+    layout: &mut Layout,
+    item_nodes: &[akar_layout::NodeId],
+    response: &DataListResponse,
+) {
+    for &node in item_nodes {
+        layout.set_style(
+            node,
+            Style {
+                display: Display::None,
+                ..Default::default()
+            },
+        );
+    }
+
+    for binding in data_list_item_bindings(item_nodes, response) {
+        let local_y = response.content_origin[1]
+            + binding.item_index as f32 * DATA_LIST_ITEM_HEIGHT
+            - response.viewport_rect[1];
+        layout.set_style(
+            binding.node,
+            Style {
+                position: taffy::style::Position::Absolute,
+                inset: taffy::geometry::Rect {
+                    left: length(response.content_origin[0]),
+                    right: taffy::style::LengthPercentageAuto::auto(),
+                    top: length(local_y),
+                    bottom: taffy::style::LengthPercentageAuto::auto(),
+                },
+                size: Size {
+                    width: Dimension::percent(1.0),
+                    height: length(DATA_LIST_ITEM_HEIGHT),
+                },
+                ..Default::default()
+            },
+        );
+    }
+}
+
 /// Font candidates tried in order. v1 accepts collections only when all loaded
 /// faces resolve to one distinct primary family; multi-family collections are
 /// rejected by `load_font_bytes`.
@@ -331,16 +435,15 @@ fn main() {
         }
         cli::RunMode::CaptureAll(ref dir) => {
             let base = std::path::PathBuf::from(dir);
-            let mut cap_config = capture_runner::CaptureConfig::new(&base);
-            cap_config.output_dir = base.join(".artifacts/epic026/captures");
+            let cap_config = capture_runner::CaptureConfig::new(&base);
             let results = capture_runner::run_capture_all(&cap_config);
             capture_runner::print_summary(&results);
-            if let Err(e) = capture_runner::verify_managed_dirs(&cap_config) {
-                eprintln!("Managed directory verification failed:\n{e}");
-                std::process::exit(1);
-            }
             let has_failures = results.iter().any(|r| !r.success);
             if has_failures {
+                std::process::exit(1);
+            }
+            if let Err(e) = capture_runner::verify_managed_dirs(&cap_config) {
+                eprintln!("Managed directory verification failed:\n{e}");
                 std::process::exit(1);
             }
             std::process::exit(0);
@@ -455,9 +558,10 @@ fn prepare_layout(
     scale: f32,
     isolated_component: Option<&Component>,
     variant: Option<&str>,
+    component_state: Option<&str>,
 ) {
     if let Some(component) = isolated_component {
-        component.prepare_isolated_layout(state, size, scale, variant);
+        component.prepare_isolated_layout(state, size, scale, variant, component_state);
         return;
     }
 
@@ -1424,6 +1528,7 @@ impl Component {
         size: PhysicalSize<u32>,
         scale: f32,
         variant: Option<&str>,
+        component_state: Option<&str>,
     ) {
         let (root, style) = match self {
             Self::Navbar => {
@@ -1576,15 +1681,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.heading_showcase_root,
-                        &[
-                            state.heading_h1_node,
-                            state.heading_h2_node,
-                            state.heading_h3_node,
-                            state.heading_h4_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.heading_showcase_root,
                         (
@@ -1751,10 +1847,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.drawer_showcase_root,
-                        &[state.drawer_left_node, state.drawer_right_node],
-                    );
                     state.layout.compute(
                         state.drawer_showcase_root,
                         (
@@ -1823,14 +1915,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.button_showcase_root,
-                        &[
-                            state.button_solid_node,
-                            state.button_outline_node,
-                            state.button_ghost_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.button_showcase_root,
                         (
@@ -1880,10 +1964,6 @@ impl Component {
                             ..Default::default()
                         },
                     );
-                    state.layout.set_children(
-                        state.badge_showcase_root,
-                        &[state.badge_row1_node, state.badge_row2_node],
-                    );
                     let row_style = Style {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Row,
@@ -1918,22 +1998,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.badge_row1_node,
-                        &[
-                            state.badge_default_node,
-                            state.badge_primary_node,
-                            state.badge_success_node,
-                        ],
-                    );
-                    state.layout.set_children(
-                        state.badge_row2_node,
-                        &[
-                            state.badge_warning_node,
-                            state.badge_error_node,
-                            state.badge_info_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.badge_showcase_root,
                         (
@@ -2002,15 +2066,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.alert_showcase_root,
-                        &[
-                            state.alert_info_node,
-                            state.alert_success_node,
-                            state.alert_warning_node,
-                            state.alert_error_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.alert_showcase_root,
                         (
@@ -2078,15 +2133,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.tabs_showcase_root,
-                        &[
-                            state.tabs_boxed_node,
-                            state.tabs_lifted_node,
-                            state.tabs_pills_node,
-                            state.tabs_underline_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.tabs_showcase_root,
                         (
@@ -2170,14 +2216,6 @@ impl Component {
                             ..Default::default()
                         },
                     );
-                    state.layout.set_children(
-                        state.skeleton_showcase_root,
-                        &[
-                            state.skeleton_text_node,
-                            state.skeleton_card_node,
-                            state.skeleton_circle_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.skeleton_showcase_root,
                         (
@@ -2250,16 +2288,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.tooltip_showcase_root,
-                        &[
-                            state.tooltip_trigger_node,
-                            state.tooltip_top_node,
-                            state.tooltip_bottom_node,
-                            state.tooltip_left_node,
-                            state.tooltip_right_node,
-                        ],
-                    );
                     state.layout.compute(
                         state.tooltip_showcase_root,
                         (
@@ -2327,10 +2355,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.text_input_showcase_root,
-                        &[state.text_input_normal_node, state.text_input_masked_node],
-                    );
                     state.layout.compute(
                         state.text_input_showcase_root,
                         (
@@ -2384,10 +2408,6 @@ impl Component {
                         },
                     );
                 }
-                state.layout.set_children(
-                    state.radio_showcase_root,
-                    &[state.radio_dark_node, state.radio_light_node],
-                );
                 state.layout.compute(
                     state.radio_showcase_root,
                     (
@@ -2511,14 +2531,6 @@ impl Component {
                         },
                     );
                 }
-                state.layout.set_children(
-                    state.separator_showcase_root,
-                    &[
-                        state.separator_above_node,
-                        state.separator_node,
-                        state.separator_below_node,
-                    ],
-                );
                 state.layout.compute(
                     state.separator_showcase_root,
                     (
@@ -2541,11 +2553,8 @@ impl Component {
                 },
             ),
             Self::Progress => {
-                if let Some(v) = variant {
-                    let node = match v {
-                        "100" => state.progress_100_node,
-                        _ => state.progress_30_node,
-                    };
+                if component_state == Some("100%") {
+                    let node = state.progress_100_node;
                     state.layout.set_style(
                         node,
                         Style {
@@ -2596,10 +2605,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.progress_showcase_root,
-                        &[state.progress_30_node, state.progress_100_node],
-                    );
                     state.layout.compute(
                         state.progress_showcase_root,
                         (
@@ -2612,11 +2617,8 @@ impl Component {
                 return;
             }
             Self::Steps => {
-                if let Some(v) = variant {
-                    let node = match v {
-                        "step4" => state.steps_4of4_node,
-                        _ => state.steps_2of4_node,
-                    };
+                if component_state == Some("step4") {
+                    let node = state.steps_4of4_node;
                     state.layout.set_style(
                         node,
                         Style {
@@ -2666,10 +2668,6 @@ impl Component {
                             },
                         );
                     }
-                    state.layout.set_children(
-                        state.steps_showcase_root,
-                        &[state.steps_2of4_node, state.steps_4of4_node],
-                    );
                     state.layout.compute(
                         state.steps_showcase_root,
                         (
@@ -2714,17 +2712,46 @@ impl Component {
                     ..Default::default()
                 },
             ),
-            Self::DataList => (
-                state.data_list_node,
-                Style {
-                    flex_shrink: 0.0,
-                    size: Size {
-                        width: length(400.0_f32),
-                        height: length(300.0_f32),
+            Self::DataList => {
+                let root = state.data_list_node;
+                state.layout.set_style(
+                    root,
+                    Style {
+                        flex_shrink: 0.0,
+                        size: Size {
+                            width: length(400.0_f32),
+                            height: length(300.0_f32),
+                        },
+                        ..Default::default()
                     },
-                    ..Default::default()
-                },
-            ),
+                );
+                let available = (
+                    Some(size.width as f32 / scale),
+                    Some(size.height as f32 / scale),
+                );
+                state
+                    .layout
+                    .compute(root, available, |_, _, _, _, _| Size::ZERO);
+
+                let viewport_rect = state.layout.rect(root);
+                update_data_list_scroll_before_layout(
+                    &mut state.core.input,
+                    &mut state.data_list_state,
+                    viewport_rect,
+                );
+                let keys = data_list_keys();
+                let response =
+                    data_list_layout_response(viewport_rect, state.data_list_state.scroll_y, &keys);
+                prepare_data_list_item_layout(
+                    &mut state.layout,
+                    &state.data_list_item_nodes,
+                    &response,
+                );
+                state
+                    .layout
+                    .compute(root, available, |_, _, _, _, _| Size::ZERO);
+                return;
+            }
         };
 
         state.layout.set_style(root, style);
@@ -3669,12 +3696,14 @@ impl Component {
             }
             Self::Progress => {
                 let style = ProgressStyle::from_theme(&AKAR_THEME_DARK);
-                if let Some(v) = variant {
-                    let (node, value) = match v {
-                        "100" => (state.progress_100_node, 1.0),
-                        _ => (state.progress_30_node, 0.3),
-                    };
-                    akar_progress(&mut state.core, &state.layout, node, value, &style);
+                if component_state == Some("100%") {
+                    akar_progress(
+                        &mut state.core,
+                        &state.layout,
+                        state.progress_100_node,
+                        1.0,
+                        &style,
+                    );
                 } else {
                     akar_progress(
                         &mut state.core,
@@ -3694,17 +3723,13 @@ impl Component {
             }
             Self::Steps => {
                 let labels = ["Step 1", "Step 2", "Step 3", "Step 4"];
-                if let Some(v) = variant {
-                    let (node, current) = match v {
-                        "step4" => (state.steps_4of4_node, 3),
-                        _ => (state.steps_2of4_node, 1),
-                    };
+                if component_state == Some("step4") {
                     akar_steps(
                         &mut state.core,
                         &state.layout,
-                        node,
+                        state.steps_4of4_node,
                         &labels,
-                        current,
+                        3,
                         &AKAR_THEME_DARK,
                     );
                 } else {
@@ -3833,31 +3858,32 @@ impl Component {
                 scroll_area_end(&mut state.core);
             }
             Self::DataList => {
-                let total_items = 20_usize;
-                let item_height = 48.0_f32;
-                let keys: Vec<u64> = (0..total_items as u64).map(|i| (i + 1) * 1000).collect();
+                let keys = data_list_keys();
 
                 let resp = data_list_begin(
                     &mut state.core,
                     &state.layout,
                     state.data_list_node,
                     &mut state.data_list_state,
-                    total_items,
-                    item_height,
+                    DATA_LIST_ITEM_COUNT,
+                    DATA_LIST_ITEM_HEIGHT,
                     &keys,
                 );
 
                 let style = DataItemStyle::from_theme(&AKAR_THEME_DARK);
-                for (vis_idx, i) in resp.visible_range.clone().enumerate() {
-                    let key = keys[i];
-                    let item_node =
-                        state.data_list_item_nodes[vis_idx % state.data_list_item_nodes.len()];
-                    let _resp =
-                        akar_data_item(&mut state.core, &state.layout, item_node, key, &style);
-                    let item_rect = state.layout.rect(item_node);
-                    let label_text = format!("Item {} (key {})", i + 1, key);
+                for binding in data_list_item_bindings(&state.data_list_item_nodes, &resp) {
+                    let _response = akar_data_item(
+                        &mut state.core,
+                        &state.layout,
+                        binding.node,
+                        binding.key,
+                        &style,
+                    );
+                    let item_rect = state.layout.rect(binding.node);
+                    let label_text =
+                        format!("Item {} (key {})", binding.item_index + 1, binding.key);
                     let buffer_id = state.core.text_pipeline.set_text(
-                        Some(52000 + i as u64),
+                        Some(52000 + binding.key),
                         &label_text,
                         glyphon::Metrics::new(14.0, 14.0 * 1.2),
                         Some(item_rect[2] - 16.0),
@@ -4016,6 +4042,15 @@ impl ApplicationHandler for App {
             akar_core::TextPipelineConfig::default(),
         );
         core.set_text_edit_keybindings(akar_core::TextEditKeybindings::platform_default());
+        // InputState defaults mouse_pos to (0, 0), and this demo never wires
+        // up real OS CursorMoved events (input is script/fixture-driven only
+        // for deterministic captures). Several isolated single-component
+        // fixtures (e.g. the standalone Checkbox) resolve to a rect whose
+        // origin is also (0, 0), so leaving the default mouse there makes an
+        // unscripted "idle" capture indistinguishable from an explicit
+        // "hover" capture. Park the default pointer off any real content;
+        // scripts that need hover/press explicitly set their own position.
+        core.input.set_mouse_pos(-9999.0, -9999.0);
 
         let i18n_cjk_font = load_i18n_font(&mut core, "CJK", I18N_CJK_FONT_CANDIDATES);
         let i18n_arabic_font = load_i18n_font(&mut core, "Arabic", I18N_ARABIC_FONT_CANDIDATES);
@@ -4722,6 +4757,84 @@ impl ApplicationHandler for App {
         layout.register_label("data_list", data_list_node);
         let data_list_item_nodes: [akar_layout::NodeId; 20] =
             std::array::from_fn(|_| layout.new_leaf(Style::default()));
+        layout.set_children(data_list_node, &data_list_item_nodes);
+        for (index, &node) in data_list_item_nodes.iter().enumerate() {
+            layout.register_label(&format!("data_list_item_{index}"), node);
+        }
+
+        // Showcase parent-child relationships are fixed for the lifetime of the
+        // demo and must be established once here (construct phase), never in
+        // `prepare_isolated_layout` (paint/compute phase) — see DEVELOP.md's
+        // construct/compute/paint contract.
+        layout.set_children(
+            heading_showcase_root,
+            &[
+                heading_h1_node,
+                heading_h2_node,
+                heading_h3_node,
+                heading_h4_node,
+            ],
+        );
+        layout.set_children(drawer_showcase_root, &[drawer_left_node, drawer_right_node]);
+        layout.set_children(
+            button_showcase_root,
+            &[button_solid_node, button_outline_node, button_ghost_node],
+        );
+        layout.set_children(badge_showcase_root, &[badge_row1_node, badge_row2_node]);
+        layout.set_children(
+            badge_row1_node,
+            &[badge_default_node, badge_primary_node, badge_success_node],
+        );
+        layout.set_children(
+            badge_row2_node,
+            &[badge_warning_node, badge_error_node, badge_info_node],
+        );
+        layout.set_children(
+            alert_showcase_root,
+            &[
+                alert_info_node,
+                alert_success_node,
+                alert_warning_node,
+                alert_error_node,
+            ],
+        );
+        layout.set_children(
+            tabs_showcase_root,
+            &[
+                tabs_boxed_node,
+                tabs_lifted_node,
+                tabs_pills_node,
+                tabs_underline_node,
+            ],
+        );
+        layout.set_children(
+            skeleton_showcase_root,
+            &[skeleton_text_node, skeleton_card_node, skeleton_circle_node],
+        );
+        layout.set_children(
+            tooltip_showcase_root,
+            &[
+                tooltip_trigger_node,
+                tooltip_top_node,
+                tooltip_bottom_node,
+                tooltip_left_node,
+                tooltip_right_node,
+            ],
+        );
+        layout.set_children(
+            text_input_showcase_root,
+            &[text_input_normal_node, text_input_masked_node],
+        );
+        layout.set_children(radio_showcase_root, &[radio_dark_node, radio_light_node]);
+        layout.set_children(
+            separator_showcase_root,
+            &[separator_above_node, separator_node, separator_below_node],
+        );
+        layout.set_children(
+            progress_showcase_root,
+            &[progress_30_node, progress_100_node],
+        );
+        layout.set_children(steps_showcase_root, &[steps_2of4_node, steps_4of4_node]);
 
         if self.screenshot_path.is_some() {
             self.start_time = Some(Instant::now());
@@ -4983,6 +5096,7 @@ impl ApplicationHandler for App {
                     scale,
                     self.isolated_component.as_ref(),
                     self.variant.as_deref(),
+                    self.component_state.as_deref(),
                 );
 
                 if self.dump_layout {
@@ -5009,7 +5123,7 @@ impl ApplicationHandler for App {
                             for tab in 0..4 {
                                 state.active_tab = tab;
                                 state.prev_active_tab = tab;
-                                prepare_layout(state, size, scale, None, None);
+                                prepare_layout(state, size, scale, None, None, None);
                                 match tab {
                                     0 => render_list_tab(state, viewport_rect),
                                     1 => render_canvas_tab(state),
@@ -5050,6 +5164,19 @@ impl ApplicationHandler for App {
                 } else {
                     None
                 };
+
+                if matches!(self.isolated_component.as_ref(), Some(Component::DataList))
+                    && state.core.input.scroll_delta.y != 0.0
+                {
+                    prepare_layout(
+                        state,
+                        size,
+                        scale,
+                        self.isolated_component.as_ref(),
+                        self.variant.as_deref(),
+                        self.component_state.as_deref(),
+                    );
+                }
 
                 if let Some(component) = &self.isolated_component {
                     component.render(
@@ -5316,6 +5443,284 @@ mod screenshot_schedule_tests {
             screenshot_schedule(Some("out.png"), true, Some(now), 5.0, now),
             ScreenshotSchedule::Idle
         );
+    }
+}
+
+#[cfg(test)]
+mod data_list_showcase_tests {
+    use super::{
+        data_list_item_bindings, data_list_keys, data_list_layout_response,
+        prepare_data_list_item_layout, update_data_list_scroll_before_layout, DATA_LIST_ITEM_COUNT,
+        DATA_LIST_ITEM_HEIGHT,
+    };
+    use akar_components::{
+        akar_data_item, data_list_begin, data_list_end, DataItemStyle, DataListState,
+        AKAR_THEME_DARK,
+    };
+    use akar_core::{AkarCore, DrawCall};
+    use akar_layout::{length, Layout, Size, Style};
+
+    fn prepared_layout(
+        scroll_y: f32,
+    ) -> (
+        Layout,
+        akar_layout::NodeId,
+        [akar_layout::NodeId; DATA_LIST_ITEM_COUNT],
+        akar_components::DataListResponse,
+    ) {
+        let mut layout = Layout::new();
+        let list = layout.new_leaf(Style {
+            size: Size {
+                width: length(400.0_f32),
+                height: length(300.0_f32),
+            },
+            ..Default::default()
+        });
+        let item_nodes = std::array::from_fn(|_| layout.new_leaf(Style::default()));
+        layout.set_children(list, &item_nodes);
+        layout.compute(list, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        let response = data_list_layout_response(layout.rect(list), scroll_y, &data_list_keys());
+        prepare_data_list_item_layout(&mut layout, &item_nodes, &response);
+        layout.compute(list, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+        (layout, list, item_nodes, response)
+    }
+
+    #[test]
+    fn visible_pool_nodes_have_nonzero_resolved_rects() {
+        let (layout, _, item_nodes, response) = prepared_layout(0.0);
+        let bindings = data_list_item_bindings(&item_nodes, &response);
+
+        assert!(!bindings.is_empty());
+        for binding in &bindings {
+            let rect = layout.rect(binding.node);
+            assert_eq!(rect[2], 400.0);
+            assert_eq!(rect[3], DATA_LIST_ITEM_HEIGHT);
+        }
+        assert_eq!(layout.rect(item_nodes[bindings.len()]), [0.0; 4]);
+    }
+
+    #[test]
+    fn real_data_items_submit_nonzero_quads_inside_list_scope() {
+        let (layout, list, item_nodes, _) = prepared_layout(0.0);
+        let keys = data_list_keys();
+        let mut state = DataListState { scroll_y: 0.0 };
+        let mut core = AkarCore::mock();
+        core.draw_list.start_recording();
+        core.draw_list.begin_frame(1.0);
+
+        let response = data_list_begin(
+            &mut core,
+            &layout,
+            list,
+            &mut state,
+            DATA_LIST_ITEM_COUNT,
+            DATA_LIST_ITEM_HEIGHT,
+            &keys,
+        );
+        let bindings = data_list_item_bindings(&item_nodes, &response);
+        let style = DataItemStyle::from_theme(&AKAR_THEME_DARK);
+        for binding in &bindings {
+            akar_data_item(&mut core, &layout, binding.node, binding.key, &style);
+        }
+        data_list_end(&mut core);
+
+        let quads: Vec<_> = core
+            .draw_list
+            .recorded_calls()
+            .iter()
+            .filter_map(|recorded| match &recorded.call {
+                DrawCall::Quad(quad) => Some(quad),
+                DrawCall::Text(_) => None,
+            })
+            .collect();
+        assert_eq!(quads.len(), bindings.len());
+        assert!(quads
+            .iter()
+            .all(|quad| quad.rect[2] > 0.0 && quad.rect[3] > 0.0));
+    }
+
+    #[test]
+    fn scrolling_rebinds_pool_slots_to_visible_stable_keys() {
+        let keys = data_list_keys();
+        let (_, _, top_nodes, top_response) = prepared_layout(0.0);
+        let top_bindings = data_list_item_bindings(&top_nodes, &top_response);
+
+        let scroll_y = DATA_LIST_ITEM_HEIGHT * 2.0;
+        let (layout, list, scrolled_nodes, prepared_response) = prepared_layout(scroll_y);
+        let prepared_bindings = data_list_item_bindings(&scrolled_nodes, &prepared_response);
+        let mut state = DataListState { scroll_y };
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+        let actual_response = data_list_begin(
+            &mut core,
+            &layout,
+            list,
+            &mut state,
+            DATA_LIST_ITEM_COUNT,
+            DATA_LIST_ITEM_HEIGHT,
+            &keys,
+        );
+        data_list_end(&mut core);
+
+        assert_eq!(
+            prepared_response.visible_range,
+            actual_response.visible_range
+        );
+        assert_eq!(prepared_response.visible_keys, actual_response.visible_keys);
+        assert_ne!(prepared_bindings[0].key, top_bindings[0].key);
+        assert_eq!(
+            prepared_bindings[0].key,
+            keys[prepared_response.visible_range.start]
+        );
+        let first_rect = layout.rect(prepared_bindings[0].node);
+        let expected_y = prepared_response.content_origin[1]
+            + prepared_bindings[0].item_index as f32 * DATA_LIST_ITEM_HEIGHT;
+        assert_eq!(first_rect[1], expected_y);
+    }
+
+    #[test]
+    fn partial_scroll_updates_item_rect_before_same_frame_paint() {
+        let (mut layout, list, item_nodes, _) = prepared_layout(0.0);
+        let keys = data_list_keys();
+        let viewport_rect = layout.rect(list);
+        let mut state = DataListState { scroll_y: 0.0 };
+        let mut core = AkarCore::mock();
+        core.input
+            .set_mouse_pos(viewport_rect[0] + 10.0, viewport_rect[1] + 10.0);
+        core.input.push_scroll(0.0, -24.0);
+
+        update_data_list_scroll_before_layout(&mut core.input, &mut state, viewport_rect);
+        let prepared_response = data_list_layout_response(viewport_rect, state.scroll_y, &keys);
+        prepare_data_list_item_layout(&mut layout, &item_nodes, &prepared_response);
+        layout.compute(list, (Some(400.0), Some(300.0)), |_, _, _, _, _| Size::ZERO);
+
+        assert_eq!(state.scroll_y, 24.0);
+        assert_eq!(core.input.scroll_delta.y, 0.0);
+        core.draw_list.start_recording();
+        core.draw_list.begin_frame(1.0);
+        let paint_response = data_list_begin(
+            &mut core,
+            &layout,
+            list,
+            &mut state,
+            DATA_LIST_ITEM_COUNT,
+            DATA_LIST_ITEM_HEIGHT,
+            &keys,
+        );
+        let binding = data_list_item_bindings(&item_nodes, &paint_response)[0];
+        akar_data_item(
+            &mut core,
+            &layout,
+            binding.node,
+            binding.key,
+            &DataItemStyle::from_theme(&AKAR_THEME_DARK),
+        );
+        data_list_end(&mut core);
+
+        assert_eq!(state.scroll_y, 24.0);
+        assert_eq!(paint_response.content_origin, [0.0, -24.0]);
+        assert_eq!(layout.rect(binding.node), [0.0, -24.0, 400.0, 48.0]);
+        let painted_rect = core
+            .draw_list
+            .recorded_calls()
+            .iter()
+            .find_map(|recorded| match recorded.call {
+                DrawCall::Quad(quad) => Some(quad.rect),
+                DrawCall::Text(_) => None,
+            })
+            .unwrap();
+        assert_eq!(painted_rect, [0.0, -24.0, 400.0, 48.0]);
+    }
+}
+
+#[cfg(test)]
+mod showcase_lifecycle_tests {
+    use akar_layout::{length, AlignItems, Display, FlexDirection, Layout, NodeId, Size, Style};
+
+    // Mirrors the button showcase's persistent construction (established once
+    // in `ApplicationHandler::resumed`) and its per-frame body in
+    // `Component::prepare_isolated_layout`'s Button branch, which must only
+    // touch style/compute on every redraw, never child relationships. The
+    // full `Component::prepare_isolated_layout` takes `&mut AppState`, which
+    // owns a real `wgpu::Device`/`Window` and cannot be constructed under
+    // `cargo test` without a live GPU (see AGENTS.md "No live GPU in CI"), so
+    // this test exercises the same construct-once/redraw-many invariant
+    // directly against `Layout`, the type the construct/compute/paint
+    // contract in DEVELOP.md actually governs.
+    #[allow(clippy::too_many_arguments)]
+    fn simulate_button_showcase_frame(
+        layout: &mut Layout,
+        root: NodeId,
+        solid: NodeId,
+        outline: NodeId,
+        ghost: NodeId,
+        width: f32,
+        height: f32,
+    ) {
+        layout.set_style(
+            root,
+            Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
+                align_items: Some(AlignItems::CENTER),
+                gap: Size {
+                    width: length(16.0_f32),
+                    height: length(0.0_f32),
+                },
+                size: Size {
+                    width: length(420.0_f32),
+                    height: length(40.0_f32),
+                },
+                ..Default::default()
+            },
+        );
+        for &node in &[solid, outline, ghost] {
+            layout.set_style(
+                node,
+                Style {
+                    flex_shrink: 0.0,
+                    size: Size {
+                        width: length(120.0_f32),
+                        height: length(36.0_f32),
+                    },
+                    ..Default::default()
+                },
+            );
+        }
+        layout.compute(root, (Some(width), Some(height)), |_, _, _, _, _| {
+            Size::ZERO
+        });
+    }
+
+    #[test]
+    fn showcase_children_are_stable_across_repeated_redraw_frames() {
+        let mut layout = Layout::new();
+        let root = layout.new_leaf(Style::default());
+        let solid = layout.new_leaf(Style::default());
+        let outline = layout.new_leaf(Style::default());
+        let ghost = layout.new_leaf(Style::default());
+
+        // Construct phase: establish the tree relationship exactly once.
+        layout.set_children(root, &[solid, outline, ghost]);
+        assert_eq!(layout.set_children_calls(), 1);
+        let expected_children = layout.children(root);
+        assert_eq!(expected_children, vec![solid, outline, ghost]);
+
+        // Simulate repeated redraw frames: only paint/compute must run.
+        for frame in 0..5 {
+            simulate_button_showcase_frame(&mut layout, root, solid, outline, ghost, 800.0, 600.0);
+            assert_eq!(
+                layout.set_children_calls(),
+                1,
+                "frame {frame}: redraw must not call set_children again"
+            );
+            assert_eq!(
+                layout.children(root),
+                expected_children,
+                "frame {frame}: child NodeIds must be stable across redraws"
+            );
+        }
     }
 }
 

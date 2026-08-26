@@ -7,7 +7,7 @@ import GlassCard from '@/components/ui/GlassCard.astro';
 import Badge from '@/components/ui/Badge.astro';
 import Section from '@/components/ui/Section.astro';
 import { categories, implementedByCategory } from '@/lib/components';
-import { plannedComponents } from '@/lib/component-crosswalk';
+import { plannedComponents, referenceSources } from '@/lib/component-crosswalk';
 
 const planned = plannedComponents();
 ---
@@ -95,6 +95,15 @@ const planned = plannedComponents();
           </GlassCard>
         ))}
       </div>
+      <p class="crosswalk-note">
+        Crosswalk compared against local checkouts pinned at{' '}
+        {referenceSources.map((source, i) => (
+          <>
+            {i > 0 && ' and '}
+            {source.label} <code>{source.pinnedCommit.slice(0, 12)}</code>
+          </>
+        ))}.
+      </p>
     </Section>
 
     <section class="components-cta">
@@ -236,6 +245,16 @@ const planned = plannedComponents();
     padding: 0.125rem 0.5rem;
     border-radius: var(--radius-sm);
     border: 1px solid var(--glass-border);
+  }
+
+  .crosswalk-note {
+    margin-top: var(--space-lg);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .crosswalk-note code {
+    font-family: var(--font-mono, monospace);
   }
 
   .components-cta {

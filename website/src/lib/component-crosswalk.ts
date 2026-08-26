@@ -8,6 +8,35 @@ export interface CrosswalkEntry {
   reason: string;
 }
 
+export interface ReferenceSource {
+  id: "daisyui" | "shadcn";
+  label: string;
+  localPath: string;
+  /** Commit hash of the local checkout this crosswalk was compared against. */
+  pinnedCommit: string;
+}
+
+/**
+ * The crosswalk below was built by reading these exact local checkouts
+ * (per AGENTS.md / DEVELOP.md "Local source access") at these commits, not
+ * by browsing the upstream repos on the web. Re-pin and re-diff the
+ * crosswalk if either checkout advances past these commits.
+ */
+export const referenceSources: ReferenceSource[] = [
+  {
+    id: "daisyui",
+    label: "daisyUI",
+    localPath: "~/Projects/daisyui",
+    pinnedCommit: "7238552d97fcc131f4808e1f8c5842228d4e7dfd",
+  },
+  {
+    id: "shadcn",
+    label: "shadcn/ui",
+    localPath: "~/Projects/shadcn_ui",
+    pinnedCommit: "67cef8fcb94a4223a144e8ed6cbd26169943db7a",
+  },
+];
+
 function daisy(
   name: string,
   status: CrosswalkStatus,
@@ -34,7 +63,7 @@ export const crosswalk: CrosswalkEntry[] = [
   daisy(
     "avatar",
     "implemented_equivalent",
-    "akar avatar with initials and image support",
+    "akar avatar with initials-only display, no image support",
   ),
   daisy(
     "badge",
@@ -178,7 +207,11 @@ export const crosswalk: CrosswalkEntry[] = [
     "Device mockup frames; presentation tool, not a UI component",
   ),
   daisy("modal", "implemented_equivalent", "akar modal dialog"),
-  daisy("navbar", "implemented_equivalent", "akar navbar with responsive menu"),
+  daisy(
+    "navbar",
+    "implemented_equivalent",
+    "akar navbar with fixed start/center/end layout slots",
+  ),
   daisy("progress", "implemented_equivalent", "akar progress indicator"),
   daisy(
     "radialprogress",
@@ -277,7 +310,7 @@ export const crosswalk: CrosswalkEntry[] = [
   shadcn(
     "avatar",
     "implemented_equivalent",
-    "akar avatar with initials and image support",
+    "akar avatar with initials-only display, no image support",
   ),
   shadcn(
     "badge",
@@ -410,7 +443,7 @@ export const crosswalk: CrosswalkEntry[] = [
   shadcn(
     "scroll-area",
     "implemented_equivalent",
-    "akar scroll_area with clipping and scroll ownership",
+    "akar scroll_area with clipping and caller-owned scroll position",
   ),
   shadcn("select", "implemented_equivalent", "akar select dropdown"),
   shadcn("separator", "implemented_equivalent", "akar separator divider"),

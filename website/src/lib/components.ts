@@ -167,8 +167,7 @@ export const implemented: ComponentEntry[] = [
     family: "link",
     name: "Link",
     category: "Typography",
-    description:
-      "Navigation links with hover states and external link support.",
+    description: "Navigation links with a hover underline state.",
     cAbi: true,
     variants: [],
     screenshot: "akar-link.png",
@@ -188,7 +187,8 @@ export const implemented: ComponentEntry[] = [
     family: "navbar",
     name: "Navbar",
     category: "Overlay/Navigation",
-    description: "Top navigation bar with responsive menu and brand slot.",
+    description:
+      "Top navigation bar with fixed start, center, and end layout slots.",
     cAbi: true,
     variants: [],
     screenshot: "akar-navbar.png",
@@ -230,7 +230,7 @@ export const implemented: ComponentEntry[] = [
     name: "Scroll Area",
     category: "Layout",
     description:
-      "Scrolling and clipping scope that owns scroll state and clips overflow content to its bounds.",
+      "Scrolling and clipping scope that clips overflow content to its bounds; scroll position is caller-owned, not retained by the component.",
     cAbi: true,
     variants: [],
     screenshot: "akar-scroll-area.png",

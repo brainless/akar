@@ -225,6 +225,19 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<CliConfig, Strin
                 ));
             }
         }
+
+        if let Some(ref st_name) = state {
+            if !catalog::is_valid_state(entry, st_name) {
+                let mut valid: Vec<&str> = vec!["default"];
+                valid.extend(entry.states.iter().copied());
+                return Err(format!(
+                    "unknown state '{}' for component '{}'. Valid states:\n  {}",
+                    st_name,
+                    entry.canonical_cli_name,
+                    valid.join(", ")
+                ));
+            }
+        }
     }
 
     if screenshot.is_some() && script.is_some() {
@@ -533,6 +546,98 @@ mod tests {
     }
 
     #[test]
+    fn every_registered_state_parses() {
+        for entry in catalog::CATALOG {
+            for &s in entry.states {
+                let cfg = parse_strs(&[
+                    "demo-rust",
+                    "--component",
+                    entry.canonical_cli_name,
+                    "--state",
+                    s,
+                ])
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "state '{s}' for component '{}' failed to parse: {e}",
+                        entry.canonical_cli_name
+                    )
+                });
+                assert_eq!(cfg.state.as_deref(), Some(s));
+            }
+        }
+    }
+
+    #[test]
+    fn default_state_always_parses() {
+        for entry in catalog::CATALOG {
+            let cfg = parse_strs(&[
+                "demo-rust",
+                "--component",
+                entry.canonical_cli_name,
+                "--state",
+                "default",
+            ])
+            .unwrap();
+            assert_eq!(cfg.state.as_deref(), Some("default"));
+        }
+    }
+
+    #[test]
+    fn every_manifest_state_parses() {
+        for entry in crate::capture_manifest::MANIFEST {
+            if entry.state == "default" {
+                continue;
+            }
+            let cfg = parse_strs(&[
+                "demo-rust",
+                "--component",
+                entry.component,
+                "--state",
+                entry.state,
+            ])
+            .unwrap_or_else(|e| {
+                panic!(
+                    "manifest state '{}' for component '{}' (filename '{}') failed to parse: {e}",
+                    entry.state, entry.component, entry.filename
+                )
+            });
+            assert_eq!(cfg.state.as_deref(), Some(entry.state));
+        }
+    }
+
+    #[test]
+    fn unknown_state_errors() {
+        let err =
+            parse_strs(&["demo-rust", "--component", "alert", "--state", "bogus"]).unwrap_err();
+        assert!(err.contains("unknown state"));
+        assert!(err.contains("bogus"));
+        assert!(err.contains("closable"));
+    }
+
+    #[test]
+    fn state_registered_on_other_component_errors() {
+        let err = parse_strs(&[
+            "demo-rust",
+            "--component",
+            "card",
+            "--state",
+            "outline-hover",
+        ])
+        .unwrap_err();
+        assert!(err.contains("unknown state"));
+        assert!(err.contains("outline-hover"));
+        assert!(err.contains("card"));
+    }
+
+    #[test]
+    fn state_on_component_with_no_registered_states_errors() {
+        let err =
+            parse_strs(&["demo-rust", "--component", "card", "--state", "hovered"]).unwrap_err();
+        assert!(err.contains("unknown state"));
+        assert!(err.contains("default"));
+    }
+
+    #[test]
     fn script_screenshot_conflict() {
         let err = parse_strs(&[
             "demo-rust",
@@ -596,7 +701,7 @@ mod tests {
             "--variant",
             "outline",
             "--state",
-            "hover",
+            "outline-hover",
             "--screenshot",
             "/tmp/out.png",
             "--delay",
@@ -607,7 +712,7 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.component.as_deref(), Some("button"));
         assert_eq!(cfg.variant.as_deref(), Some("outline"));
-        assert_eq!(cfg.state.as_deref(), Some("hover"));
+        assert_eq!(cfg.state.as_deref(), Some("outline-hover"));
         assert_eq!(cfg.screenshot.as_deref(), Some("/tmp/out.png"));
         assert_eq!(cfg.delay, 2.5);
         assert!(cfg.rtl);

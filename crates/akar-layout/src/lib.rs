@@ -56,6 +56,7 @@ pub struct Layout {
     screen_origin: [f32; 2],
     namespace_id: u64,
     direction: AkarDirection,
+    set_children_calls: u64,
 }
 
 impl Layout {
@@ -67,6 +68,7 @@ impl Layout {
             screen_origin: [0.0; 2],
             namespace_id: 0,
             direction: AkarDirection::default(),
+            set_children_calls: 0,
         }
     }
 
@@ -147,6 +149,20 @@ impl Layout {
         for &child in children {
             self.parents.insert(child, parent);
         }
+        self.set_children_calls += 1;
+    }
+
+    pub fn children(&self, node: NodeId) -> Vec<NodeId> {
+        self.tree.children(node).unwrap_or_default()
+    }
+
+    /// Number of times [`Layout::set_children`] has been called on this tree.
+    /// Construct/compute/paint contract: tree relationships should be
+    /// established once (or only on a deliberate layout rebuild), never once
+    /// per redraw. Tests use this counter to catch a paint/redraw path that
+    /// mutates child relationships every frame.
+    pub fn set_children_calls(&self) -> u64 {
+        self.set_children_calls
     }
 
     pub fn remove(&mut self, node: NodeId) {

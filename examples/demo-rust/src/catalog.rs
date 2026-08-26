@@ -5,6 +5,11 @@ pub struct CatalogEntry {
     pub aliases: &'static [&'static str],
     pub artifact_stem: &'static str,
     pub variants: &'static [&'static str],
+    /// Registered `--state` values for this component, beyond the implicit
+    /// "default" that every component accepts (a no-op reset). CLI parsing
+    /// and the capture manifest share this list so an unknown or
+    /// wrong-component state is rejected before any GPU/window creation.
+    pub states: &'static [&'static str],
     pub c_abi: bool,
     pub website_category: &'static str,
     pub is_composite: bool,
@@ -18,6 +23,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "alert",
         variants: &["info", "success", "warning", "error"],
+        states: &["closable"],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -28,6 +34,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "avatar",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Primitives",
         is_composite: false,
@@ -38,6 +45,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "badge",
         variants: &["default", "primary", "success", "warning", "error", "info"],
+        states: &[],
         c_abi: true,
         website_category: "Primitives",
         is_composite: false,
@@ -48,6 +56,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "button",
         variants: &["solid", "outline", "ghost"],
+        states: &["outline-hover", "outline-pressed"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -58,6 +67,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "canvas",
         variants: &[],
+        states: &[],
         c_abi: false,
         website_category: "Special",
         is_composite: false,
@@ -68,6 +78,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "card",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -78,6 +89,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "checkbox",
         variants: &[],
+        states: &["checked", "unchecked-hover", "unchecked-pressed"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -88,6 +100,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "container",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -98,6 +111,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "data_item",
         variants: &[],
+        states: &["hovered", "pressed"],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -108,6 +122,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "data_list",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -118,6 +133,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "drawer",
         variants: &["left", "right"],
+        states: &[],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -128,6 +144,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "dropdown",
         variants: &[],
+        states: &["composite"],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -138,6 +155,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "heading",
         variants: &["h1", "h2", "h3", "h4"],
+        states: &[],
         c_abi: true,
         website_category: "Typography",
         is_composite: false,
@@ -148,6 +166,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "label",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Typography",
         is_composite: false,
@@ -158,6 +177,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "link",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Typography",
         is_composite: false,
@@ -168,6 +188,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "modal",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -178,6 +199,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "navbar",
         variants: &[],
+        states: &["composite"],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -188,6 +210,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "paragraph",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Typography",
         is_composite: false,
@@ -198,6 +221,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "progress",
         variants: &[],
+        states: &["100%"],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -208,6 +232,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "radio",
         variants: &[],
+        states: &["second-selected"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -218,6 +243,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "scroll_area",
         variants: &[],
+        states: &["scrolled"],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -228,6 +254,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "select",
         variants: &[],
+        states: &["open"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -238,6 +265,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "separator",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Layout",
         is_composite: false,
@@ -248,6 +276,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "skeleton",
         variants: &["text", "card", "circle"],
+        states: &[],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -258,6 +287,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "slider",
         variants: &[],
+        states: &["80%"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -268,6 +298,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "stat",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -278,6 +309,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "steps",
         variants: &[],
+        states: &["step4"],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -288,6 +320,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "switch",
         variants: &[],
+        states: &["on", "off-hover", "off-pressed"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -298,6 +331,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &["tabs"],
         artifact_stem: "tabs",
         variants: &["boxed", "lifted", "pills", "underline"],
+        states: &[],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -308,6 +342,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "text_input",
         variants: &["normal", "masked"],
+        states: &["normal-empty", "normal-focused", "masked-focused"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -318,6 +353,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "textarea",
         variants: &[],
+        states: &["focused"],
         c_abi: true,
         website_category: "Inputs",
         is_composite: false,
@@ -328,6 +364,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &["toast"],
         artifact_stem: "toast",
         variants: &["info", "success", "warning", "error"],
+        states: &[],
         c_abi: true,
         website_category: "Feedback",
         is_composite: false,
@@ -338,6 +375,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "tooltip",
         variants: &["top", "bottom", "left", "right"],
+        states: &["visible", "hidden-trigger"],
         c_abi: true,
         website_category: "Overlay/Navigation",
         is_composite: false,
@@ -348,6 +386,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "list",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Layout",
         is_composite: true,
@@ -358,6 +397,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "stats",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Feedback",
         is_composite: true,
@@ -368,6 +408,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "form",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Inputs",
         is_composite: true,
@@ -378,6 +419,7 @@ pub static CATALOG: &[CatalogEntry] = &[
         aliases: &[],
         artifact_stem: "i18n",
         variants: &[],
+        states: &[],
         c_abi: true,
         website_category: "Special",
         is_composite: true,
@@ -416,6 +458,19 @@ pub fn standalone_names() -> Vec<&'static str> {
 #[allow(dead_code)]
 pub fn variants_for(name: &str) -> &'static [&'static str] {
     resolve(name).map(|e| e.variants).unwrap_or(&[])
+}
+
+#[allow(dead_code)]
+pub fn states_for(name: &str) -> &'static [&'static str] {
+    resolve(name).map(|e| e.states).unwrap_or(&[])
+}
+
+/// "default" is always valid: it means "no explicit state", the implicit
+/// reset every component already supports. Any other value must be
+/// registered against the resolved component's `states` list.
+#[allow(dead_code)]
+pub fn is_valid_state(entry: &CatalogEntry, state: &str) -> bool {
+    state == "default" || entry.states.contains(&state)
 }
 
 #[cfg(test)]
@@ -479,6 +534,52 @@ mod tests {
     #[test]
     fn variants_for_button() {
         assert_eq!(variants_for("button"), &["solid", "outline", "ghost"]);
+    }
+
+    #[test]
+    fn states_for_unknown_returns_empty() {
+        assert!(states_for("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn states_for_button() {
+        assert_eq!(states_for("button"), &["outline-hover", "outline-pressed"]);
+    }
+
+    #[test]
+    fn states_for_alert_via_alias_free_name() {
+        assert_eq!(states_for("alert"), &["closable"]);
+    }
+
+    #[test]
+    fn default_state_always_valid() {
+        for entry in CATALOG {
+            assert!(is_valid_state(entry, "default"));
+        }
+    }
+
+    #[test]
+    fn registered_states_are_valid() {
+        for entry in CATALOG {
+            for &s in entry.states {
+                assert!(is_valid_state(entry, s));
+            }
+        }
+    }
+
+    #[test]
+    fn unregistered_state_is_invalid() {
+        let entry = by_canonical_name("card").unwrap();
+        assert!(entry.states.is_empty());
+        assert!(!is_valid_state(entry, "hovered"));
+    }
+
+    #[test]
+    fn state_registered_on_one_component_is_invalid_on_another() {
+        let card = by_canonical_name("card").unwrap();
+        assert!(!is_valid_state(card, "closable"));
+        let alert = by_canonical_name("alert").unwrap();
+        assert!(!is_valid_state(alert, "outline-hover"));
     }
 
     #[test]
