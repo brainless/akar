@@ -4,7 +4,7 @@ import mdx from "@astrojs/mdx";
 import siteConfig from "./src/site.config.ts";
 
 export default defineConfig({
-  site: "https://akar.dev",
+  site: "https://akar.pixlie.com",
   integrations: [mdx(), ...(siteConfig.features.sitemap ? [sitemap()] : [])],
   output: "static",
   trailingSlash: "always",

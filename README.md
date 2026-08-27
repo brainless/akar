@@ -6,7 +6,7 @@ GPU-accelerated UI components for agents and developers.
 
 ## What is akar
 
-akar is an immediate-mode, GPU-rendered UI component library with a C ABI. It ships 30+ ready-to-use components — buttons, cards, inputs, tables, modals, drawers, sliders, toggles, and more — styled out of the box and arranged with a flexbox layout engine. The rendering stack is [wgpu](https://github.com/gfx-rs/wgpu) 29 + [glyphon](https://github.com/grovesNL/glyphon) (cosmic-text backed, GPU atlas), and layout is resolved by [taffy](https://github.com/DioxusLabs/taffy) to pixel coordinates before any draw calls.
+akar is an immediate-mode, GPU-rendered UI component library with a C ABI. It ships 33 ready-to-use components — buttons, cards, inputs, data lists, modals, drawers, sliders, toggles, and more — styled out of the box and arranged with a flexbox layout engine. The rendering stack is [wgpu](https://github.com/gfx-rs/wgpu) 29 + [glyphon](https://github.com/grovesNL/glyphon) (cosmic-text backed, GPU atlas), and layout is resolved by [taffy](https://github.com/DioxusLabs/taffy) to pixel coordinates before any draw calls.
 
 The public API is a C ABI (`libakar` + `akar.h`). Rust is the implementation detail; any language that can call C can use akar. No Rust toolchain is required on the consumer side.
 
@@ -41,7 +41,7 @@ This is a proof of concept that a small team of agents can build a production-qu
 | ![Form controls](images/components/akar-form.png) | ![Drawer](images/components/akar-drawer.png) | ![Stats](images/components/akar-stats.png) |
 | Form | Drawer | Stats |
 
-See the [full component catalog](https://akar.dev/components) for all 33 components, variants, and interactive states.
+See the [full component catalog](https://akar.pixlie.com/components) for all 33 components, variants, and interactive states.
 
 ## The akar marketing page
 
@@ -79,7 +79,7 @@ cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --e
 
 ## Documentation
 
-Full documentation and component catalog at [akar.dev](https://akar.dev) (coming soon).
+Full documentation and component catalog at [akar.pixlie.com](https://akar.pixlie.com) (coming soon).
 
 ## License
 

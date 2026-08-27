@@ -80,7 +80,7 @@ const siteConfig: SiteConfig = {
   description:
     "A GPU-accelerated, language-neutral UI component library for agents and developers",
   author: "akar",
-  url: "https://akar.dev",
+  url: "https://akar.pixlie.com",
   ogImage: "/og-image.png",
   twitterHandle: "",
   lang: "en",

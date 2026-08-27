@@ -783,7 +783,7 @@ impl Site for AkarSite {
             layout,
             self.stat_nodes[0],
             "Components",
-            "30+",
+            "33",
             None,
             &THEME,
         );
@@ -823,7 +823,7 @@ impl Site for AkarSite {
         let card_descriptions = [
             "Built on wgpu for native performance across macOS, Windows, and Linux. Every pixel is GPU-accelerated.",
             "Use from any language that calls C. The generated header is the only contract you need.",
-            "Buttons, cards, inputs, and tables styled out of the box with semantic theme tokens.",
+            "Buttons, cards, inputs, and data lists styled out of the box with semantic theme tokens.",
         ];
         for i in 0..3 {
             akar_heading(
