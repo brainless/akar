@@ -128,6 +128,17 @@ pub static CATALOG: &[CatalogEntry] = &[
         is_composite: false,
     },
     CatalogEntry {
+        family: "data_grid",
+        canonical_cli_name: "data_grid",
+        aliases: &[],
+        artifact_stem: "data-grid",
+        variants: &[],
+        states: &["scrolled", "sorted", "selected", "keyboard"],
+        c_abi: true,
+        website_category: "Data Display",
+        is_composite: false,
+    },
+    CatalogEntry {
         family: "drawer",
         canonical_cli_name: "drawer",
         aliases: &[],
@@ -478,13 +489,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_has_37_entries() {
-        assert_eq!(CATALOG.len(), 37);
+    fn catalog_has_38_entries() {
+        assert_eq!(CATALOG.len(), 38);
     }
 
     #[test]
-    fn standalone_count_is_33() {
-        assert_eq!(standalone_names().len(), 33);
+    fn standalone_count_is_34() {
+        assert_eq!(standalone_names().len(), 34);
     }
 
     #[test]

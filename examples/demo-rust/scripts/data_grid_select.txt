@@ -1,0 +1,4 @@
+# Click a cell to select it
+click @data_grid_cell_3000_status
+delay 0.1
+screenshot /tmp/akar-data-grid-select.png

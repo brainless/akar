@@ -1,0 +1,4 @@
+# Click header to sort data grid by Name column
+click @data_grid_header_name
+delay 0.1
+screenshot /tmp/akar-data-grid-sort.png

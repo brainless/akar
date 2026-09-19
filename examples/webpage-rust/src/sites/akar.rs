@@ -807,13 +807,13 @@ impl Site for AkarSite {
         );
 
         let card_style = CardStyle::default(&THEME);
-        for i in 0..3 {
+        for &root in &self.card_roots[..3] {
             let slots = CardSlots {
                 header: None,
-                body: self.card_roots[i],
+                body: root,
                 footer: None,
             };
-            akar_card(core, layout, self.card_roots[i], &slots, &card_style);
+            akar_card(core, layout, root, &slots, &card_style);
         }
         let card_titles = [
             "Cross-Platform GPU Rendering",

@@ -1,0 +1,5 @@
+# Scroll down ~5000px into the data
+hover 400 400
+scroll 0 -5000
+delay 0.5
+screenshot /tmp/data-grid-scroll-vertical.png

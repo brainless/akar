@@ -168,8 +168,8 @@ mod tests {
     fn sized_node(layout: &mut akar_layout::Layout) -> akar_layout::NodeId {
         let node = layout.new_leaf(Style {
             size: akar_layout::Size {
-                width: akar_layout::length(400.0),
-                height: akar_layout::length(60.0),
+                width: akar_layout::length(400.0_f32),
+                height: akar_layout::length(60.0_f32),
             },
             ..Default::default()
         });

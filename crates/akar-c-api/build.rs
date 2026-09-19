@@ -35,5 +35,14 @@ fn main() {
         .cargo_metadata(false)
         .compile("akar_c_api_font_tests");
 
+    cc::Build::new()
+        .file(workspace_root.join("crates/akar-c-api/tests/data_grid.c"))
+        .include(workspace_root)
+        .warnings(true)
+        .extra_warnings(true)
+        .warnings_into_errors(true)
+        .cargo_metadata(false)
+        .compile("akar_c_api_data_grid_tests");
+
     println!("cargo:rustc-link-search=native={out_dir}");
 }

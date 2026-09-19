@@ -120,6 +120,15 @@ pub use data_item::{
 pub mod data_list;
 pub use data_list::{data_list_begin, data_list_end, DataListResponse, DataListState};
 
+pub mod data_grid;
+pub use data_grid::{
+    data_grid_begin, data_grid_body_begin, data_grid_body_end, data_grid_cell, data_grid_end,
+    data_grid_handle_keyboard, data_grid_header_begin, data_grid_header_cell, data_grid_header_end,
+    DataGridAlign, DataGridCellRef, DataGridCellResponse, DataGridColumn, DataGridHeaderResponse,
+    DataGridKeyboardResponse, DataGridResponse, DataGridSortDirection, DataGridState,
+    DataGridStyle, DATA_GRID_OVERSCAN,
+};
+
 pub mod heading;
 pub use heading::{heading as akar_heading, HeadingLevel};
 

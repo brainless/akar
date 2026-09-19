@@ -1,0 +1,14 @@
+# Click a cell to focus, then navigate with arrow keys
+click 150 212
+delay 0.1
+key Down
+delay 0.1
+key Down
+delay 0.1
+key Down
+delay 0.1
+key Right
+delay 0.1
+key Right
+delay 0.5
+screenshot /tmp/data-grid-keyboard.png

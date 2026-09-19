@@ -1,0 +1,4 @@
+# Click a cell to select a row
+click 150 212
+delay 0.5
+screenshot /tmp/data-grid-selected.png

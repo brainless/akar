@@ -133,8 +133,8 @@ mod tests {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(800.0),
-                height: length(60.0),
+                width: length(800.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -154,8 +154,8 @@ mod tests {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(800.0),
-                height: length(60.0),
+                width: length(800.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -195,8 +195,8 @@ mod tests {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(500.0),
-                height: length(80.0),
+                width: length(500.0_f32),
+                height: length(80.0_f32),
             },
             ..Default::default()
         });
@@ -222,8 +222,8 @@ mod tests {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(800.0),
-                height: length(60.0),
+                width: length(800.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -231,8 +231,8 @@ mod tests {
 
         let child_start = layout.new_leaf(Style {
             size: Size {
-                width: length(100.0),
-                height: length(40.0),
+                width: length(100.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -240,8 +240,8 @@ mod tests {
 
         let child_center = layout.new_leaf(Style {
             size: Size {
-                width: length(200.0),
-                height: length(40.0),
+                width: length(200.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -249,8 +249,8 @@ mod tests {
 
         let child_end = layout.new_leaf(Style {
             size: Size {
-                width: length(100.0),
-                height: length(40.0),
+                width: length(100.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -291,8 +291,8 @@ mod tests {
         layout.set_direction(AkarDirection::Rtl);
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(800.0),
-                height: length(60.0),
+                width: length(800.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -300,8 +300,8 @@ mod tests {
 
         let child_start = layout.new_leaf(Style {
             size: Size {
-                width: length(100.0),
-                height: length(40.0),
+                width: length(100.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -309,8 +309,8 @@ mod tests {
 
         let child_center = layout.new_leaf(Style {
             size: Size {
-                width: length(200.0),
-                height: length(40.0),
+                width: length(200.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -318,8 +318,8 @@ mod tests {
 
         let child_end = layout.new_leaf(Style {
             size: Size {
-                width: length(100.0),
-                height: length(40.0),
+                width: length(100.0_f32),
+                height: length(40.0_f32),
             },
             ..Default::default()
         });
@@ -362,8 +362,8 @@ mod tests {
         let mut layout = akar_layout::Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(800.0),
-                height: length(60.0),
+                width: length(800.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });

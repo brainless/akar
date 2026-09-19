@@ -69,7 +69,7 @@ mod tests {
         let mut layout = Layout::new();
         let node = layout.new_leaf(Style {
             size: Size {
-                width: length(200.0),
+                width: length(200.0_f32),
                 height: length(viewport_h),
             },
             ..Default::default()

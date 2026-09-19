@@ -1,0 +1,5 @@
+# Scroll right to see off-screen columns
+hover 400 400
+scroll -500 0
+delay 0.5
+screenshot /tmp/data-grid-scroll-horizontal.png

@@ -101,8 +101,8 @@ mod tests {
     fn node_100x30(layout: &mut Layout) -> NodeId {
         let n = layout.new_leaf(Style {
             size: Size {
-                width: length(100.0),
-                height: length(30.0),
+                width: length(100.0_f32),
+                height: length(30.0_f32),
             },
             ..Default::default()
         });

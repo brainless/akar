@@ -6,10 +6,13 @@ use akar_components::{
     akar_container, akar_data_item, akar_heading, akar_label, akar_link, akar_navbar_layout,
     akar_paragraph, akar_progress, akar_radio_group, akar_select, akar_separator, akar_skeleton,
     akar_slider, akar_stat, akar_steps, akar_switch, akar_tab_bar, akar_text_input,
-    akar_text_input_masked, akar_textarea, akar_tooltip, data_list_begin, data_list_end,
-    drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end, progress_at,
-    scroll_area_begin, scroll_area_end, toasts, AlertVariant, BadgeVariant, BoxStyle,
-    ButtonVariant, CardLayout, CardSlots, CardStyle, DataItemStyle, DataListResponse,
+    akar_text_input_masked, akar_textarea, akar_tooltip, data_grid_begin, data_grid_body_begin,
+    data_grid_body_end, data_grid_cell, data_grid_end, data_grid_handle_keyboard,
+    data_grid_header_begin, data_grid_header_cell, data_grid_header_end, data_list_begin,
+    data_list_end, drawer_begin, drawer_end, dropdown_begin, dropdown_end, modal_begin, modal_end,
+    progress_at, scroll_area_begin, scroll_area_end, toasts, AlertVariant, BadgeVariant, BoxStyle,
+    ButtonVariant, CardLayout, CardSlots, CardStyle, DataGridAlign, DataGridColumn,
+    DataGridSortDirection, DataGridState, DataGridStyle, DataItemStyle, DataListResponse,
     DataListState, DrawerEdge, FontFamily, HeadingLevel, LinkResult, NavbarSlots, ProgressStyle,
     SkeletonVariant, TabVariant, TextStyle, ToastItem, ToastVariant, TooltipSide, AKAR_THEME_DARK,
 };
@@ -260,6 +263,13 @@ struct AppState {
     data_list_node: akar_layout::NodeId,
     data_list_state: DataListState,
     data_list_item_nodes: [akar_layout::NodeId; 20],
+    data_grid_node: akar_layout::NodeId,
+    data_grid_state: DataGridState,
+    #[allow(dead_code)]
+    data_grid_header_nodes: [akar_layout::NodeId; DATA_GRID_COLUMN_COUNT],
+    #[allow(dead_code)]
+    data_grid_cell_nodes: Vec<akar_layout::NodeId>,
+    data_grid_sorted_col: Option<usize>,
 }
 
 const DATA_LIST_ITEM_COUNT: usize = 20;
@@ -364,6 +374,122 @@ fn prepare_data_list_item_layout(
             },
         );
     }
+}
+
+const DATA_GRID_COLUMN_COUNT: usize = 10;
+const DATA_GRID_ROW_COUNT: usize = 20;
+
+const DATA_GRID_COLUMN_NAMES: [&str; DATA_GRID_COLUMN_COUNT] = [
+    "ID", "Name", "Email", "City", "Status", "Amount", "Date", "Category", "Priority", "Notes",
+];
+
+const DATA_GRID_COLUMN_WIDTHS: [f32; DATA_GRID_COLUMN_COUNT] = [
+    60.0, 120.0, 180.0, 100.0, 80.0, 90.0, 100.0, 100.0, 80.0, 160.0,
+];
+
+fn data_grid_columns() -> Vec<DataGridColumn> {
+    DATA_GRID_COLUMN_WIDTHS
+        .iter()
+        .enumerate()
+        .map(|(i, &w)| DataGridColumn {
+            key: (i as u64 + 1) * 100,
+            width: w,
+            align: if i == 5 {
+                DataGridAlign::Right
+            } else {
+                DataGridAlign::Left
+            },
+        })
+        .collect()
+}
+
+fn data_grid_row_keys() -> Vec<u64> {
+    (0..DATA_GRID_ROW_COUNT as u64)
+        .map(|i| (i + 1) * 1000)
+        .collect()
+}
+
+fn data_grid_cell_text(row: usize, col: usize) -> String {
+    let names = [
+        "Alice", "Bob", "Carol", "Dave", "Eve", "Frank", "Grace", "Heidi", "Ivan", "Judy", "Karl",
+        "Lena", "Mike", "Nina", "Oscar", "Pam", "Quinn", "Ruth", "Steve", "Tina",
+    ];
+    let cities = [
+        "NYC",
+        "LA",
+        "Chicago",
+        "Houston",
+        "Phoenix",
+        "Philadelphia",
+        "San Antonio",
+        "San Diego",
+        "Dallas",
+        "Austin",
+        "Seattle",
+        "Denver",
+        "Boston",
+        "Nashville",
+        "Portland",
+        "Atlanta",
+        "Miami",
+        "Detroit",
+        "Minneapolis",
+        "Tampa",
+    ];
+    let statuses = ["Active", "Pending", "Inactive", "Active", "Pending"];
+    let categories = ["Sales", "Engineering", "Marketing", "Support", "Finance"];
+    let priorities = ["Low", "Medium", "High", "Critical", "Low"];
+    let notes = [
+        "Follow up",
+        "Review docs",
+        "NDA signed",
+        "Onboarded",
+        "Escalated",
+        "Resolved",
+        "Waiting",
+        "Approved",
+        "Blocked",
+        "In progress",
+        "Backlog",
+        "Sprint 4",
+        "Needs QA",
+        "Deployed",
+        "On hold",
+        "Trending",
+        "New lead",
+        "VIP client",
+        "Renewal",
+        "Archived",
+    ];
+    let id = (row as u64 + 1) * 1000;
+    match col {
+        0 => format!("{id}"),
+        1 => names[row % names.len()].to_string(),
+        2 => format!("{}@example.com", names[row % names.len()].to_lowercase()),
+        3 => cities[row % cities.len()].to_string(),
+        4 => statuses[row % statuses.len()].to_string(),
+        5 => format!("${:.2}", (row as f64 + 1.0) * 137.50),
+        6 => format!("2025-{:02}-{:02}", (row % 12) + 1, (row % 28) + 1),
+        7 => categories[row % categories.len()].to_string(),
+        8 => priorities[row % priorities.len()].to_string(),
+        9 => notes[row % notes.len()].to_string(),
+        _ => String::new(),
+    }
+}
+
+fn data_grid_header_label(col: usize) -> String {
+    format!(
+        "data_grid_header_{}",
+        DATA_GRID_COLUMN_NAMES[col].to_lowercase()
+    )
+}
+
+fn data_grid_cell_label(row: usize, col: usize) -> String {
+    format!(
+        "data_grid_cell_{}_{}",
+        (row as u64 + 1) * 1000,
+        DATA_GRID_COLUMN_NAMES[col].to_lowercase()
+    )
 }
 
 /// Font candidates tried in order. v1 accepts collections only when all loaded
@@ -1393,6 +1519,7 @@ enum Component {
     DataItem,
     ScrollArea,
     DataList,
+    DataGrid,
 }
 
 fn render_i18n_sample(
@@ -2752,6 +2879,28 @@ impl Component {
                     .compute(root, available, |_, _, _, _, _| Size::ZERO);
                 return;
             }
+            Self::DataGrid => {
+                let root = state.data_grid_node;
+                state.layout.set_style(
+                    root,
+                    Style {
+                        flex_shrink: 0.0,
+                        size: Size {
+                            width: length(600.0_f32),
+                            height: length(400.0_f32),
+                        },
+                        ..Default::default()
+                    },
+                );
+                let available = (
+                    Some(size.width as f32 / scale),
+                    Some(size.height as f32 / scale),
+                );
+                state
+                    .layout
+                    .compute(root, available, |_, _, _, _, _| Size::ZERO);
+                return;
+            }
         };
 
         state.layout.set_style(root, style);
@@ -2804,6 +2953,7 @@ impl Component {
             "data_item" => Some(Self::DataItem),
             "scroll_area" => Some(Self::ScrollArea),
             "data_list" => Some(Self::DataList),
+            "data_grid" => Some(Self::DataGrid),
             _ => None,
         }
     }
@@ -2847,6 +2997,7 @@ impl Component {
             "data_item",
             "scroll_area",
             "data_list",
+            "data_grid",
         ]
     }
 
@@ -3902,6 +4053,97 @@ impl Component {
 
                 data_list_end(&mut state.core);
             }
+            Self::DataGrid => {
+                let columns = data_grid_columns();
+                let row_keys = data_grid_row_keys();
+                let style = DataGridStyle::from_theme(&AKAR_THEME_DARK);
+
+                data_grid_handle_keyboard(
+                    &mut state.core,
+                    &state.layout,
+                    state.data_grid_node,
+                    &mut state.data_grid_state,
+                    DATA_GRID_ROW_COUNT,
+                    &row_keys,
+                    &columns,
+                    &style,
+                );
+
+                let resp = data_grid_begin(
+                    &mut state.core,
+                    &state.layout,
+                    state.data_grid_node,
+                    &mut state.data_grid_state,
+                    DATA_GRID_ROW_COUNT,
+                    &row_keys,
+                    0.0,
+                    0.0,
+                    &columns,
+                    &style,
+                );
+
+                data_grid_header_begin(&mut state.core, &resp, &style);
+                for col_i in resp.visible_columns.clone() {
+                    if col_i >= columns.len() {
+                        continue;
+                    }
+                    let sort = if state.data_grid_sorted_col == Some(col_i) {
+                        DataGridSortDirection::Ascending
+                    } else {
+                        DataGridSortDirection::None
+                    };
+                    let label = data_grid_header_label(col_i);
+                    let hdr_resp = data_grid_header_cell(
+                        &mut state.core,
+                        &state.layout,
+                        &resp,
+                        state.data_grid_node,
+                        col_i,
+                        &columns,
+                        &style,
+                        DATA_GRID_COLUMN_NAMES[col_i],
+                        sort,
+                    );
+                    let _ = hdr_resp;
+                    let _ = label;
+                }
+                data_grid_header_end(&mut state.core);
+
+                data_grid_body_begin(&mut state.core, &resp, &row_keys, &style, &[]);
+                for row_i in resp.visible_rows.clone() {
+                    if row_i >= DATA_GRID_ROW_COUNT {
+                        continue;
+                    }
+                    let row_key = row_keys[row_i];
+                    let is_selected = false;
+                    for col_i in resp.visible_columns.clone() {
+                        if col_i >= columns.len() {
+                            continue;
+                        }
+                        let text = data_grid_cell_text(row_i, col_i);
+                        let cell_resp = data_grid_cell(
+                            &mut state.core,
+                            &state.layout,
+                            &resp,
+                            state.data_grid_node,
+                            row_i,
+                            row_key,
+                            col_i,
+                            &columns,
+                            &style,
+                            &text,
+                            is_selected,
+                        );
+                        if cell_resp.clicked {
+                            state.data_grid_state.has_active_cell = true;
+                            state.data_grid_state.active_row_key = row_key;
+                            state.data_grid_state.active_column_key = columns[col_i].key;
+                        }
+                    }
+                }
+                data_grid_body_end(&mut state.core);
+                data_grid_end(&mut state.core);
+            }
         }
     }
 
@@ -3997,6 +4239,29 @@ impl Component {
             }
             Self::DataList => {
                 state.data_list_state.scroll_y = 0.0;
+            }
+            Self::DataGrid => {
+                state.data_grid_state = DataGridState::new();
+                state.data_grid_sorted_col = None;
+                match component_state {
+                    Some("scrolled") => {
+                        state.data_grid_state.scroll_y = 200.0;
+                    }
+                    Some("sorted") => {
+                        state.data_grid_sorted_col = Some(1);
+                    }
+                    Some("selected") => {
+                        state.data_grid_state.has_active_cell = true;
+                        state.data_grid_state.active_row_key = 3000;
+                        state.data_grid_state.active_column_key = 200;
+                    }
+                    Some("keyboard") => {
+                        state.data_grid_state.has_active_cell = true;
+                        state.data_grid_state.active_row_key = 2000;
+                        state.data_grid_state.active_column_key = 300;
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -4762,6 +5027,27 @@ impl ApplicationHandler for App {
             layout.register_label(&format!("data_list_item_{index}"), node);
         }
 
+        let data_grid_node = layout.new_leaf(Style::default());
+        layout.register_label("data_grid", data_grid_node);
+        let data_grid_header_nodes: [akar_layout::NodeId; DATA_GRID_COLUMN_COUNT] =
+            std::array::from_fn(|_| layout.new_leaf(Style::default()));
+        for (col_i, &node) in data_grid_header_nodes.iter().enumerate() {
+            layout.register_label(&data_grid_header_label(col_i), node);
+        }
+        let data_grid_cell_count = DATA_GRID_ROW_COUNT * DATA_GRID_COLUMN_COUNT;
+        let data_grid_cell_nodes: Vec<akar_layout::NodeId> = (0..data_grid_cell_count)
+            .map(|_| layout.new_leaf(Style::default()))
+            .collect();
+        for row_i in 0..DATA_GRID_ROW_COUNT {
+            for col_i in 0..DATA_GRID_COLUMN_COUNT {
+                let idx = row_i * DATA_GRID_COLUMN_COUNT + col_i;
+                layout.register_label(
+                    &data_grid_cell_label(row_i, col_i),
+                    data_grid_cell_nodes[idx],
+                );
+            }
+        }
+
         // Showcase parent-child relationships are fixed for the lifetime of the
         // demo and must be established once here (construct phase), never in
         // `prepare_isolated_layout` (paint/compute phase) — see DEVELOP.md's
@@ -5006,6 +5292,11 @@ impl ApplicationHandler for App {
             data_list_node,
             data_list_state: DataListState { scroll_y: 0.0 },
             data_list_item_nodes,
+            data_grid_node,
+            data_grid_state: DataGridState::new(),
+            data_grid_header_nodes,
+            data_grid_cell_nodes,
+            data_grid_sorted_col: None,
         });
 
         if let Some(state) = &self.state {

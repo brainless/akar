@@ -603,8 +603,8 @@ mod tests {
         let child_a = layout.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -612,8 +612,8 @@ mod tests {
         let child_b = layout.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -654,8 +654,8 @@ mod tests {
         let child_a = ltr.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -663,8 +663,8 @@ mod tests {
         let child_b = ltr.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -693,8 +693,8 @@ mod tests {
         let child_a = rtl.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -702,8 +702,8 @@ mod tests {
         let child_b = rtl.new_leaf(Style {
             display: Display::Flex,
             size: Size {
-                width: length(100.0),
-                height: length(50.0),
+                width: length(100.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -865,8 +865,8 @@ mod tests {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(50.0),
-                height: length(50.0),
+                width: length(50.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -874,8 +874,8 @@ mod tests {
             Style {
                 display: Display::Flex,
                 size: Size {
-                    width: length(200.0),
-                    height: length(200.0),
+                    width: length(200.0_f32),
+                    height: length(200.0_f32),
                 },
                 ..Default::default()
             },
@@ -894,8 +894,8 @@ mod tests {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(40.0),
-                height: length(20.0),
+                width: length(40.0_f32),
+                height: length(20.0_f32),
             },
             ..Default::default()
         });
@@ -914,8 +914,8 @@ mod tests {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(50.0),
-                height: length(50.0),
+                width: length(50.0_f32),
+                height: length(50.0_f32),
             },
             ..Default::default()
         });
@@ -939,8 +939,8 @@ mod tests {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(60.0),
-                height: length(60.0),
+                width: length(60.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -960,8 +960,8 @@ mod tests {
         let mut layout = Layout::new();
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(60.0),
-                height: length(60.0),
+                width: length(60.0_f32),
+                height: length(60.0_f32),
             },
             ..Default::default()
         });
@@ -991,8 +991,8 @@ mod tests {
 
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(40.0),
-                height: length(20.0),
+                width: length(40.0_f32),
+                height: length(20.0_f32),
             },
             ..Default::default()
         });
@@ -1012,8 +1012,8 @@ mod tests {
 
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(40.0),
-                height: length(20.0),
+                width: length(40.0_f32),
+                height: length(20.0_f32),
             },
             ..Default::default()
         });
@@ -1107,8 +1107,8 @@ mod tests {
 
         let child = layout.new_leaf(Style {
             size: Size {
-                width: length(40.0),
-                height: length(20.0),
+                width: length(40.0_f32),
+                height: length(20.0_f32),
             },
             ..Default::default()
         });
@@ -1132,8 +1132,8 @@ mod tests {
 
         let grandchild = layout.new_leaf(Style {
             size: Size {
-                width: length(20.0),
-                height: length(10.0),
+                width: length(20.0_f32),
+                height: length(10.0_f32),
             },
             ..Default::default()
         });
@@ -1141,14 +1141,14 @@ mod tests {
             Style {
                 display: Display::Flex,
                 size: Size {
-                    width: length(100.0),
-                    height: length(50.0),
+                    width: length(100.0_f32),
+                    height: length(50.0_f32),
                 },
                 padding: taffy::geometry::Rect {
-                    top: length(5.0),
-                    right: length(5.0),
-                    bottom: length(5.0),
-                    left: length(5.0),
+                    top: length(5.0_f32),
+                    right: length(5.0_f32),
+                    bottom: length(5.0_f32),
+                    left: length(5.0_f32),
                 },
                 ..Default::default()
             },

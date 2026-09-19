@@ -197,8 +197,8 @@ mod tests {
         let mut layout = Layout::new();
         let node_id = layout.new_leaf(Style {
             size: akar_layout::Size {
-                width: akar_layout::length(100.0),
-                height: akar_layout::length(40.0),
+                width: akar_layout::length(100.0_f32),
+                height: akar_layout::length(40.0_f32),
             },
             ..Default::default()
         });

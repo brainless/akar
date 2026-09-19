@@ -42,14 +42,14 @@ mod tests {
     #[test]
     fn contrast_color_dark_bg_returns_white() {
         assert_eq!(contrast_color(0x000000FF), 0xFFFFFFFF);
-        assert_eq!(contrast_color(0x1a1a2eFF), 0xFFFFFFFF);
+        assert_eq!(contrast_color(0x1A1A2EFF), 0xFFFFFFFF);
         assert_eq!(contrast_color(0x333333FF), 0xFFFFFFFF);
     }
 
     #[test]
     fn contrast_color_light_bg_returns_black() {
         assert_eq!(contrast_color(0xFFFFFFFF), 0x000000FF);
-        assert_eq!(contrast_color(0xf0f0f0FF), 0x000000FF);
+        assert_eq!(contrast_color(0xF0F0F0FF), 0x000000FF);
         assert_eq!(contrast_color(0xDDDDDDFF), 0x000000FF);
     }
 }

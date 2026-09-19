@@ -1,0 +1,6 @@
+# Hover over data grid then scroll down vertically
+hover @data_grid
+delay 0.1
+scroll 0 -200
+delay 0.1
+screenshot /tmp/akar-data-grid-scroll-vertical.png

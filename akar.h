@@ -210,6 +210,91 @@ typedef struct AkarDataListState {
     float scroll_y;
 } AkarDataListState;
 
+typedef struct AkarDataGridStyle {
+    uint32_t header_bg;
+    uint32_t header_text;
+    uint32_t row_bg;
+    uint32_t row_bg_alt;
+    uint32_t row_text;
+    uint32_t selected_row_bg;
+    uint32_t selected_row_text;
+    uint32_t active_cell_bg;
+    uint32_t active_cell_text;
+    uint32_t hover_bg;
+    uint32_t grid_line_color;
+    float grid_line_width;
+    float header_height;
+    float row_height;
+    float cell_padding_x;
+    float cell_padding_y;
+    float font_size;
+} AkarDataGridStyle;
+
+typedef struct AkarDataGridCellRef {
+    uint64_t row_key;
+    uint64_t column_key;
+    uint32_t row_index;
+    uint32_t column_index;
+} AkarDataGridCellRef;
+
+typedef struct AkarDataGridResponse {
+    float viewport_rect[4];
+    float header_rect[4];
+    float body_rect[4];
+    uint32_t visible_row_start;
+    uint32_t visible_row_end;
+    uint32_t visible_column_start;
+    uint32_t visible_column_end;
+    bool has_activated;
+    struct AkarDataGridCellRef activated;
+    bool has_header_clicked;
+    uint64_t header_clicked_column_key;
+    float row_height;
+    float scroll_x;
+    float total_content_width;
+    float total_content_height;
+    bool has_active_cell;
+    uint64_t active_row_key;
+} AkarDataGridResponse;
+
+typedef struct AkarDataGridState {
+    float scroll_x;
+    float scroll_y;
+    uint64_t active_row_key;
+    uint64_t active_column_key;
+    bool has_active_cell;
+} AkarDataGridState;
+
+typedef struct AkarDataGridColumn {
+    uint64_t key;
+    float width;
+    uint32_t align;
+} AkarDataGridColumn;
+
+typedef struct AkarDataGridHeaderResponse {
+    float rect[4];
+    uint64_t column_key;
+    bool hovered;
+    bool pressed;
+    bool clicked;
+} AkarDataGridHeaderResponse;
+
+typedef struct AkarDataGridCellResponse {
+    float rect[4];
+    uint64_t row_key;
+    uint64_t column_key;
+    uint32_t row_index;
+    uint32_t column_index;
+    bool hovered;
+    bool pressed;
+    bool clicked;
+} AkarDataGridCellResponse;
+
+typedef struct AkarDataGridKeyboardResponse {
+    bool activated;
+    bool cell_changed;
+} AkarDataGridKeyboardResponse;
+
 typedef struct AkarTextAreaResponse {
     bool changed;
     uint64_t widget_id;
@@ -333,6 +418,14 @@ typedef struct AkarDirection {
 typedef struct AkarHeadingLevel {
     uint32_t value;
 } AkarHeadingLevel;
+
+typedef struct AkarDataGridAlign {
+    uint32_t value;
+} AkarDataGridAlign;
+
+typedef struct AkarDataGridSortDirection {
+    uint32_t value;
+} AkarDataGridSortDirection;
 
 /**
  * Bundled fonts only; no system font scanning. Deterministic across machines
@@ -626,6 +719,72 @@ struct AkarDataListResponse akar_data_list_begin(struct AkarCtx *ctx,
                                                  uint32_t key_count);
 
 void akar_data_list_end(struct AkarCtx *ctx);
+
+void akar_data_grid_style_default(struct AkarCtx *ctx, struct AkarDataGridStyle *style_out);
+
+struct AkarDataGridResponse akar_data_grid_begin(struct AkarCtx *ctx,
+                                                 uint64_t node_id,
+                                                 struct AkarDataGridState *state,
+                                                 uint32_t row_count,
+                                                 const uint64_t *row_keys,
+                                                 uint32_t row_key_count,
+                                                 float row_height,
+                                                 float header_height,
+                                                 const struct AkarDataGridColumn *columns,
+                                                 uint32_t column_count,
+                                                 const struct AkarDataGridStyle *style);
+
+void akar_data_grid_header_begin(struct AkarCtx *ctx,
+                                 const struct AkarDataGridResponse *response,
+                                 const struct AkarDataGridColumn *columns,
+                                 uint32_t column_count,
+                                 const struct AkarDataGridStyle *style);
+
+struct AkarDataGridHeaderResponse akar_data_grid_header_cell(struct AkarCtx *ctx,
+                                                             uint64_t node_id,
+                                                             const struct AkarDataGridResponse *response,
+                                                             uint32_t column_index,
+                                                             const struct AkarDataGridColumn *columns,
+                                                             uint32_t column_count,
+                                                             const char *label,
+                                                             uint32_t sort);
+
+void akar_data_grid_header_end(struct AkarCtx *ctx);
+
+void akar_data_grid_body_begin(struct AkarCtx *ctx,
+                               const struct AkarDataGridResponse *response,
+                               const uint64_t *row_keys,
+                               uint32_t row_key_count,
+                               const struct AkarDataGridColumn *columns,
+                               uint32_t column_count,
+                               const struct AkarDataGridStyle *style,
+                               const uint64_t *selected_rows,
+                               uint32_t selected_row_count);
+
+struct AkarDataGridCellResponse akar_data_grid_cell(struct AkarCtx *ctx,
+                                                    uint64_t node_id,
+                                                    const struct AkarDataGridResponse *response,
+                                                    uint32_t row_index,
+                                                    uint64_t row_key,
+                                                    uint32_t column_index,
+                                                    const struct AkarDataGridColumn *columns,
+                                                    uint32_t column_count,
+                                                    const char *text,
+                                                    bool selected_row);
+
+void akar_data_grid_body_end(struct AkarCtx *ctx);
+
+void akar_data_grid_end(struct AkarCtx *ctx);
+
+struct AkarDataGridKeyboardResponse akar_data_grid_handle_keyboard(struct AkarCtx *ctx,
+                                                                   uint64_t node_id,
+                                                                   struct AkarDataGridState *state,
+                                                                   uint32_t row_count,
+                                                                   const uint64_t *row_keys,
+                                                                   uint32_t row_key_count,
+                                                                   const struct AkarDataGridColumn *columns,
+                                                                   uint32_t column_count,
+                                                                   const struct AkarDataGridStyle *style);
 
 /**
  * Edits a caller-owned multiline UTF-8 buffer.

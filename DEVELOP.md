@@ -191,6 +191,36 @@ Widget identity inside a virtualized list is keyed, not positional (ADR-016a). I
 
 Canvas summary items (`canvas_data_item`) are display-only. They render world-space backgrounds and textual fields through `CanvasPainter` with group-level hover/press/click via `CanvasInput`. They create no layout nodes, focusable widgets, text-buffer IDs, or child hit targets. Use portal mode (`canvas_portal_begin/end`) for interactive components inside a canvas.
 
+### Data grid
+
+The data grid is a virtualized, immediate-mode tabular component. It is **not** a Taffy CSS Grid layout node — Taffy's CSS Grid support is a layout facility that resolves a tree of flex/grid nodes to pixel rects. The data grid is a single layout node whose internal cell geometry is computed arithmetically from fixed row height, caller-sized column widths, and two-axis scroll offsets. It never creates one Taffy node per logical cell.
+
+The data grid builds on `data_list` but adds columns, a sticky header, horizontal scroll, cell semantics, stable keyed identity, and keyboard navigation. `data_list` remains the right choice for single-axis, fixed-height virtualized lists without column structure.
+
+**Ownership boundary:**
+
+- The application owns records, stable row keys, column descriptors, sorting, filtering, selection, and persistence.
+- akar owns grid geometry, virtualization, clipping, drawing, input hit-testing, focus/navigation state, and typed interaction responses.
+
+**Lifecycle:**
+
+```
+data_grid_begin
+  -> data_grid_header_begin
+     -> data_grid_header_cell*
+  -> data_grid_header_end
+  -> data_grid_body_begin
+     -> data_grid_cell*
+  -> data_grid_body_end
+data_grid_end
+```
+
+**Virtualization:** Fixed row height, caller-sized column widths, sticky header that scrolls horizontally with the body, and two-axis scroll. `visible_row_range` and `visible_column_range` return only the visible + overscan ranges. A 100,000-row x 100-column grid produces ~1,000 draw calls per frame, not 10 million.
+
+**Stable identity:** Text-buffer and widget identity for cells is composed from `(grid_namespace, row_key, column_key)`, not the visible screen slot. Scrolling a new record into an old screen position cannot reuse the previous record's text buffer or focus state. Header identity uses a separate domain offset to avoid collision with body cells.
+
+**Deferred beyond MVP:** Inline cell editing, custom/variable-height rows, column resize/reorder/pinning, multi-row selection, clipboard, accessibility.
+
 ### What akar does NOT own
 
 - The window and swap chain — developer provides these.

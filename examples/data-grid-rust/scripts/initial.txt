@@ -1,0 +1,3 @@
+# Initial grid state — idle capture
+delay 0.5
+screenshot /tmp/data-grid-initial.png

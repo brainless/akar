@@ -1,0 +1,6 @@
+# Hover over data grid then scroll right horizontally
+hover @data_grid
+delay 0.1
+scroll -200 0
+delay 0.1
+screenshot /tmp/akar-data-grid-scroll-horizontal.png

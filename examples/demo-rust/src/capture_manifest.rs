@@ -1085,6 +1085,62 @@ pub static MANIFEST: &[CaptureEntry] = &[
         is_website_card: false,
         is_regression: false,
     },
+    // --- Data grid state captures ---
+    CaptureEntry {
+        family: "data_grid",
+        component: "data_grid",
+        variant: None,
+        state: "default",
+        script: None,
+        labels: &["data_grid"],
+        filename: "akar-data-grid.png",
+        is_website_card: true,
+        is_regression: false,
+    },
+    CaptureEntry {
+        family: "data_grid",
+        component: "data_grid",
+        variant: None,
+        state: "scrolled",
+        script: Some("data_grid_scroll_vertical.txt"),
+        labels: &["data_grid"],
+        filename: "akar-data-grid-scrolled.png",
+        is_website_card: false,
+        is_regression: false,
+    },
+    CaptureEntry {
+        family: "data_grid",
+        component: "data_grid",
+        variant: None,
+        state: "sorted",
+        script: Some("data_grid_sort.txt"),
+        labels: &["data_grid", "data_grid_header_name"],
+        filename: "akar-data-grid-sorted.png",
+        is_website_card: false,
+        is_regression: false,
+    },
+    CaptureEntry {
+        family: "data_grid",
+        component: "data_grid",
+        variant: None,
+        state: "selected",
+        script: Some("data_grid_select.txt"),
+        labels: &["data_grid", "data_grid_cell_3000_status"],
+        filename: "akar-data-grid-selected.png",
+        is_website_card: false,
+        is_regression: false,
+    },
+    CaptureEntry {
+        family: "data_grid",
+        component: "data_grid",
+        variant: None,
+        state: "keyboard",
+        script: Some("data_grid_keyboard.txt"),
+        labels: &["data_grid", "data_grid_cell_2000_email"],
+        filename: "akar-data-grid-keyboard.png",
+        is_website_card: false,
+        is_regression: false,
+    },
     // --- Retained composite images ---
     CaptureEntry {
         family: "form",
@@ -1169,7 +1225,7 @@ mod tests {
 
     #[test]
     fn manifest_has_expected_entry_count() {
-        assert_eq!(MANIFEST.len(), 100);
+        assert_eq!(MANIFEST.len(), 105);
     }
 
     #[test]
@@ -1215,8 +1271,8 @@ mod tests {
     }
 
     #[test]
-    fn website_card_count_is_33() {
-        assert_eq!(website_card_count(), 33);
+    fn website_card_count_is_34() {
+        assert_eq!(website_card_count(), 34);
     }
 
     #[test]

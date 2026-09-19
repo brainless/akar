@@ -1,0 +1,6 @@
+# Click a cell then move with arrow keys
+click @data_grid_cell_2000_email
+delay 0.1
+key Right
+delay 0.1
+screenshot /tmp/akar-data-grid-keyboard.png

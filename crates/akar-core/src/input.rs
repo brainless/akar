@@ -12,6 +12,8 @@ pub enum Key {
     Down,
     Home,
     End,
+    PageUp,
+    PageDown,
     Enter,
     Escape,
     Tab,
@@ -321,7 +323,7 @@ mod tests {
             repeat: false,
         });
         input.modifiers = Modifiers::default();
-        assert_eq!(input.key_events[0].modifiers.control, true);
+        assert!(input.key_events[0].modifiers.control);
         assert!(!input.modifiers.control);
         input.begin_frame();
         assert!(input.key_events.is_empty());

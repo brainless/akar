@@ -1,0 +1,4 @@
+# Click Name column header to sort ascending
+click 150 18
+delay 0.5
+screenshot /tmp/data-grid-sorted.png

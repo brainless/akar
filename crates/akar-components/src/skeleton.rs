@@ -72,8 +72,8 @@ mod tests {
         let mut layout = Layout::new();
         let node_id = layout.new_leaf(Style {
             size: akar_layout::Size {
-                width: akar_layout::length(200.0),
-                height: akar_layout::length(20.0),
+                width: akar_layout::length(200.0_f32),
+                height: akar_layout::length(20.0_f32),
             },
             ..Default::default()
         });
@@ -100,8 +100,8 @@ mod tests {
         let mut layout = Layout::new();
         let node_id = layout.new_leaf(Style {
             size: akar_layout::Size {
-                width: akar_layout::length(48.0),
-                height: akar_layout::length(48.0),
+                width: akar_layout::length(48.0_f32),
+                height: akar_layout::length(48.0_f32),
             },
             ..Default::default()
         });

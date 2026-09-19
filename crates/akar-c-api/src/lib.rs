@@ -3,7 +3,9 @@
 use std::ffi::{c_char, c_void};
 use std::ptr;
 
-use akar_components::{AkarTheme, ButtonVariant, AKAR_THEME_DARK};
+use akar_components::{
+    AkarTheme, ButtonVariant, DataGridAlign, DataGridSortDirection, AKAR_THEME_DARK,
+};
 use akar_core::{
     AkarCore, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
     TextPipelineConfig,
@@ -2128,6 +2130,624 @@ pub unsafe extern "C" fn akar_data_list_begin(
 pub unsafe extern "C" fn akar_data_list_end(ctx: *mut AkarCtx) {
     let ctx = unsafe { &mut *ctx };
     akar_components::data_list_end(&mut ctx.core);
+}
+
+// ---- Data Grid ----
+
+#[repr(C)]
+pub struct AkarDataGridAlign {
+    pub value: u32,
+}
+
+#[repr(C)]
+pub struct AkarDataGridSortDirection {
+    pub value: u32,
+}
+
+#[repr(C)]
+pub struct AkarDataGridColumn {
+    pub key: u64,
+    pub width: f32,
+    pub align: u32,
+}
+
+#[repr(C)]
+pub struct AkarDataGridStyle {
+    pub header_bg: u32,
+    pub header_text: u32,
+    pub row_bg: u32,
+    pub row_bg_alt: u32,
+    pub row_text: u32,
+    pub selected_row_bg: u32,
+    pub selected_row_text: u32,
+    pub active_cell_bg: u32,
+    pub active_cell_text: u32,
+    pub hover_bg: u32,
+    pub grid_line_color: u32,
+    pub grid_line_width: f32,
+    pub header_height: f32,
+    pub row_height: f32,
+    pub cell_padding_x: f32,
+    pub cell_padding_y: f32,
+    pub font_size: f32,
+}
+
+#[repr(C)]
+pub struct AkarDataGridState {
+    pub scroll_x: f32,
+    pub scroll_y: f32,
+    pub active_row_key: u64,
+    pub active_column_key: u64,
+    pub has_active_cell: bool,
+}
+
+#[repr(C)]
+pub struct AkarDataGridCellRef {
+    pub row_key: u64,
+    pub column_key: u64,
+    pub row_index: u32,
+    pub column_index: u32,
+}
+
+#[repr(C)]
+pub struct AkarDataGridResponse {
+    pub viewport_rect: [f32; 4],
+    pub header_rect: [f32; 4],
+    pub body_rect: [f32; 4],
+    pub visible_row_start: u32,
+    pub visible_row_end: u32,
+    pub visible_column_start: u32,
+    pub visible_column_end: u32,
+    pub has_activated: bool,
+    pub activated: AkarDataGridCellRef,
+    pub has_header_clicked: bool,
+    pub header_clicked_column_key: u64,
+    pub row_height: f32,
+    pub scroll_x: f32,
+    pub total_content_width: f32,
+    pub total_content_height: f32,
+    pub has_active_cell: bool,
+    pub active_row_key: u64,
+}
+
+#[repr(C)]
+pub struct AkarDataGridHeaderResponse {
+    pub rect: [f32; 4],
+    pub column_key: u64,
+    pub hovered: bool,
+    pub pressed: bool,
+    pub clicked: bool,
+}
+
+#[repr(C)]
+pub struct AkarDataGridCellResponse {
+    pub rect: [f32; 4],
+    pub row_key: u64,
+    pub column_key: u64,
+    pub row_index: u32,
+    pub column_index: u32,
+    pub hovered: bool,
+    pub pressed: bool,
+    pub clicked: bool,
+}
+
+#[repr(C)]
+pub struct AkarDataGridKeyboardResponse {
+    pub activated: bool,
+    pub cell_changed: bool,
+}
+
+fn c_grid_align_to_rust(value: u32) -> DataGridAlign {
+    match value {
+        1 => DataGridAlign::Center,
+        2 => DataGridAlign::Right,
+        _ => DataGridAlign::Left,
+    }
+}
+
+fn c_grid_sort_to_rust(value: u32) -> DataGridSortDirection {
+    match value {
+        1 => DataGridSortDirection::Ascending,
+        2 => DataGridSortDirection::Descending,
+        _ => DataGridSortDirection::None,
+    }
+}
+
+unsafe fn c_columns_to_rust(
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+) -> Vec<akar_components::DataGridColumn> {
+    if columns.is_null() || column_count == 0 {
+        return Vec::new();
+    }
+    let mut result = Vec::with_capacity(column_count as usize);
+    for i in 0..column_count as usize {
+        let c = unsafe { &*columns.add(i) };
+        result.push(akar_components::DataGridColumn {
+            key: c.key,
+            width: c.width,
+            align: c_grid_align_to_rust(c.align),
+        });
+    }
+    result
+}
+
+fn empty_grid_response() -> AkarDataGridResponse {
+    AkarDataGridResponse {
+        viewport_rect: [0.0; 4],
+        header_rect: [0.0; 4],
+        body_rect: [0.0; 4],
+        visible_row_start: 0,
+        visible_row_end: 0,
+        visible_column_start: 0,
+        visible_column_end: 0,
+        has_activated: false,
+        activated: AkarDataGridCellRef {
+            row_key: 0,
+            column_key: 0,
+            row_index: 0,
+            column_index: 0,
+        },
+        has_header_clicked: false,
+        header_clicked_column_key: 0,
+        row_height: 0.0,
+        scroll_x: 0.0,
+        total_content_width: 0.0,
+        total_content_height: 0.0,
+        has_active_cell: false,
+        active_row_key: 0,
+    }
+}
+
+fn empty_header_response() -> AkarDataGridHeaderResponse {
+    AkarDataGridHeaderResponse {
+        rect: [0.0; 4],
+        column_key: 0,
+        hovered: false,
+        pressed: false,
+        clicked: false,
+    }
+}
+
+fn empty_cell_response() -> AkarDataGridCellResponse {
+    AkarDataGridCellResponse {
+        rect: [0.0; 4],
+        row_key: 0,
+        column_key: 0,
+        row_index: 0,
+        column_index: 0,
+        hovered: false,
+        pressed: false,
+        clicked: false,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_style_default(
+    ctx: *mut AkarCtx,
+    style_out: *mut AkarDataGridStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if style_out.is_null() {
+        return;
+    }
+    let s = akar_components::DataGridStyle::from_theme(&ctx.theme);
+    let out = unsafe { &mut *style_out };
+    out.header_bg = s.header_bg;
+    out.header_text = s.header_text;
+    out.row_bg = s.row_bg;
+    out.row_bg_alt = s.row_bg_alt;
+    out.row_text = s.row_text;
+    out.selected_row_bg = s.selected_row_bg;
+    out.selected_row_text = s.selected_row_text;
+    out.active_cell_bg = s.active_cell_bg;
+    out.active_cell_text = s.active_cell_text;
+    out.hover_bg = s.hover_bg;
+    out.grid_line_color = s.grid_line_color;
+    out.grid_line_width = s.grid_line_width;
+    out.header_height = s.header_height;
+    out.row_height = s.row_height;
+    out.cell_padding_x = s.cell_padding_x;
+    out.cell_padding_y = s.cell_padding_y;
+    out.font_size = s.font_size;
+}
+
+fn c_style_to_rust(s: &AkarDataGridStyle) -> akar_components::DataGridStyle {
+    akar_components::DataGridStyle {
+        header_bg: s.header_bg,
+        header_text: s.header_text,
+        row_bg: s.row_bg,
+        row_bg_alt: s.row_bg_alt,
+        row_text: s.row_text,
+        selected_row_bg: s.selected_row_bg,
+        selected_row_text: s.selected_row_text,
+        active_cell_bg: s.active_cell_bg,
+        active_cell_text: s.active_cell_text,
+        hover_bg: s.hover_bg,
+        grid_line_color: s.grid_line_color,
+        grid_line_width: s.grid_line_width,
+        header_height: s.header_height,
+        row_height: s.row_height,
+        cell_padding_x: s.cell_padding_x,
+        cell_padding_y: s.cell_padding_y,
+        font_size: s.font_size,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_begin(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    state: *mut AkarDataGridState,
+    row_count: u32,
+    row_keys: *const u64,
+    row_key_count: u32,
+    row_height: f32,
+    header_height: f32,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    style: *const AkarDataGridStyle,
+) -> AkarDataGridResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return empty_grid_response();
+    };
+    if state.is_null() || style.is_null() {
+        return empty_grid_response();
+    }
+    let ffi_state = unsafe { &mut *state };
+    let mut rust_state = akar_components::DataGridState {
+        scroll_x: ffi_state.scroll_x,
+        scroll_y: ffi_state.scroll_y,
+        active_row_key: ffi_state.active_row_key,
+        active_column_key: ffi_state.active_column_key,
+        has_active_cell: ffi_state.has_active_cell,
+    };
+    let keys_slice = if row_keys.is_null() || row_key_count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(row_keys, row_key_count as usize) }
+    };
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let rust_style = c_style_to_rust(unsafe { &*style });
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::data_grid_begin(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &mut rust_state,
+        row_count as usize,
+        keys_slice,
+        row_height,
+        header_height,
+        &rust_columns,
+        &rust_style,
+    );
+    ffi_state.scroll_x = rust_state.scroll_x;
+    ffi_state.scroll_y = rust_state.scroll_y;
+    ffi_state.active_row_key = rust_state.active_row_key;
+    ffi_state.active_column_key = rust_state.active_column_key;
+    ffi_state.has_active_cell = rust_state.has_active_cell;
+    let activated = result.activated.map(|a| AkarDataGridCellRef {
+        row_key: a.row_key,
+        column_key: a.column_key,
+        row_index: a.row_index as u32,
+        column_index: a.column_index as u32,
+    });
+    let activated = activated.unwrap_or(AkarDataGridCellRef {
+        row_key: 0,
+        column_key: 0,
+        row_index: 0,
+        column_index: 0,
+    });
+    AkarDataGridResponse {
+        viewport_rect: result.viewport_rect,
+        header_rect: result.header_rect,
+        body_rect: result.body_rect,
+        visible_row_start: result.visible_rows.start as u32,
+        visible_row_end: result.visible_rows.end as u32,
+        visible_column_start: result.visible_columns.start as u32,
+        visible_column_end: result.visible_columns.end as u32,
+        has_activated: result.activated.is_some(),
+        activated,
+        has_header_clicked: result.header_clicked.is_some(),
+        header_clicked_column_key: result.header_clicked.unwrap_or(0),
+        row_height: result.row_height,
+        scroll_x: result.scroll_x,
+        total_content_width: result.total_content_width,
+        total_content_height: result.total_content_height,
+        has_active_cell: result.has_active_cell,
+        active_row_key: result.active_row_key,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_header_begin(
+    ctx: *mut AkarCtx,
+    response: *const AkarDataGridResponse,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    style: *const AkarDataGridStyle,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if response.is_null() || style.is_null() {
+        return;
+    }
+    let resp = unsafe { &*response };
+    let rust_style = c_style_to_rust(unsafe { &*style });
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let rust_resp = response_from_ffi(resp, &rust_columns);
+    akar_components::data_grid_header_begin(&mut ctx.core, &rust_resp, &rust_style);
+}
+
+fn response_from_ffi(
+    resp: &AkarDataGridResponse,
+    columns: &[akar_components::DataGridColumn],
+) -> akar_components::DataGridResponse {
+    let mut offsets = Vec::with_capacity(columns.len() + 1);
+    offsets.push(0.0);
+    for col in columns {
+        let w = if col.width.is_finite() && col.width > 0.0 {
+            col.width
+        } else {
+            0.0
+        };
+        let prev = *offsets.last().unwrap();
+        offsets.push(prev + w);
+    }
+    akar_components::DataGridResponse {
+        viewport_rect: resp.viewport_rect,
+        header_rect: resp.header_rect,
+        body_rect: resp.body_rect,
+        visible_rows: resp.visible_row_start as usize..resp.visible_row_end as usize,
+        visible_columns: resp.visible_column_start as usize..resp.visible_column_end as usize,
+        activated: if resp.has_activated {
+            Some(akar_components::DataGridCellRef {
+                row_key: resp.activated.row_key,
+                column_key: resp.activated.column_key,
+                row_index: resp.activated.row_index as usize,
+                column_index: resp.activated.column_index as usize,
+            })
+        } else {
+            None
+        },
+        header_clicked: if resp.has_header_clicked {
+            Some(resp.header_clicked_column_key)
+        } else {
+            None
+        },
+        row_height: resp.row_height,
+        scroll_x: resp.scroll_x,
+        total_content_width: resp.total_content_width,
+        total_content_height: resp.total_content_height,
+        has_active_cell: resp.has_active_cell,
+        active_row_key: resp.active_row_key,
+        column_offsets: offsets,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_header_cell(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    response: *const AkarDataGridResponse,
+    column_index: u32,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    label: *const c_char,
+    sort: u32,
+) -> AkarDataGridHeaderResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return empty_header_response();
+    };
+    if response.is_null() || columns.is_null() || column_count == 0 || label.is_null() {
+        return empty_header_response();
+    }
+    let resp = unsafe { &*response };
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let label_str = unsafe { std::ffi::CStr::from_ptr(label) }
+        .to_str()
+        .unwrap_or("");
+    let rust_resp = response_from_ffi(resp, &rust_columns);
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::data_grid_header_cell(
+        &mut ctx.core,
+        &ctx.layout,
+        &rust_resp,
+        nid,
+        column_index as usize,
+        &rust_columns,
+        &akar_components::DataGridStyle::from_theme(&ctx.theme),
+        label_str,
+        c_grid_sort_to_rust(sort),
+    );
+    AkarDataGridHeaderResponse {
+        rect: result.rect,
+        column_key: result.column_key,
+        hovered: result.hovered,
+        pressed: result.pressed,
+        clicked: result.clicked,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_header_end(ctx: *mut AkarCtx) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    akar_components::data_grid_header_end(&mut ctx.core);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_body_begin(
+    ctx: *mut AkarCtx,
+    response: *const AkarDataGridResponse,
+    row_keys: *const u64,
+    row_key_count: u32,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    style: *const AkarDataGridStyle,
+    selected_rows: *const u64,
+    selected_row_count: u32,
+) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    if response.is_null() || style.is_null() {
+        return;
+    }
+    let resp = unsafe { &*response };
+    let rust_style = c_style_to_rust(unsafe { &*style });
+    let keys_slice = if row_keys.is_null() || row_key_count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(row_keys, row_key_count as usize) }
+    };
+    let selected_slice = if selected_rows.is_null() || selected_row_count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(selected_rows, selected_row_count as usize) }
+    };
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let rust_resp = response_from_ffi(resp, &rust_columns);
+    akar_components::data_grid_body_begin(
+        &mut ctx.core,
+        &rust_resp,
+        keys_slice,
+        &rust_style,
+        selected_slice,
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_cell(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    response: *const AkarDataGridResponse,
+    row_index: u32,
+    row_key: u64,
+    column_index: u32,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    text: *const c_char,
+    selected_row: bool,
+) -> AkarDataGridCellResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return empty_cell_response();
+    };
+    if response.is_null() || columns.is_null() || column_count == 0 || text.is_null() {
+        return empty_cell_response();
+    }
+    let resp = unsafe { &*response };
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let text_str = unsafe { std::ffi::CStr::from_ptr(text) }
+        .to_str()
+        .unwrap_or("");
+    let rust_resp = response_from_ffi(resp, &rust_columns);
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::data_grid_cell(
+        &mut ctx.core,
+        &ctx.layout,
+        &rust_resp,
+        nid,
+        row_index as usize,
+        row_key,
+        column_index as usize,
+        &rust_columns,
+        &akar_components::DataGridStyle::from_theme(&ctx.theme),
+        text_str,
+        selected_row,
+    );
+    AkarDataGridCellResponse {
+        rect: result.rect,
+        row_key: result.row_key,
+        column_key: result.column_key,
+        row_index: result.row_index as u32,
+        column_index: result.column_index as u32,
+        hovered: result.hovered,
+        pressed: result.pressed,
+        clicked: result.clicked,
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_body_end(ctx: *mut AkarCtx) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    akar_components::data_grid_body_end(&mut ctx.core);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_end(ctx: *mut AkarCtx) {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return;
+    };
+    akar_components::data_grid_end(&mut ctx.core);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_data_grid_handle_keyboard(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    state: *mut AkarDataGridState,
+    row_count: u32,
+    row_keys: *const u64,
+    row_key_count: u32,
+    columns: *const AkarDataGridColumn,
+    column_count: u32,
+    style: *const AkarDataGridStyle,
+) -> AkarDataGridKeyboardResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarDataGridKeyboardResponse {
+            activated: false,
+            cell_changed: false,
+        };
+    };
+    if state.is_null() || style.is_null() {
+        return AkarDataGridKeyboardResponse {
+            activated: false,
+            cell_changed: false,
+        };
+    }
+    let ffi_state = unsafe { &mut *state };
+    let mut rust_state = akar_components::DataGridState {
+        scroll_x: ffi_state.scroll_x,
+        scroll_y: ffi_state.scroll_y,
+        active_row_key: ffi_state.active_row_key,
+        active_column_key: ffi_state.active_column_key,
+        has_active_cell: ffi_state.has_active_cell,
+    };
+    let keys_slice = if row_keys.is_null() || row_key_count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(row_keys, row_key_count as usize) }
+    };
+    let rust_columns = unsafe { c_columns_to_rust(columns, column_count) };
+    let rust_style = c_style_to_rust(unsafe { &*style });
+    let nid: akar_layout::NodeId = node_id.into();
+    let result = akar_components::data_grid_handle_keyboard(
+        &mut ctx.core,
+        &ctx.layout,
+        nid,
+        &mut rust_state,
+        row_count as usize,
+        keys_slice,
+        &rust_columns,
+        &rust_style,
+    );
+    ffi_state.scroll_x = rust_state.scroll_x;
+    ffi_state.scroll_y = rust_state.scroll_y;
+    ffi_state.active_row_key = rust_state.active_row_key;
+    ffi_state.active_column_key = rust_state.active_column_key;
+    ffi_state.has_active_cell = rust_state.has_active_cell;
+    AkarDataGridKeyboardResponse {
+        activated: result.activated,
+        cell_changed: result.cell_changed,
+    }
 }
 
 #[no_mangle]
