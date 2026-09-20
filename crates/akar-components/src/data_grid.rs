@@ -163,6 +163,7 @@ pub struct DataGridResponse {
     pub header_clicked: Option<u64>,
     pub row_height: f32,
     pub scroll_x: f32,
+    pub scroll_y: f32,
     pub total_content_width: f32,
     pub total_content_height: f32,
     pub has_active_cell: bool,
@@ -417,6 +418,7 @@ pub fn data_grid_begin(
         header_clicked: None,
         row_height,
         scroll_x: state.scroll_x,
+        scroll_y: state.scroll_y,
         total_content_width: col_layout.total_width,
         total_content_height: content_height,
         has_active_cell: state.has_active_cell,
@@ -592,7 +594,7 @@ pub fn data_grid_body_begin(
     };
 
     for row_i in response.visible_rows.clone() {
-        let row_y = by + (row_i as f32) * response.row_height;
+        let row_y = by + (row_i as f32) * response.row_height - response.scroll_y;
         let row_bg = if row_i % 2 == 0 {
             style.row_bg
         } else {
@@ -637,14 +639,14 @@ pub fn data_grid_body_begin(
     if response.visible_rows.start < response.visible_rows.end {
         let last_vis = response.visible_rows.end as f32;
         let content_top = by;
-        let content_bottom = by + last_vis * response.row_height;
+        let content_bottom = by + last_vis * response.row_height - response.scroll_y;
         let glh = glw.max(1.0);
 
         for row_i in response.visible_rows.clone() {
             if row_i == 0 {
                 continue;
             }
-            let line_y = by + (row_i as f32) * response.row_height - glh * 0.5;
+            let line_y = by + (row_i as f32) * response.row_height - response.scroll_y - glh * 0.5;
             core.draw_list.push_quad(QuadCall {
                 rect: [bx, line_y, bw, glh],
                 fill: grid_line,
@@ -690,7 +692,7 @@ pub fn data_grid_body_begin(
         if (style.active_cell_text != 0 || style.active_cell_bg != 0) && response.has_active_cell {
             if let Some(active_idx) = find_active_row_index(row_keys, response.active_row_key) {
                 if response.visible_rows.contains(&active_idx) {
-                    let row_y = by + (active_idx as f32) * response.row_height;
+                    let row_y = by + (active_idx as f32) * response.row_height - response.scroll_y;
                     core.draw_list.push_quad(QuadCall {
                         rect: [bx, row_y, bw, response.row_height],
                         fill: color_to_f32(style.active_cell_bg),
@@ -751,7 +753,7 @@ pub fn data_grid_cell(
     let [vx, _, _, _] = response.viewport_rect;
     let [_, body_y, _, _] = response.body_rect;
     let row_height = response.row_height;
-    let cell_y = body_y + (row_index as f32) * row_height;
+    let cell_y = body_y + (row_index as f32) * row_height - response.scroll_y;
     let col = &columns[column_index];
     let col_x = vx + response.column_offsets[column_index] - response.scroll_x;
     let col_w = normalize_width(col.width);
@@ -1589,6 +1591,32 @@ mod tests {
 
         data_grid_end(&mut core);
         assert!(core.draw_list.active_scissor().is_none());
+    }
+
+    #[test]
+    fn scrolled_body_rows_use_viewport_coordinates() {
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+        let (layout, node) = make_grid_layout(400.0, 300.0);
+        let mut state = DataGridState {
+            scroll_y: 64.0,
+            ..DataGridState::new()
+        };
+        let columns = make_columns(&[100.0; 3]);
+        let keys = make_row_keys(20);
+        let style = default_style();
+
+        let response = data_grid_begin(
+            &mut core, &layout, node, &mut state, 20, &keys, 32.0, 36.0, &columns, &style,
+        );
+        data_grid_body_begin(&mut core, &response, &keys, &style, &[]);
+        let cell = data_grid_cell(
+            &mut core, &layout, &response, node, 2, keys[2], 0, &columns, &style, "row 2", false,
+        );
+        data_grid_body_end(&mut core);
+        data_grid_end(&mut core);
+
+        assert_eq!(cell.rect, [0.0, 36.0, 100.0, 32.0]);
     }
 
     // -- Non-finite dimensions --

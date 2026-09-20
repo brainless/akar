@@ -251,6 +251,7 @@ typedef struct AkarDataGridResponse {
     uint64_t header_clicked_column_key;
     float row_height;
     float scroll_x;
+    float scroll_y;
     float total_content_width;
     float total_content_height;
     bool has_active_cell;
