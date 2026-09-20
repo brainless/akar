@@ -32,32 +32,30 @@ const DEFAULT_SEED: u64 = 42;
 
 struct Record {
     original_index: usize,
+    amount: f64,
     cells: [String; 8],
-    sort_keys: [SortKey; 8],
 }
 
-#[derive(Clone)]
-enum SortKey {
-    U64(u64),
-    F64(f64),
-    Str(String),
-}
-
-impl SortKey {
-    fn cmp(&self, other: &SortKey, ascending: bool) -> std::cmp::Ordering {
-        let ord = match (self, other) {
-            (SortKey::U64(a), SortKey::U64(b)) => a.cmp(b),
-            (SortKey::F64(a), SortKey::F64(b)) => {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (SortKey::Str(a), SortKey::Str(b)) => a.cmp(b),
-            _ => std::cmp::Ordering::Equal,
-        };
-        if ascending {
-            ord
-        } else {
-            ord.reverse()
-        }
+fn compare_records(a: &Record, b: &Record, column: usize, ascending: bool) -> std::cmp::Ordering {
+    let ordering = match column {
+        0 => a.original_index.cmp(&b.original_index),
+        6 => a
+            .amount
+            .partial_cmp(&b.amount)
+            .unwrap_or(std::cmp::Ordering::Equal),
+        _ => a.cells[column]
+            .bytes()
+            .map(|byte| byte.to_ascii_lowercase())
+            .cmp(
+                b.cells[column]
+                    .bytes()
+                    .map(|byte| byte.to_ascii_lowercase()),
+            ),
+    };
+    if ascending {
+        ordering
+    } else {
+        ordering.reverse()
     }
 }
 
@@ -108,30 +106,19 @@ fn generate_records(count: usize, seed: u64) -> Vec<Record> {
 
         let cells = [
             format!("{id}"),
-            name.clone(),
-            email.clone(),
-            company.clone(),
-            city.clone(),
+            name,
+            email,
+            company,
+            city,
             status.to_string(),
             format!("${amount:.2}"),
             created,
         ];
 
-        let sort_keys = [
-            SortKey::U64(id),
-            SortKey::Str(name.to_lowercase()),
-            SortKey::Str(email.to_lowercase()),
-            SortKey::Str(company.to_lowercase()),
-            SortKey::Str(city.to_lowercase()),
-            SortKey::Str(status.to_lowercase()),
-            SortKey::F64(amount),
-            SortKey::Str(format!("2025-{month:02}-{day:02}")),
-        ];
-
         records.push(Record {
             original_index: i,
+            amount,
             cells,
-            sort_keys,
         });
     }
 
@@ -498,8 +485,10 @@ impl ApplicationHandler for App {
                         if state.sort_dir != DataGridSortDirection::None {
                             let col = state.sort_col.unwrap();
                             state.records.sort_by(|a, b| {
-                                a.sort_keys[col].cmp(
-                                    &b.sort_keys[col],
+                                compare_records(
+                                    a,
+                                    b,
+                                    col,
                                     state.sort_dir == DataGridSortDirection::Ascending,
                                 )
                             });
@@ -703,5 +692,41 @@ impl ApplicationHandler for App {
         } else {
             state.window.request_redraw();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(original_index: usize, amount: f64, name: &str) -> Record {
+        Record {
+            original_index,
+            amount,
+            cells: std::array::from_fn(|column| {
+                if column == 1 {
+                    name.to_string()
+                } else {
+                    String::new()
+                }
+            }),
+        }
+    }
+
+    #[test]
+    fn record_sorting_preserves_numeric_and_case_insensitive_order() {
+        let a = record(1, 20.0, "alice");
+        let b = record(2, 10.0, "Bob");
+
+        assert_eq!(compare_records(&a, &b, 0, true), std::cmp::Ordering::Less);
+        assert_eq!(
+            compare_records(&a, &b, 6, true),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(compare_records(&a, &b, 1, true), std::cmp::Ordering::Less);
+        assert_eq!(
+            compare_records(&a, &b, 1, false),
+            std::cmp::Ordering::Greater
+        );
     }
 }

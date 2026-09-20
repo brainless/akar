@@ -805,8 +805,8 @@ pub fn data_grid_cell(
             DataGridAlign::Right => col_x + col_w - px - text_w,
         };
 
-        let buffer_id = core.text_pipeline.set_text(
-            Some(cell_id),
+        let buffer_id = core.text_pipeline.set_text_transient(
+            cell_id,
             text,
             glyphon::Metrics::new(font_size, font_size * 1.2),
             Some(text_w),

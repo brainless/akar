@@ -2,7 +2,7 @@ use crate::font_source::{
     FontLoadError, FontRequest, FontSelection, FontSource, TextPipelineConfig,
 };
 use crate::TextCall;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -54,6 +54,8 @@ pub struct TextPipeline {
     atlas: glyphon::TextAtlas,
     renderer: glyphon::TextRenderer,
     buffers: HashMap<u64, glyphon::Buffer>,
+    transient_buffers: HashSet<u64>,
+    transient_buffers_used: HashSet<u64>,
     next_id: u64,
     font_families: Vec<String>,
     font_sources: Vec<(Arc<Vec<u8>>, u32)>,
@@ -117,6 +119,8 @@ impl TextPipeline {
             atlas,
             renderer,
             buffers: HashMap::new(),
+            transient_buffers: HashSet::new(),
+            transient_buffers_used: HashSet::new(),
             next_id: 1,
             font_families: Vec::new(),
             font_sources: Vec::new(),
@@ -211,7 +215,7 @@ impl TextPipeline {
         height: Option<f32>,
         attrs: Option<glyphon::Attrs>,
     ) -> u64 {
-        set_text_impl(
+        let id = set_text_impl(
             &mut self.font_system,
             &mut self.buffers,
             &mut self.next_id,
@@ -222,7 +226,38 @@ impl TextPipeline {
             height,
             attrs.as_ref().unwrap_or(&glyphon::Attrs::new()),
             None,
-        )
+        );
+        self.transient_buffers.remove(&id);
+        self.transient_buffers_used.remove(&id);
+        id
+    }
+
+    /// Shapes display-only text whose buffer may be discarded after one frame
+    /// in which it is unused. `AkarCore::begin_frame` performs the pruning.
+    pub fn set_text_transient(
+        &mut self,
+        buffer_id: u64,
+        text: &str,
+        metrics: glyphon::Metrics,
+        width: Option<f32>,
+        height: Option<f32>,
+        attrs: Option<glyphon::Attrs>,
+    ) -> u64 {
+        let id = set_text_impl(
+            &mut self.font_system,
+            &mut self.buffers,
+            &mut self.next_id,
+            Some(buffer_id),
+            text,
+            metrics,
+            width,
+            height,
+            attrs.as_ref().unwrap_or(&glyphon::Attrs::new()),
+            None,
+        );
+        self.transient_buffers.insert(id);
+        self.transient_buffers_used.insert(id);
+        id
     }
 
     /// Shapes text from an owned, `Copy` font request. `FontSelection::Named`
@@ -255,7 +290,7 @@ impl TextPipeline {
             .family(family)
             .weight(glyphon::Weight(font.weight));
 
-        set_text_impl(
+        let id = set_text_impl(
             &mut self.font_system,
             &mut self.buffers,
             &mut self.next_id,
@@ -266,11 +301,27 @@ impl TextPipeline {
             height,
             &attrs,
             align,
-        )
+        );
+        self.transient_buffers.remove(&id);
+        self.transient_buffers_used.remove(&id);
+        id
     }
 
     pub fn remove_buffer(&mut self, buffer_id: u64) {
+        self.transient_buffers.remove(&buffer_id);
+        self.transient_buffers_used.remove(&buffer_id);
         self.buffers.remove(&buffer_id);
+    }
+
+    pub(crate) fn clear_transient_buffers(&mut self) {
+        self.transient_buffers.retain(|id| {
+            let keep = self.transient_buffers_used.contains(id);
+            if !keep {
+                self.buffers.remove(id);
+            }
+            keep
+        });
+        self.transient_buffers_used.clear();
     }
 
     pub fn measure(&mut self, buffer_id: u64, width: Option<f32>) -> glam::Vec2 {
@@ -995,6 +1046,35 @@ mod tests {
 
         pipeline.set_text(Some(id1), "updated", metrics, Some(200.0), None, None);
         assert_eq!(pipeline.buffers.len(), 2);
+    }
+
+    #[test]
+    fn transient_text_is_removed_after_one_unused_frame() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        pipeline.set_text(Some(1), "persistent", metrics, None, None, None);
+        pipeline.set_text_transient(2, "visible cell", metrics, None, None, None);
+        assert_eq!(pipeline.buffers.len(), 2);
+
+        pipeline.clear_transient_buffers();
+        assert!(pipeline.buffers.contains_key(&2));
+        pipeline.clear_transient_buffers();
+
+        assert!(pipeline.buffers.contains_key(&1));
+        assert!(!pipeline.buffers.contains_key(&2));
+    }
+
+    #[test]
+    fn persistent_text_can_reclaim_a_transient_id() {
+        let mut pipeline = create_pipeline();
+        let metrics = glyphon::Metrics::new(16.0, 20.0);
+
+        pipeline.set_text_transient(7, "cell", metrics, None, None, None);
+        pipeline.set_text(Some(7), "persistent", metrics, None, None, None);
+        pipeline.clear_transient_buffers();
+
+        assert!(pipeline.buffers.contains_key(&7));
     }
 
     #[test]

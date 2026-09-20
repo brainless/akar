@@ -406,3 +406,28 @@ The implementation may consolidate scopes if it proves balanced and C-safe, but 
 - [x] `data-grid-rust` demonstrates a full-screen, deterministic fake-data grid and exposes the required debug flags.
 - [x] Existing `data_list` and `scroll_area` behavior does not regress.
 - [x] Workspace tests, formatting, checking, and clippy pass.
+
+---
+
+## Post-completion memory follow-up — 2026-09-20
+
+**Status:** Done.
+
+Same-machine `/usr/bin/time -l` measurements found two avoidable sources of
+memory use in the full-screen example. Each fake record retained eight display
+strings plus six duplicate string sort keys, and grid body cells left every
+stable keyed `glyphon::Buffer` in `TextPipeline` after the row left the
+viewport.
+
+The example now stores each display string once and compares the stored fields
+without allocating during sorting; numeric ID and amount ordering remain
+typed. Grid body text uses an opt-in transient-buffer path. Transient buffers
+retain a one-unused-frame grace period so a stationary viewport reuses its
+allocations, then are pruned by `AkarCore::begin_frame`. Persistent layout and
+text-editing buffers keep their previous lifetime.
+
+At 100,000 rows, maximum RSS fell from 153.5 MiB to 125.4 MiB in debug and from
+141.7 MiB to 114.0 MiB in release. After ten large jumps through disjoint row
+ranges, RSS remained bounded at 129.1 MiB debug and 120.3 MiB release. The
+initial full-grid screenshot remained pixel-identical (0 of 1,024,000 pixels
+changed).

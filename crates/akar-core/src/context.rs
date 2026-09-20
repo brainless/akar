@@ -66,6 +66,7 @@ impl AkarCore {
     }
 
     pub fn begin_frame(&mut self, width: u32, height: u32, scale_factor: f32) {
+        self.text_pipeline.clear_transient_buffers();
         self.draw_list.begin_frame(scale_factor);
         self.viewport_width = width;
         self.viewport_height = height;
