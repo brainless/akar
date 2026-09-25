@@ -1,7 +1,9 @@
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use akar_core::{
-    InputState, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
+    FileDragInput, InputState, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers,
+    TextEditKeybindings,
 };
 use akar_layout::Layout;
 
@@ -29,6 +31,9 @@ pub enum ScriptStep {
     TextBindings(TextEditKeybindings),
     Type(String),
     Paste(HoverTarget, String),
+    FileEnter(HoverTarget, PathBuf),
+    FileDrop(HoverTarget, PathBuf),
+    FileLeave,
     Delay(f64),
     Screenshot(String),
 }
@@ -167,6 +172,22 @@ pub fn parse_script(input: &str) -> Result<Vec<ScriptStep>, String> {
             ));
             continue;
         }
+        if line.starts_with("file-enter ") || line.starts_with("file-drop ") {
+            let (command, rest) = line.split_once(' ').unwrap();
+            let label = rest
+                .split_whitespace()
+                .next()
+                .and_then(|target| target.strip_prefix('@'))
+                .ok_or_else(|| format!("line {}: file target must be a label", i + 1))?;
+            let path = PathBuf::from(parse_quoted(rest)?);
+            let target = HoverTarget::Label(label.to_string());
+            steps.push(if command == "file-enter" {
+                ScriptStep::FileEnter(target, path)
+            } else {
+                ScriptStep::FileDrop(target, path)
+            });
+            continue;
+        }
         let mut parts = line.split_whitespace();
         let cmd = parts.next().unwrap();
         let step = match cmd {
@@ -267,6 +288,7 @@ pub fn parse_script(input: &str) -> Result<Vec<ScriptStep>, String> {
                     .ok_or_else(|| format!("line {}: screenshot requires a path", i + 1))?;
                 ScriptStep::Screenshot(path.to_string())
             }
+            "file-leave" => ScriptStep::FileLeave,
             other => return Err(format!("line {}: unknown command '{other}'", i + 1)),
         };
         steps.push(step);
@@ -283,6 +305,16 @@ fn apply_target(input: &mut InputState, target: &HoverTarget, layout: &Layout) {
                 input.set_mouse_pos(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0);
             }
         }
+    }
+}
+
+fn target_position(target: &HoverTarget, layout: &Layout) -> Option<[f32; 2]> {
+    match target {
+        HoverTarget::Coords(x, y) => Some([*x, *y]),
+        HoverTarget::Label(name) => layout.resolve_label(name).map(|node| {
+            let [x, y, w, h] = layout.rect(node);
+            [x + w / 2.0, y + h / 2.0]
+        }),
     }
 }
 
@@ -375,6 +407,28 @@ impl ScriptRunner {
                 None
             }
             ScriptStep::Paste(HoverTarget::Coords(_, _), _) => unreachable!(),
+            ScriptStep::FileEnter(target, path) => {
+                if let Some(position) = target_position(&target, layout) {
+                    input.push_file_drag(FileDragInput::Enter {
+                        position,
+                        paths: vec![path],
+                    });
+                }
+                None
+            }
+            ScriptStep::FileDrop(target, path) => {
+                if let Some(position) = target_position(&target, layout) {
+                    input.push_file_drag(FileDragInput::Drop {
+                        position,
+                        paths: vec![path],
+                    });
+                }
+                None
+            }
+            ScriptStep::FileLeave => {
+                input.push_file_drag(FileDragInput::Leave);
+                None
+            }
             ScriptStep::Delay(_) => unreachable!(),
         }
     }
@@ -404,6 +458,21 @@ mod tests {
             vec![
                 ScriptStep::Hover(HoverTarget::Label("form_submit".to_string())),
                 ScriptStep::Click(HoverTarget::Label("navbar_btn".to_string())),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_positioned_file_drop_fixture() {
+        let steps =
+            parse_script("file-enter @form \"/tmp/a\"\nfile-drop @form \"/tmp/a\"\nfile-leave\n")
+                .unwrap();
+        assert_eq!(
+            steps,
+            vec![
+                ScriptStep::FileEnter(HoverTarget::Label("form".into()), PathBuf::from("/tmp/a")),
+                ScriptStep::FileDrop(HoverTarget::Label("form".into()), PathBuf::from("/tmp/a")),
+                ScriptStep::FileLeave,
             ]
         );
     }

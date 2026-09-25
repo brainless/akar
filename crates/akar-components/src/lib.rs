@@ -21,6 +21,9 @@ pub use separator::{
 pub mod container;
 pub use container::container as akar_container;
 
+pub mod file_drop;
+pub use file_drop::{file_drop_target, FileDropResponse};
+
 pub mod box_style;
 pub use box_style::{BoxShadow, BoxStyle};
 

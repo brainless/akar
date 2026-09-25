@@ -116,6 +116,10 @@ impl DrawList {
         self.scissor_stack.last().copied()
     }
 
+    pub fn scale_factor(&self) -> f32 {
+        self.scale_factor
+    }
+
     pub fn push_quad(&mut self, mut call: QuadCall) {
         call.rect[0] *= self.scale_factor;
         call.rect[1] *= self.scale_factor;

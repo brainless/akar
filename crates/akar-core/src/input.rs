@@ -1,5 +1,32 @@
 use glam;
 use std::ops::{BitOr, BitOrAssign};
+use std::path::PathBuf;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FileDragInput {
+    Enter {
+        position: [f32; 2],
+        paths: Vec<PathBuf>,
+    },
+    Move {
+        position: [f32; 2],
+    },
+    Drop {
+        position: [f32; 2],
+        paths: Vec<PathBuf>,
+    },
+    Leave,
+    UnpositionedDrop {
+        paths: Vec<PathBuf>,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FileDropEvent {
+    pub position: [f32; 2],
+    pub paths: Vec<PathBuf>,
+    claimed: bool,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
@@ -155,6 +182,11 @@ pub struct InputState {
     pub keys_pressed: Vec<Key>,
     pub key_events: Vec<KeyEvent>,
     pub paste_events: Vec<PasteEvent>,
+    pub file_drag_position: Option<[f32; 2]>,
+    pub file_drag_paths: Vec<PathBuf>,
+    pub file_drop_events: Vec<FileDropEvent>,
+    pub unpositioned_file_drops: Vec<Vec<PathBuf>>,
+    file_hover_claimed: bool,
     pub modifiers: Modifiers,
     pub focused_id: Option<u64>,
 }
@@ -172,11 +204,18 @@ impl InputState {
             keys_pressed: Vec::new(),
             key_events: Vec::new(),
             paste_events: Vec::new(),
+            file_drag_position: None,
+            file_drag_paths: Vec::new(),
+            file_drop_events: Vec::new(),
+            unpositioned_file_drops: Vec::new(),
+            file_hover_claimed: false,
             modifiers: Modifiers::default(),
             focused_id: None,
         }
     }
 
+    /// Clears one-frame events after rendering, or before host input is submitted for a frame.
+    /// Submit file events after an explicit input reset such as `akar_input_begin`.
     pub fn begin_frame(&mut self) {
         self.mouse_pos_prev = self.mouse_pos;
         self.mouse_buttons_pressed = [false; 5];
@@ -186,6 +225,64 @@ impl InputState {
         self.keys_pressed.clear();
         self.key_events.clear();
         self.paste_events.clear();
+        self.file_drop_events.clear();
+        self.unpositioned_file_drops.clear();
+        self.file_hover_claimed = false;
+    }
+
+    /// Queues a host file event. Coordinates must use the layout's window-local input space.
+    /// An invalid drop coordinate is retained only as an unpositioned window-level drop.
+    pub fn push_file_drag(&mut self, event: FileDragInput) {
+        match event {
+            FileDragInput::Enter { position, paths } => {
+                self.file_drag_position = valid_file_position(position);
+                self.file_drag_paths = paths;
+            }
+            FileDragInput::Move { position } => {
+                self.file_drag_position = valid_file_position(position);
+            }
+            FileDragInput::Drop { position, paths } => {
+                self.file_drag_position = None;
+                self.file_drag_paths.clear();
+                if valid_file_position(position).is_some() {
+                    self.file_drop_events.push(FileDropEvent {
+                        position,
+                        paths,
+                        claimed: false,
+                    });
+                } else {
+                    self.unpositioned_file_drops.push(paths);
+                }
+            }
+            FileDragInput::Leave => {
+                self.file_drag_position = None;
+                self.file_drag_paths.clear();
+            }
+            FileDragInput::UnpositionedDrop { paths } => {
+                self.file_drag_position = None;
+                self.file_drag_paths.clear();
+                self.unpositioned_file_drops.push(paths);
+            }
+        }
+    }
+
+    pub fn claim_file_hover(&mut self, eligible: bool) -> bool {
+        if !eligible || self.file_drag_position.is_none() || self.file_hover_claimed {
+            return false;
+        }
+        self.file_hover_claimed = true;
+        true
+    }
+
+    pub fn claim_file_drops(&mut self, mut eligible: impl FnMut([f32; 2]) -> bool) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+        for event in &mut self.file_drop_events {
+            if !event.claimed && eligible(event.position) {
+                event.claimed = true;
+                paths.append(&mut event.paths);
+            }
+        }
+        paths
     }
 
     pub fn set_mouse_pos(&mut self, x: f32, y: f32) {
@@ -257,6 +354,10 @@ impl InputState {
     }
 }
 
+fn valid_file_position([x, y]: [f32; 2]) -> Option<[f32; 2]> {
+    (x.is_finite() && y.is_finite()).then_some([x, y])
+}
+
 impl Default for InputState {
     fn default() -> Self {
         Self::new()
@@ -266,6 +367,117 @@ impl Default for InputState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_drag_hover_lifecycle_and_single_claim_per_frame() {
+        let mut input = InputState::new();
+        input.push_file_drag(FileDragInput::Enter {
+            position: [10.0, 20.0],
+            paths: vec![PathBuf::from("first")],
+        });
+        assert_eq!(input.file_drag_position, Some([10.0, 20.0]));
+        assert_eq!(input.file_drag_paths, [PathBuf::from("first")]);
+        assert!(!input.claim_file_hover(false));
+        assert!(input.claim_file_hover(true));
+        assert!(!input.claim_file_hover(true));
+
+        input.begin_frame();
+        assert_eq!(input.file_drag_position, Some([10.0, 20.0]));
+        assert!(input.claim_file_hover(true));
+
+        input.push_file_drag(FileDragInput::Move {
+            position: [30.0, 40.0],
+        });
+        assert_eq!(input.file_drag_position, Some([30.0, 40.0]));
+        input.push_file_drag(FileDragInput::Leave);
+        assert_eq!(input.file_drag_position, None);
+        assert!(input.file_drag_paths.is_empty());
+        assert!(!input.claim_file_hover(true));
+    }
+
+    #[test]
+    fn positioned_drops_retain_paths_and_positions_until_claimed() {
+        let mut input = InputState::new();
+        input.push_file_drag(FileDragInput::Drop {
+            position: [10.0, 20.0],
+            paths: vec![PathBuf::from("one"), PathBuf::from("two")],
+        });
+        input.push_file_drag(FileDragInput::Drop {
+            position: [100.0, 200.0],
+            paths: vec![PathBuf::from("three")],
+        });
+        assert_eq!(input.file_drop_events.len(), 2);
+        assert_eq!(input.file_drop_events[0].position, [10.0, 20.0]);
+        assert_eq!(input.file_drop_events[1].position, [100.0, 200.0]);
+        assert_eq!(
+            input.claim_file_drops(|position| position[0] > 50.0),
+            [PathBuf::from("three")]
+        );
+        assert_eq!(
+            input.claim_file_drops(|_| true),
+            [PathBuf::from("one"), PathBuf::from("two")]
+        );
+        assert!(input.claim_file_drops(|_| true).is_empty());
+    }
+
+    #[test]
+    fn invalid_coordinates_never_become_targetable() {
+        let mut input = InputState::new();
+        input.push_file_drag(FileDragInput::Enter {
+            position: [f32::NAN, 10.0],
+            paths: vec![],
+        });
+        assert_eq!(input.file_drag_position, None);
+        assert!(!input.claim_file_hover(true));
+        input.push_file_drag(FileDragInput::Move {
+            position: [f32::INFINITY, 10.0],
+        });
+        assert_eq!(input.file_drag_position, None);
+        input.push_file_drag(FileDragInput::Drop {
+            position: [10.0, f32::NEG_INFINITY],
+            paths: vec![PathBuf::from("invalid-position")],
+        });
+        assert!(input.file_drop_events.is_empty());
+        assert_eq!(
+            input.unpositioned_file_drops,
+            [vec![PathBuf::from("invalid-position")]]
+        );
+        assert!(input.claim_file_drops(|_| true).is_empty());
+    }
+
+    #[test]
+    fn unpositioned_drops_and_frame_cleanup() {
+        let mut input = InputState::new();
+        input.begin_frame();
+        input.push_file_drag(FileDragInput::UnpositionedDrop {
+            paths: vec![PathBuf::from("window-level")],
+        });
+        input.push_file_drag(FileDragInput::Drop {
+            position: [1.0, 2.0],
+            paths: vec![PathBuf::from("node-level")],
+        });
+        assert_eq!(input.unpositioned_file_drops.len(), 1);
+        assert_eq!(input.file_drop_events.len(), 1);
+        input.begin_frame();
+        assert!(input.unpositioned_file_drops.is_empty());
+        assert!(input.file_drop_events.is_empty());
+        assert!(input.claim_file_drops(|_| true).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dropped_path_keeps_native_non_utf8_bytes() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+
+        let path = PathBuf::from(OsString::from_vec(vec![b'f', 0xff]));
+        let mut input = InputState::new();
+        input.push_file_drag(FileDragInput::Drop {
+            position: [1.0, 2.0],
+            paths: vec![path.clone()],
+        });
+        assert_eq!(input.claim_file_drops(|_| true), [path]);
+    }
 
     #[test]
     fn hovering_inside_rect() {

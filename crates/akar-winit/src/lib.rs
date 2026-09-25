@@ -1,4 +1,4 @@
-use akar_core::{InputState, Key, KeyEvent, Modifiers};
+use akar_core::{FileDragInput, InputState, Key, KeyEvent, Modifiers};
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 fn is_committed_text_char(c: char) -> bool {
@@ -86,8 +86,18 @@ fn physical_latin_key(key: winit::keyboard::PhysicalKey) -> Option<Key> {
     Some(Key::Character(c))
 }
 
+/// Translates winit input into akar input. In winit 0.30, file events carry
+/// paths but no drag position, so drops stay window-level and cannot target a
+/// layout node. Hosts with native drag coordinates can submit `FileDragInput`
+/// directly through `InputState::push_file_drag`.
 pub fn process_window_event(input: &mut InputState, event: &WindowEvent) {
     match event {
+        WindowEvent::DroppedFile(path) => {
+            input.push_file_drag(FileDragInput::UnpositionedDrop {
+                paths: vec![path.clone()],
+            });
+        }
+        WindowEvent::HoveredFileCancelled => input.push_file_drag(FileDragInput::Leave),
         WindowEvent::CursorMoved { position, .. } => {
             input.set_mouse_pos(position.x as f32, position.y as f32);
         }
@@ -208,5 +218,50 @@ mod tests {
         });
         input.modifiers = Modifiers::default();
         assert!(input.key_events[0].modifiers.super_key);
+    }
+
+    #[test]
+    fn winit_file_drop_remains_unpositioned_despite_last_pointer_position() {
+        let mut input = InputState::new();
+        input.set_mouse_pos(42.0, 17.0);
+        process_window_event(&mut input, &WindowEvent::HoveredFile("first".into()));
+        process_window_event(&mut input, &WindowEvent::DroppedFile("first".into()));
+        process_window_event(&mut input, &WindowEvent::DroppedFile("second".into()));
+
+        assert!(input.file_drag_position.is_none());
+        assert!(input.file_drop_events.is_empty());
+        assert_eq!(
+            input.unpositioned_file_drops,
+            [
+                vec![std::path::PathBuf::from("first")],
+                vec![std::path::PathBuf::from("second")],
+            ]
+        );
+        assert!(input.claim_file_drops(|_| true).is_empty());
+    }
+
+    #[test]
+    fn native_host_positioned_events_are_independent_of_winit_pointer_state() {
+        let mut input = InputState::new();
+        input.set_mouse_pos(500.0, 500.0);
+        input.push_file_drag(FileDragInput::Enter {
+            position: [12.0, 24.0],
+            paths: vec!["first".into()],
+        });
+        assert_eq!(input.file_drag_position, Some([12.0, 24.0]));
+        input.push_file_drag(FileDragInput::Drop {
+            position: [14.0, 26.0],
+            paths: vec!["first".into(), "second".into()],
+        });
+        assert!(input
+            .claim_file_drops(|position| position == [500.0, 500.0])
+            .is_empty());
+        assert_eq!(
+            input.claim_file_drops(|position| position == [14.0, 26.0]),
+            [
+                std::path::PathBuf::from("first"),
+                std::path::PathBuf::from("second"),
+            ]
+        );
     }
 }

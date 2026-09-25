@@ -3,8 +3,8 @@ pub use draw_list::{DrawCall, DrawList, QuadCall, TextCall};
 
 pub mod input;
 pub use input::{
-    InputState, Key, KeyEvent, Modifiers, PasteEvent, Shortcut, ShortcutModifiers,
-    TextEditKeybindings,
+    FileDragInput, FileDropEvent, InputState, Key, KeyEvent, Modifiers, PasteEvent, Shortcut,
+    ShortcutModifiers, TextEditKeybindings,
 };
 
 pub mod quad_pipeline;

@@ -247,22 +247,26 @@ impl Layout {
     }
 
     pub fn rect(&self, node: NodeId) -> [f32; 4] {
-        let l = self.tree.layout(node).unwrap();
+        self.try_rect(node).expect("node has no resolved layout")
+    }
+
+    pub fn try_rect(&self, node: NodeId) -> Option<[f32; 4]> {
+        let l = self.tree.layout(node).ok()?;
         let mut x = l.location.x;
         let mut y = l.location.y;
         let mut current = node;
         while let Some(&parent) = self.parents.get(&current) {
-            let pl = self.tree.layout(parent).unwrap();
+            let pl = self.tree.layout(parent).ok()?;
             x += pl.location.x;
             y += pl.location.y;
             current = parent;
         }
-        [
+        Some([
             self.screen_origin[0] + x,
             self.screen_origin[1] + y,
             l.size.width,
             l.size.height,
-        ]
+        ])
     }
 }
 

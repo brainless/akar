@@ -1,14 +1,15 @@
 #![allow(clippy::missing_safety_doc)]
 
 use std::ffi::{c_char, c_void};
+use std::path::PathBuf;
 use std::ptr;
 
 use akar_components::{
     AkarTheme, ButtonVariant, DataGridAlign, DataGridSortDirection, AKAR_THEME_DARK,
 };
 use akar_core::{
-    AkarCore, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers, TextEditKeybindings,
-    TextPipelineConfig,
+    AkarCore, FileDragInput, Key, KeyEvent, Modifiers, Shortcut, ShortcutModifiers,
+    TextEditKeybindings, TextPipelineConfig,
 };
 use akar_layout::Layout;
 
@@ -22,6 +23,7 @@ pub struct AkarCtx {
     theme: AkarTheme,
     device: *const wgpu::Device,
     queue: *const wgpu::Queue,
+    file_target_paths: Vec<PathBuf>,
 }
 
 unsafe impl Send for AkarCtx {}
@@ -443,6 +445,7 @@ pub unsafe extern "C" fn akar_ctx_new(
         theme,
         device: device as *const wgpu::Device,
         queue: queue as *const wgpu::Queue,
+        file_target_paths: Vec::new(),
     }))
 }
 
@@ -470,6 +473,7 @@ pub unsafe extern "C" fn akar_ctx_mock() -> *mut AkarCtx {
         theme,
         device: std::ptr::null(),
         queue: std::ptr::null(),
+        file_target_paths: Vec::new(),
     }))
 }
 
@@ -544,6 +548,293 @@ pub unsafe extern "C" fn akar_end_frame(ctx: *mut AkarCtx, pass: *mut c_void) {
 pub unsafe extern "C" fn akar_input_begin(ctx: *mut AkarCtx) {
     let ctx = unsafe { &mut *ctx };
     ctx.core.input.begin_frame();
+    ctx.file_target_paths.clear();
+}
+
+pub const AKAR_FILE_OK: u32 = 0;
+pub const AKAR_FILE_INVALID_ARGUMENT: u32 = 1;
+pub const AKAR_FILE_INVALID_ENCODING: u32 = 2;
+pub const AKAR_FILE_UNSUPPORTED_ENCODING: u32 = 3;
+pub const AKAR_FILE_INDEX_OUT_OF_RANGE: u32 = 4;
+pub const AKAR_FILE_BUFFER_TOO_SMALL: u32 = 5;
+pub const AKAR_FILE_ENCODING_UTF8: u32 = 1;
+/// Lossless Unix `OsStr` byte representation, available on Unix hosts.
+pub const AKAR_FILE_ENCODING_UNIX_BYTES: u32 = 2;
+/// Native-endian UTF-16 code units, available on Windows hosts.
+pub const AKAR_FILE_ENCODING_WINDOWS_UTF16: u32 = 3;
+
+/// `byte_len` is exact; no NUL terminator is read. Data is copied during submission.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct AkarFilePathInput {
+    pub data: *const u8,
+    pub byte_len: u32,
+    pub encoding: u32,
+}
+
+#[repr(C)]
+#[derive(Default)]
+pub struct AkarFileTargetResponse {
+    pub status: u32,
+    pub hovered: bool,
+    pub path_count: u32,
+}
+
+#[repr(C)]
+pub struct AkarFilePathInfo {
+    pub encoding: u32,
+    pub required_bytes: u32,
+}
+
+unsafe fn decode_file_paths(
+    paths: *const AkarFilePathInput,
+    count: u32,
+) -> Result<Vec<PathBuf>, u32> {
+    if count > 0 && paths.is_null() {
+        return Err(AKAR_FILE_INVALID_ARGUMENT);
+    }
+    let inputs = if count == 0 {
+        &[][..]
+    } else {
+        unsafe { std::slice::from_raw_parts(paths, count as usize) }
+    };
+    inputs
+        .iter()
+        .map(|input| {
+            if input.byte_len > 0 && input.data.is_null() {
+                return Err(AKAR_FILE_INVALID_ARGUMENT);
+            }
+            let bytes = if input.byte_len == 0 {
+                &[][..]
+            } else {
+                unsafe { std::slice::from_raw_parts(input.data, input.byte_len as usize) }
+            };
+            match input.encoding {
+                AKAR_FILE_ENCODING_UTF8 => std::str::from_utf8(bytes)
+                    .map(PathBuf::from)
+                    .map_err(|_| AKAR_FILE_INVALID_ENCODING),
+                AKAR_FILE_ENCODING_UNIX_BYTES => {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::ffi::OsStrExt;
+                        Ok(PathBuf::from(std::ffi::OsStr::from_bytes(bytes)))
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        Err(AKAR_FILE_UNSUPPORTED_ENCODING)
+                    }
+                }
+                AKAR_FILE_ENCODING_WINDOWS_UTF16 => {
+                    if bytes.len() % 2 != 0 {
+                        return Err(AKAR_FILE_INVALID_ENCODING);
+                    }
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::ffi::OsStringExt;
+                        let units: Vec<u16> = bytes
+                            .chunks_exact(2)
+                            .map(|chunk| u16::from_ne_bytes([chunk[0], chunk[1]]))
+                            .collect();
+                        Ok(PathBuf::from(std::ffi::OsString::from_wide(&units)))
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        Err(AKAR_FILE_UNSUPPORTED_ENCODING)
+                    }
+                }
+                _ => Err(AKAR_FILE_INVALID_ENCODING),
+            }
+        })
+        .collect()
+}
+
+/// Copies all supplied paths before returning. Positions are window-local logical pixels.
+/// Submit after `akar_input_begin` and before checking targets in the same frame.
+/// Each input has an exact byte length; no terminator is read. UTF-8 works on every
+/// host; Unix bytes and native-endian Windows UTF-16 work on their respective hosts.
+/// Returns `AKAR_FILE_OK`, `AKAR_FILE_INVALID_ARGUMENT` for null pointers,
+/// `AKAR_FILE_INVALID_ENCODING` for malformed data or unknown tags, or
+/// `AKAR_FILE_UNSUPPORTED_ENCODING` for a native encoding on another platform.
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drag_enter(
+    ctx: *mut AkarCtx,
+    x: f32,
+    y: f32,
+    paths: *const AkarFilePathInput,
+    count: u32,
+) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    let paths = match unsafe { decode_file_paths(paths, count) } {
+        Ok(paths) => paths,
+        Err(status) => return status,
+    };
+    ctx.core.input.push_file_drag(FileDragInput::Enter {
+        position: [x, y],
+        paths,
+    });
+    AKAR_FILE_OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drag_move(ctx: *mut AkarCtx, x: f32, y: f32) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    ctx.core
+        .input
+        .push_file_drag(FileDragInput::Move { position: [x, y] });
+    AKAR_FILE_OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drag_leave(ctx: *mut AkarCtx) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    ctx.core.input.push_file_drag(FileDragInput::Leave);
+    AKAR_FILE_OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drop(
+    ctx: *mut AkarCtx,
+    x: f32,
+    y: f32,
+    paths: *const AkarFilePathInput,
+    count: u32,
+) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    let paths = match unsafe { decode_file_paths(paths, count) } {
+        Ok(paths) => paths,
+        Err(status) => return status,
+    };
+    ctx.core.input.push_file_drag(FileDragInput::Drop {
+        position: [x, y],
+        paths,
+    });
+    AKAR_FILE_OK
+}
+
+/// For hosts without a trustworthy drag position. Such paths cannot hit a node target.
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drop_unpositioned(
+    ctx: *mut AkarCtx,
+    paths: *const AkarFilePathInput,
+    count: u32,
+) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    let paths = match unsafe { decode_file_paths(paths, count) } {
+        Ok(paths) => paths,
+        Err(status) => return status,
+    };
+    ctx.core
+        .input
+        .push_file_drag(FileDragInput::UnpositionedDrop { paths });
+    AKAR_FILE_OK
+}
+
+/// Claims drops on an existing layout node. Check specific children before parents.
+/// Retrieve the returned paths before the next target query or `akar_input_begin`;
+/// either call replaces the path-result slot. `path_count` is zero after a repeated
+/// query because each drop is claimed at most once.
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_drop_target(
+    ctx: *mut AkarCtx,
+    node: u64,
+) -> AkarFileTargetResponse {
+    let Some(ctx) = (unsafe { ctx.as_mut() }) else {
+        return AkarFileTargetResponse {
+            status: AKAR_FILE_INVALID_ARGUMENT,
+            ..Default::default()
+        };
+    };
+    let response = akar_components::file_drop_target(&mut ctx.core, &ctx.layout, node.into());
+    ctx.file_target_paths = response.dropped_paths;
+    AkarFileTargetResponse {
+        status: AKAR_FILE_OK,
+        hovered: response.hovered,
+        path_count: ctx.file_target_paths.len() as u32,
+    }
+}
+
+fn file_path_bytes(path: &std::path::Path) -> (u32, Vec<u8>) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        (
+            AKAR_FILE_ENCODING_UNIX_BYTES,
+            path.as_os_str().as_bytes().to_vec(),
+        )
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let bytes = path
+            .as_os_str()
+            .encode_wide()
+            .flat_map(u16::to_ne_bytes)
+            .collect();
+        (AKAR_FILE_ENCODING_WINDOWS_UTF16, bytes)
+    }
+}
+
+/// Queries native output encoding and exact required byte count, excluding terminators.
+/// Returns `AKAR_FILE_INDEX_OUT_OF_RANGE` when no path occupies `index`.
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_target_path_info(
+    ctx: *const AkarCtx,
+    index: u32,
+    out_info: *mut AkarFilePathInfo,
+) -> u32 {
+    let (Some(ctx), Some(out_info)) = (unsafe { ctx.as_ref() }, unsafe { out_info.as_mut() })
+    else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    let Some(path) = ctx.file_target_paths.get(index as usize) else {
+        return AKAR_FILE_INDEX_OUT_OF_RANGE;
+    };
+    let (encoding, bytes) = file_path_bytes(path);
+    *out_info = AkarFilePathInfo {
+        encoding,
+        required_bytes: bytes.len() as u32,
+    };
+    AKAR_FILE_OK
+}
+
+/// Copies exactly `required_bytes`; no terminator is written. An undersized buffer
+/// is untouched and returns `AKAR_FILE_BUFFER_TOO_SMALL`. Query size first with
+/// `akar_file_target_path_info`. Bytes use native Unix path encoding or native-endian
+/// Windows UTF-16 as reported by that function.
+#[no_mangle]
+pub unsafe extern "C" fn akar_file_target_path_copy(
+    ctx: *const AkarCtx,
+    index: u32,
+    buffer: *mut u8,
+    capacity: u32,
+) -> u32 {
+    let Some(ctx) = (unsafe { ctx.as_ref() }) else {
+        return AKAR_FILE_INVALID_ARGUMENT;
+    };
+    let Some(path) = ctx.file_target_paths.get(index as usize) else {
+        return AKAR_FILE_INDEX_OUT_OF_RANGE;
+    };
+    let (_, bytes) = file_path_bytes(path);
+    if capacity < bytes.len() as u32 {
+        return AKAR_FILE_BUFFER_TOO_SMALL;
+    }
+    if !bytes.is_empty() {
+        if buffer.is_null() {
+            return AKAR_FILE_INVALID_ARGUMENT;
+        }
+        unsafe { ptr::copy_nonoverlapping(bytes.as_ptr(), buffer, bytes.len()) };
+    }
+    AKAR_FILE_OK
 }
 
 #[no_mangle]

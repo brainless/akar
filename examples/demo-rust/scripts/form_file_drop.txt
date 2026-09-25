@@ -1,0 +1,6 @@
+# Run with --component form --script examples/demo-rust/scripts/form_file_drop.txt
+# --dump-frame /tmp/akar-form-drop-hover.json --exit
+file-enter @form "/tmp/akar-fixture.txt"
+screenshot /tmp/akar-form-drop-hover.png
+file-drop @form "/tmp/akar-fixture.txt"
+screenshot /tmp/akar-form-drop-accepted.png

@@ -46,6 +46,30 @@
  */
 #define AKAR_FONT_LOAD_MULTIPLE_FAMILIES 4
 
+#define AKAR_FILE_OK 0
+
+#define AKAR_FILE_INVALID_ARGUMENT 1
+
+#define AKAR_FILE_INVALID_ENCODING 2
+
+#define AKAR_FILE_UNSUPPORTED_ENCODING 3
+
+#define AKAR_FILE_INDEX_OUT_OF_RANGE 4
+
+#define AKAR_FILE_BUFFER_TOO_SMALL 5
+
+#define AKAR_FILE_ENCODING_UTF8 1
+
+/**
+ * Lossless Unix `OsStr` byte representation, available on Unix hosts.
+ */
+#define AKAR_FILE_ENCODING_UNIX_BYTES 2
+
+/**
+ * Native-endian UTF-16 code units, available on Windows hosts.
+ */
+#define AKAR_FILE_ENCODING_WINDOWS_UTF16 3
+
 #define AKAR_KEY_BACKSPACE 0
 
 #define AKAR_KEY_DELETE 1
@@ -76,6 +100,26 @@ typedef struct AkarCtx AkarCtx;
  * convention.
  */
 typedef uint32_t AkarFontSource;
+
+/**
+ * `byte_len` is exact; no NUL terminator is read. Data is copied during submission.
+ */
+typedef struct AkarFilePathInput {
+    const uint8_t *data;
+    uint32_t byte_len;
+    uint32_t encoding;
+} AkarFilePathInput;
+
+typedef struct AkarFileTargetResponse {
+    uint32_t status;
+    bool hovered;
+    uint32_t path_count;
+} AkarFileTargetResponse;
+
+typedef struct AkarFilePathInfo {
+    uint32_t encoding;
+    uint32_t required_bytes;
+} AkarFilePathInfo;
 
 typedef struct AkarRect {
     float x;
@@ -482,6 +526,65 @@ void akar_begin_frame(struct AkarCtx *ctx, uint32_t width, uint32_t height, floa
 void akar_end_frame(struct AkarCtx *ctx, void *pass);
 
 void akar_input_begin(struct AkarCtx *ctx);
+
+/**
+ * Copies all supplied paths before returning. Positions are window-local logical pixels.
+ * Submit after `akar_input_begin` and before checking targets in the same frame.
+ * Each input has an exact byte length; no terminator is read. UTF-8 works on every
+ * host; Unix bytes and native-endian Windows UTF-16 work on their respective hosts.
+ * Returns `AKAR_FILE_OK`, `AKAR_FILE_INVALID_ARGUMENT` for null pointers,
+ * `AKAR_FILE_INVALID_ENCODING` for malformed data or unknown tags, or
+ * `AKAR_FILE_UNSUPPORTED_ENCODING` for a native encoding on another platform.
+ */
+uint32_t akar_file_drag_enter(struct AkarCtx *ctx,
+                              float x,
+                              float y,
+                              const struct AkarFilePathInput *paths,
+                              uint32_t count);
+
+uint32_t akar_file_drag_move(struct AkarCtx *ctx, float x, float y);
+
+uint32_t akar_file_drag_leave(struct AkarCtx *ctx);
+
+uint32_t akar_file_drop(struct AkarCtx *ctx,
+                        float x,
+                        float y,
+                        const struct AkarFilePathInput *paths,
+                        uint32_t count);
+
+/**
+ * For hosts without a trustworthy drag position. Such paths cannot hit a node target.
+ */
+uint32_t akar_file_drop_unpositioned(struct AkarCtx *ctx,
+                                     const struct AkarFilePathInput *paths,
+                                     uint32_t count);
+
+/**
+ * Claims drops on an existing layout node. Check specific children before parents.
+ * Retrieve the returned paths before the next target query or `akar_input_begin`;
+ * either call replaces the path-result slot. `path_count` is zero after a repeated
+ * query because each drop is claimed at most once.
+ */
+struct AkarFileTargetResponse akar_file_drop_target(struct AkarCtx *ctx, uint64_t node);
+
+/**
+ * Queries native output encoding and exact required byte count, excluding terminators.
+ * Returns `AKAR_FILE_INDEX_OUT_OF_RANGE` when no path occupies `index`.
+ */
+uint32_t akar_file_target_path_info(const struct AkarCtx *ctx,
+                                    uint32_t index,
+                                    struct AkarFilePathInfo *out_info);
+
+/**
+ * Copies exactly `required_bytes`; no terminator is written. An undersized buffer
+ * is untouched and returns `AKAR_FILE_BUFFER_TOO_SMALL`. Query size first with
+ * `akar_file_target_path_info`. Bytes use native Unix path encoding or native-endian
+ * Windows UTF-16 as reported by that function.
+ */
+uint32_t akar_file_target_path_copy(const struct AkarCtx *ctx,
+                                    uint32_t index,
+                                    uint8_t *buffer,
+                                    uint32_t capacity);
 
 void akar_set_mouse_pos(struct AkarCtx *ctx, float x, float y);
 

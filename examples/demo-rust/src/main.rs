@@ -149,6 +149,7 @@ struct AppState {
     form_font_size: f32,
     form_language_idx: usize,
     form_language_open: bool,
+    form_dropped_paths: Vec<std::path::PathBuf>,
     form_container: akar_layout::NodeId,
     form_name_node: akar_layout::NodeId,
     form_notes_node: akar_layout::NodeId,
@@ -1068,10 +1069,40 @@ fn render_form_tab(state: &mut AppState, viewport_rect: [f32; 4]) {
     state.cursor_tick += 1;
     let cursor_visible = state.force_caret_visible || (state.cursor_tick / 30).is_multiple_of(2);
     let form_rect = state.layout.rect(state.form_container);
+    let drop_response =
+        akar_components::file_drop_target(&mut state.core, &state.layout, state.form_container);
+    state.form_dropped_paths.extend(drop_response.dropped_paths);
+
+    if drop_response.hovered || !state.form_dropped_paths.is_empty() {
+        state.core.draw_list.push_quad(akar_core::QuadCall {
+            rect: form_rect,
+            fill: [0.0; 4],
+            border_color: if drop_response.hovered {
+                [0.25, 0.7, 1.0, 1.0]
+            } else {
+                [0.25, 0.8, 0.45, 1.0]
+            },
+            corner_radii: [8.0; 4],
+            border_width: 2.0,
+            z: 0.1,
+            shadow_blur: 0.0,
+            shadow_spread: 0.0,
+            shadow_color: [0.0; 4],
+            shadow_offset: [0.0; 2],
+            _pad: [0.0; 2],
+        });
+    }
+    let form_title = if let Some(path) = state.form_dropped_paths.last() {
+        format!("Form Demo — accepted {}", path.display())
+    } else if drop_response.hovered {
+        "Form Demo — drop file here".to_string()
+    } else {
+        "Form Demo".to_string()
+    };
 
     let title_buf = state.core.text_pipeline.set_text(
         Some(3000),
-        "Form Demo",
+        &form_title,
         glyphon::Metrics::new(18.0, 18.0 * 1.2),
         Some(form_rect[2] - 32.0),
         None,
@@ -5173,6 +5204,7 @@ impl ApplicationHandler for App {
             form_font_size: 16.0,
             form_language_idx: 0,
             form_language_open: false,
+            form_dropped_paths: Vec::new(),
             form_container,
             form_name_node,
             form_notes_node,

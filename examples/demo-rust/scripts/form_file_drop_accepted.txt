@@ -1,0 +1,4 @@
+# Run with --component form --script examples/demo-rust/scripts/form_file_drop_accepted.txt
+# --dump-frame /tmp/akar-form-drop-accepted.json --exit
+file-drop @form "/tmp/akar-fixture.txt"
+screenshot /tmp/akar-form-drop-accepted.png

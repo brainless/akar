@@ -2485,7 +2485,7 @@ mod tests {
         );
         data_grid_body_begin(&mut core0, &resp0, &keys, &style, &[]);
         let _ = data_grid_cell(
-            &mut core0, &layout0, &resp0, node0, 0, 1000, 0, &columns, &style, "row0", false,
+            &mut core0, &layout0, &resp0, node0, 1, 1001, 0, &columns, &style, "row1", false,
         );
         data_grid_body_end(&mut core0);
         let tc0 = text_calls(&core0.draw_list);
@@ -2496,7 +2496,7 @@ mod tests {
         core1.draw_list.begin_frame(1.0);
         let (layout1, node1) = make_grid_layout(400.0, 300.0);
         let mut state1 = DataGridState {
-            scroll_y: 640.0,
+            scroll_y: 32.0,
             ..DataGridState::new()
         };
         let resp1 = data_grid_begin(
@@ -2513,7 +2513,7 @@ mod tests {
         );
         data_grid_body_begin(&mut core1, &resp1, &keys, &style, &[]);
         let _ = data_grid_cell(
-            &mut core1, &layout1, &resp1, node1, 0, 1000, 0, &columns, &style, "row0", false,
+            &mut core1, &layout1, &resp1, node1, 1, 1001, 0, &columns, &style, "row1", false,
         );
         data_grid_body_end(&mut core1);
         let tc1 = text_calls(&core1.draw_list);

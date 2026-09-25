@@ -62,6 +62,10 @@ cargo run --bin demo-rust -- --screenshot /tmp/demo.png --exit
 cargo run --bin demo-rust -- --component drawer --screenshot /tmp/drawer.png --exit
 ```
 
+## File drops
+
+File drops can target an existing layout node when the host supplies the drag or drop position. Rust hosts submit `FileDragInput` through `InputState::push_file_drag`, then call `file_drop_target` on the node. Stock winit 0.30 reports file paths without a drop position, so its adapter exposes those paths only as window-level drops; it cannot identify a form or other node under the drop. See [DEVELOP.md](DEVELOP.md#file-drag-and-drop-input) for coordinate conversion and lifecycle details.
+
 ## Stack
 
 | Layer | Technology |

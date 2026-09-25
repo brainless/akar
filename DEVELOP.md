@@ -145,6 +145,12 @@ The font database is built explicitly by `akar-core` (`TextPipelineConfig`, `cra
 
 The developer supplies a wgpu `Device + Queue + Surface` (or the C equivalent). akar does not own the swap chain or the event loop.
 
+### File drag and drop input
+
+Rust hosts submit native drag events with `core.input.push_file_drag(FileDragInput::Enter { position, paths })`, `Move`, `Drop`, and `Leave`. Positions must be finite, window-local coordinates in the same space as `Layout::rect(node)` and ordinary pointer hit-testing. For a layout computed in logical pixels, convert a native physical-pixel position by dividing each axis by the window scale factor. Keep the drag event's own coordinates; the last ordinary mouse position may be stale during an OS drag. Submit events before rendering the frame that calls `file_drop_target(&mut core, &layout, node)`. A drop can carry multiple native `PathBuf`s; the application receives them without akar opening or inspecting them. `AkarCore::end_frame` clears completed drops after that frame.
+
+`akar-winit::process_window_event` uses winit 0.30, whose file events supply paths but no coordinates. It records each `DroppedFile` as an unpositioned window-level drop in `input.unpositioned_file_drops`. The application may handle those paths at window level, but `file_drop_target` cannot associate them with a node. `HoveredFile` cannot establish node hover without a position. A host with a native positioned drag hook should call `push_file_drag` directly with the native event's position and paths; do not derive the drop position from `CursorMoved` or `InputState::mouse_pos`. If the host also forwards winit's path-only events for the same drag, avoid submitting the same paths twice.
+
 ### Immediate mode and large datasets
 
 Immediate mode does not conflict with virtualizing large lists or grids. The library provides:
