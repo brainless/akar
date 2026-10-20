@@ -2,17 +2,19 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use akar_components::{
-    data_grid_begin, data_grid_body_begin, data_grid_body_end, data_grid_cell, data_grid_end,
-    data_grid_handle_keyboard, data_grid_header_begin, data_grid_header_cell, data_grid_header_end,
-    DataGridAlign, DataGridColumn, DataGridSortDirection, DataGridState, DataGridStyle,
-    AKAR_THEME_DARK,
+    badge_pill, data_grid_begin, data_grid_body_begin, data_grid_body_end, data_grid_cell,
+    data_grid_end, data_grid_handle_keyboard, data_grid_header_begin, data_grid_header_cell,
+    data_grid_header_end, DataGridAlign, DataGridColumn, DataGridSortDirection, DataGridState,
+    DataGridStyle, AKAR_THEME_DARK,
 };
 use akar_core::AkarCore;
 use akar_layout::{Layout, NodeId, PageConfig, Size, Style};
 use akar_winit::process_window_event;
+use fake::faker::{company::en::CompanyName, internet::en::SafeEmail, name::en::Name};
 use fake::rand::rngs::StdRng;
+use fake::rand::seq::IndexedRandom;
 use fake::rand::SeedableRng;
-use fake::{Fake, Faker};
+use fake::Fake;
 use wgpu::{
     CompositeAlphaMode, CurrentSurfaceTexture, InstanceDescriptor, PresentMode, TextureUsages,
 };
@@ -29,17 +31,63 @@ use script::{parse_script, ScriptRunner};
 
 const DEFAULT_ROWS: usize = 100_000;
 const DEFAULT_SEED: u64 = 42;
+const COUNTRY_COLUMN: usize = 5;
+const AMOUNT_COLUMN: usize = 7;
+const COUNTRY_PILL_DOMAIN: u64 = 1u64 << 61;
+const COUNTRY_PILL_COLORS: [u32; 8] = [
+    0x1D4ED8FF, 0x7C3AEDFF, 0x047857FF, 0x0F766EFF, 0x92400EFF, 0xBE185DFF, 0x334155FF, 0x4338CAFF,
+];
+const LOCATIONS: &[(&str, &str)] = &[
+    ("Amsterdam", "Netherlands"),
+    ("Auckland", "New Zealand"),
+    ("Bangkok", "Thailand"),
+    ("Barcelona", "Spain"),
+    ("Berlin", "Germany"),
+    ("Buenos Aires", "Argentina"),
+    ("Cairo", "Egypt"),
+    ("Cape Town", "South Africa"),
+    ("Delhi", "India"),
+    ("Dubai", "United Arab Emirates"),
+    ("Hanoi", "Vietnam"),
+    ("Istanbul", "Turkey"),
+    ("Jakarta", "Indonesia"),
+    ("Lagos", "Nigeria"),
+    ("Lima", "Peru"),
+    ("Lisbon", "Portugal"),
+    ("London", "United Kingdom"),
+    ("Mexico City", "Mexico"),
+    ("Mumbai", "India"),
+    ("Nairobi", "Kenya"),
+    ("New York", "United States"),
+    ("Paris", "France"),
+    ("Rome", "Italy"),
+    ("Seoul", "South Korea"),
+    ("Singapore", "Singapore"),
+    ("Sydney", "Australia"),
+    ("Tokyo", "Japan"),
+    ("Toronto", "Canada"),
+    ("Vancouver", "Canada"),
+    ("Zurich", "Switzerland"),
+];
 
 struct Record {
     original_index: usize,
     amount: f64,
-    cells: [String; 8],
+    country_color: u32,
+    cells: [String; 9],
+}
+
+fn country_pill_color(country: &str) -> u32 {
+    let hash = country.bytes().fold(0xcbf29ce484222325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+    });
+    COUNTRY_PILL_COLORS[(hash as usize) % COUNTRY_PILL_COLORS.len()]
 }
 
 fn compare_records(a: &Record, b: &Record, column: usize, ascending: bool) -> std::cmp::Ordering {
     let ordering = match column {
         0 => a.original_index.cmp(&b.original_index),
-        6 => a
+        AMOUNT_COLUMN => a
             .amount
             .partial_cmp(&b.amount)
             .unwrap_or(std::cmp::Ordering::Equal),
@@ -59,11 +107,11 @@ fn compare_records(a: &Record, b: &Record, column: usize, ascending: bool) -> st
     }
 }
 
-const COLUMN_NAMES: [&str; 8] = [
-    "ID", "Name", "Email", "Company", "City", "Status", "Amount", "Created",
+const COLUMN_NAMES: [&str; 9] = [
+    "ID", "Name", "Email", "Company", "City", "Country", "Status", "Amount", "Created",
 ];
 
-const COLUMN_WIDTHS: [f32; 8] = [80.0, 140.0, 200.0, 150.0, 120.0, 100.0, 110.0, 120.0];
+const COLUMN_WIDTHS: [f32; 9] = [80.0, 140.0, 200.0, 150.0, 140.0, 190.0, 110.0, 110.0, 120.0];
 
 fn columns() -> Vec<DataGridColumn> {
     COLUMN_WIDTHS
@@ -72,7 +120,7 @@ fn columns() -> Vec<DataGridColumn> {
         .map(|(i, &w)| DataGridColumn {
             key: (i as u64 + 1) * 100,
             width: w,
-            align: if i == 6 {
+            align: if i == AMOUNT_COLUMN {
                 DataGridAlign::Right
             } else {
                 DataGridAlign::Left
@@ -87,10 +135,10 @@ fn generate_records(count: usize, seed: u64) -> Vec<Record> {
 
     for i in 0..count {
         let id = (i as u64 + 1) * 1000;
-        let name: String = Faker.fake_with_rng(&mut rng);
-        let email: String = Faker.fake_with_rng(&mut rng);
-        let company: String = Faker.fake_with_rng(&mut rng);
-        let city: String = Faker.fake_with_rng(&mut rng);
+        let name: String = Name().fake_with_rng(&mut rng);
+        let email: String = SafeEmail().fake_with_rng(&mut rng);
+        let company: String = CompanyName().fake_with_rng(&mut rng);
+        let &(city, country) = LOCATIONS.choose(&mut rng).unwrap();
         let status_idx = i % 5;
         let status = match status_idx {
             0 => "Active",
@@ -109,7 +157,8 @@ fn generate_records(count: usize, seed: u64) -> Vec<Record> {
             name,
             email,
             company,
-            city,
+            city.to_string(),
+            country.to_string(),
             status.to_string(),
             format!("${amount:.2}"),
             created,
@@ -118,6 +167,7 @@ fn generate_records(count: usize, seed: u64) -> Vec<Record> {
         records.push(Record {
             original_index: i,
             amount,
+            country_color: country_pill_color(country),
             cells,
         });
     }
@@ -272,9 +322,19 @@ impl ApplicationHandler for App {
             return;
         }
 
+        let initial_size = event_loop
+            .primary_monitor()
+            .map(|monitor| {
+                let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
+                LogicalSize::new(
+                    1280.0_f64.min(size.width * 0.8),
+                    800.0_f64.min(size.height * 0.8),
+                )
+            })
+            .unwrap_or(LogicalSize::new(1280.0, 800.0));
         let window_attrs = WindowAttributes::default()
             .with_title("akar data grid")
-            .with_inner_size(LogicalSize::new(1280.0, 800.0));
+            .with_inner_size(initial_size);
         let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
 
         let instance = wgpu::Instance::new(InstanceDescriptor::new_with_display_handle(Box::new(
@@ -370,22 +430,41 @@ impl ApplicationHandler for App {
 
         match event {
             WindowEvent::Resized(new_size) => {
-                state.surface_config.width = new_size.width;
-                state.surface_config.height = new_size.height;
-                state
-                    .surface
-                    .configure(&state.device, &state.surface_config);
+                if new_size.width > 0 && new_size.height > 0 {
+                    state.surface_config.width = new_size.width;
+                    state.surface_config.height = new_size.height;
+                    state
+                        .surface
+                        .configure(&state.device, &state.surface_config);
+                }
             }
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
                 let size = state.window.inner_size();
+                if size.width == 0 || size.height == 0 {
+                    return;
+                }
                 let scale = state.window.scale_factor() as f32;
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
-                    _ => return,
+                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                        state.surface_config.width = size.width;
+                        state.surface_config.height = size.height;
+                        state
+                            .surface
+                            .configure(&state.device, &state.surface_config);
+                        state.window.request_redraw();
+                        return;
+                    }
+                    CurrentSurfaceTexture::Timeout
+                    | CurrentSurfaceTexture::Occluded
+                    | CurrentSurfaceTexture::Validation => {
+                        state.window.request_redraw();
+                        return;
+                    }
                 };
 
                 state.core.begin_frame(size.width, size.height, scale);
@@ -518,6 +597,11 @@ impl ApplicationHandler for App {
                         if col_i >= state.columns.len() {
                             break;
                         }
+                        let cell_text = if col_i == COUNTRY_COLUMN {
+                            ""
+                        } else {
+                            &record.cells[col_i]
+                        };
                         let cell_resp = data_grid_cell(
                             &mut state.core,
                             &state.layout,
@@ -528,9 +612,23 @@ impl ApplicationHandler for App {
                             col_i,
                             &state.columns,
                             &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                            &record.cells[col_i],
+                            cell_text,
                             is_selected,
                         );
+                        if col_i == COUNTRY_COLUMN {
+                            let text_id = state.layout.widget_id_keyed(state.grid_node, row_key)
+                                ^ state.columns[col_i].key
+                                ^ COUNTRY_PILL_DOMAIN;
+                            badge_pill(
+                                &mut state.core,
+                                cell_resp.rect,
+                                text_id,
+                                &record.cells[col_i],
+                                record.country_color,
+                                0xFFFFFFFF,
+                                &AKAR_THEME_DARK,
+                            );
+                        }
                         if cell_resp.clicked {
                             state.selected_key = Some(row_key);
                             state.grid_state.active_row_key = row_key;
@@ -703,6 +801,7 @@ mod tests {
         Record {
             original_index,
             amount,
+            country_color: COUNTRY_PILL_COLORS[0],
             cells: std::array::from_fn(|column| {
                 if column == 1 {
                     name.to_string()
@@ -720,7 +819,7 @@ mod tests {
 
         assert_eq!(compare_records(&a, &b, 0, true), std::cmp::Ordering::Less);
         assert_eq!(
-            compare_records(&a, &b, 6, true),
+            compare_records(&a, &b, AMOUNT_COLUMN, true),
             std::cmp::Ordering::Greater
         );
         assert_eq!(compare_records(&a, &b, 1, true), std::cmp::Ordering::Less);
@@ -728,5 +827,27 @@ mod tests {
             compare_records(&a, &b, 1, false),
             std::cmp::Ordering::Greater
         );
+    }
+
+    #[test]
+    fn generated_records_have_safe_emails_and_real_locations() {
+        let records = generate_records(128, DEFAULT_SEED);
+        let repeated = generate_records(128, DEFAULT_SEED);
+        assert_ne!(
+            country_pill_color("Switzerland"),
+            country_pill_color("Spain")
+        );
+        assert!(records
+            .iter()
+            .zip(&repeated)
+            .all(|(a, b)| a.original_index == b.original_index && a.cells == b.cells));
+
+        for record in &records {
+            let (local, domain) = record.cells[2].split_once('@').unwrap();
+            assert!(!local.is_empty());
+            assert!(["example.com", "example.net", "example.org"].contains(&domain));
+            assert!(LOCATIONS.contains(&(record.cells[4].as_str(), record.cells[5].as_str())));
+            assert_eq!(record.country_color, country_pill_color(&record.cells[5]));
+        }
     }
 }

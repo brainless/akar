@@ -5,6 +5,8 @@ use crate::color::color_to_f32;
 
 pub const DATA_GRID_OVERSCAN: usize = 2;
 const HEADER_DOMAIN_OFFSET: u64 = 1u64 << 62;
+// Scissors cull overlapping quads but do not clip them; the header must cover body quads.
+const HEADER_BACKGROUND_Z: f32 = Z_BASE + 0.2;
 
 fn normalize_dimension(v: f32, fallback: f32) -> f32 {
     if v.is_finite() && v > 0.0 {
@@ -443,7 +445,7 @@ pub fn data_grid_header_begin(
             border_color: [0.0; 4],
             corner_radii: [0.0; 4],
             border_width: 0.0,
-            z: Z_BASE,
+            z: HEADER_BACKGROUND_Z,
             shadow_blur: 0.0,
             shadow_spread: 0.0,
             shadow_color: [0.0; 4],
@@ -819,7 +821,7 @@ pub fn data_grid_cell(
             buffer_id,
             x: text_x,
             y: cell_y + py,
-            clip: rect,
+            clip: rect_intersect(rect, response.body_rect),
             color: color_to_f32(text_color),
             z: Z_TEXT_FOREGROUND,
         });
@@ -2184,6 +2186,53 @@ mod tests {
             .iter()
             .find(|q| q.fill == color_to_f32(style.header_bg) && q.rect[3] == 36.0);
         assert!(header_quad.is_some());
+    }
+
+    #[test]
+    fn scrolling_row_cannot_cover_header_background_or_draw_text_into_it() {
+        let mut core = AkarCore::mock();
+        core.draw_list.begin_frame(1.0);
+        let (layout, node) = make_grid_layout(400.0, 300.0);
+        let mut state = DataGridState::new();
+        state.scroll_y = 10.0;
+        let columns = make_columns(&[100.0]);
+        let keys = make_row_keys(20);
+        let style = default_style();
+
+        let resp = data_grid_begin(
+            &mut core, &layout, node, &mut state, 20, &keys, 32.0, 36.0, &columns, &style,
+        );
+        data_grid_header_begin(&mut core, &resp, &style);
+        data_grid_header_end(&mut core);
+        data_grid_body_begin(&mut core, &resp, &keys, &style, &[]);
+        data_grid_cell(
+            &mut core, &layout, &resp, node, 0, keys[0], 0, &columns, &style, "Row 1", false,
+        );
+        data_grid_body_end(&mut core);
+        data_grid_end(&mut core);
+
+        let quads = core.draw_list.sorted_quads();
+        let header = quads
+            .iter()
+            .find(|q| q.fill == color_to_f32(style.header_bg))
+            .unwrap();
+        let first_row = quads
+            .iter()
+            .find(|q| q.rect[1] == 26.0 && q.rect[3] == 32.0)
+            .unwrap();
+        assert!(header.z > first_row.z);
+        assert!(header.z < 1.0);
+
+        let cell_text = core
+            .draw_list
+            .text_calls()
+            .iter()
+            .find_map(|call| match call {
+                akar_core::DrawCall::Text(text) => Some(text),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(cell_text.clip, [0.0, 36.0, 100.0, 22.0]);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 GPU-accelerated UI components for agents and developers.
 
-![Full demo screenshot](images/akar-full.png)
+![Data grid demo screenshot](images/akar-data-grid.png)
 
 ## What is akar
 

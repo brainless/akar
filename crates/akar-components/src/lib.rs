@@ -40,7 +40,9 @@ pub mod avatar;
 pub use avatar::avatar as akar_avatar;
 
 pub mod badge;
-pub use badge::{badge as akar_badge, badge_styled as akar_badge_styled, BadgeStyle, BadgeVariant};
+pub use badge::{
+    badge as akar_badge, badge_pill, badge_styled as akar_badge_styled, BadgeStyle, BadgeVariant,
+};
 
 pub mod scroll_area;
 pub use scroll_area::{scroll_area_begin, scroll_area_end, ScrollAreaResponse};
