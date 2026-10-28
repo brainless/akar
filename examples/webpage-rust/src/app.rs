@@ -145,14 +145,28 @@ impl ApplicationHandler for App {
             return;
         };
 
-        match event {
-            WindowEvent::Resized(new_size) => {
-                state.surface_config.width = new_size.width;
-                state.surface_config.height = new_size.height;
-                state
-                    .surface
-                    .configure(&state.device, &state.surface_config);
+        if let WindowEvent::Resized(new_size) = event {
+            if new_size.width == 0 || new_size.height == 0 {
+                return;
             }
+            state.surface_config.width = new_size.width;
+            state.surface_config.height = new_size.height;
+            state
+                .surface
+                .configure(&state.device, &state.surface_config);
+            // CAMetalLayer resizes with the view immediately, so render now rather than on a
+            // later redraw. On macOS, present inside the resize's Core Animation transaction
+            // so the compositor never scales a frame rendered for the previous size.
+            akar_winit::set_presents_with_transaction(&state.surface, true);
+            let window_id = state.window.id();
+            self.window_event(event_loop, window_id, WindowEvent::RedrawRequested);
+            if let Some(state) = &self.state {
+                akar_winit::set_presents_with_transaction(&state.surface, false);
+            }
+            return;
+        }
+
+        match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }

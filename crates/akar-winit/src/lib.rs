@@ -1,6 +1,9 @@
 use akar_core::{FileDragInput, InputState, Key, KeyEvent, Modifiers};
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
+mod surface;
+pub use surface::set_presents_with_transaction;
+
 fn is_committed_text_char(c: char) -> bool {
     !c.is_control()
         && !matches!(

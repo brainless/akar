@@ -322,6 +322,366 @@ struct App {
     dump_frame_written: bool,
 }
 
+impl App {
+    fn redraw(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(state) = self.state.as_mut() else {
+            return;
+        };
+
+        let has_screenshot = self.config.screenshot.is_some();
+        let screenshot_path = self.config.screenshot.clone();
+        let delay = self.config.delay;
+        let dump_frame = self.config.dump_frame.clone();
+        let do_exit = self.config.exit;
+        let do_dump_layout = self.config.dump_layout;
+
+        let size = state.window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            return;
+        }
+        let scale = state.window.scale_factor() as f32;
+
+        // Native resize events can lag behind the current window bounds.
+        if state.surface_config.width != size.width || state.surface_config.height != size.height {
+            state.surface_config.width = size.width;
+            state.surface_config.height = size.height;
+            state
+                .surface
+                .configure(&state.device, &state.surface_config);
+        }
+
+        let output = match state.surface.get_current_texture() {
+            CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
+            CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
+                state.surface_config.width = size.width;
+                state.surface_config.height = size.height;
+                state
+                    .surface
+                    .configure(&state.device, &state.surface_config);
+                state.window.request_redraw();
+                return;
+            }
+            CurrentSurfaceTexture::Timeout
+            | CurrentSurfaceTexture::Occluded
+            | CurrentSurfaceTexture::Validation => {
+                state.window.request_redraw();
+                return;
+            }
+        };
+        let size = output.texture.size();
+
+        state.core.begin_frame(size.width, size.height, scale);
+
+        if dump_frame.is_some() && !self.dump_frame_written {
+            state.core.draw_list.start_recording();
+        }
+
+        let viewport_rect = [
+            0.0,
+            0.0,
+            size.width as f32 / scale,
+            size.height as f32 / scale,
+        ];
+
+        state.layout.compute(
+            state.page.root,
+            (Some(viewport_rect[2]), Some(viewport_rect[3])),
+            |_, _, _, _, _| Size::ZERO,
+        );
+
+        if do_dump_layout && !self.dump_layout_written {
+            self.dump_layout_written = true;
+            for (name, rect) in state.layout.labeled_rects() {
+                println!("{} {} {} {} {}", name, rect[0], rect[1], rect[2], rect[3]);
+            }
+            event_loop.exit();
+            return;
+        }
+
+        let script_capture_path = if let Some(runner) = self.script_runner.as_mut() {
+            runner.advance(
+                &mut state.core.input,
+                &mut state.core.text_edit_keybindings,
+                &state.layout,
+                Instant::now(),
+            )
+        } else {
+            None
+        };
+
+        let row_keys = &state.row_keys;
+        let selected_slice = if let Some(key) = state.selected_key {
+            vec![key]
+        } else {
+            vec![]
+        };
+
+        let grid_resp = data_grid_begin(
+            &mut state.core,
+            &state.layout,
+            state.grid_node,
+            &mut state.grid_state,
+            state.records.len(),
+            row_keys,
+            32.0,
+            36.0,
+            &state.columns,
+            &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+        );
+
+        data_grid_header_begin(
+            &mut state.core,
+            &grid_resp,
+            &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+        );
+        for (col_i, col_name) in COLUMN_NAMES.iter().enumerate() {
+            let sort = if state.sort_col == Some(col_i) {
+                state.sort_dir
+            } else {
+                DataGridSortDirection::None
+            };
+            let hdr_resp = data_grid_header_cell(
+                &mut state.core,
+                &state.layout,
+                &grid_resp,
+                state.grid_node,
+                col_i,
+                &state.columns,
+                &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+                col_name,
+                sort,
+            );
+            if hdr_resp.clicked {
+                if state.sort_col == Some(col_i) {
+                    state.sort_dir = match state.sort_dir {
+                        DataGridSortDirection::Ascending => DataGridSortDirection::Descending,
+                        DataGridSortDirection::Descending => DataGridSortDirection::None,
+                        DataGridSortDirection::None => DataGridSortDirection::Ascending,
+                    };
+                } else {
+                    state.sort_col = Some(col_i);
+                    state.sort_dir = DataGridSortDirection::Ascending;
+                }
+                if state.sort_dir != DataGridSortDirection::None {
+                    let col = state.sort_col.unwrap();
+                    state.records.sort_by(|a, b| {
+                        compare_records(
+                            a,
+                            b,
+                            col,
+                            state.sort_dir == DataGridSortDirection::Ascending,
+                        )
+                    });
+                } else {
+                    state.records.sort_by_key(|r| r.original_index);
+                }
+                state.row_keys = rebuild_row_keys(&state.records);
+            }
+        }
+        data_grid_header_end(&mut state.core);
+
+        data_grid_body_begin(
+            &mut state.core,
+            &grid_resp,
+            &state.row_keys,
+            &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+            &selected_slice,
+        );
+        for row_i in grid_resp.visible_rows.clone() {
+            if row_i >= state.records.len() {
+                break;
+            }
+            let record = &state.records[row_i];
+            let row_key = record.original_index as u64;
+            let is_selected = state.selected_key == Some(row_key);
+            for col_i in grid_resp.visible_columns.clone() {
+                if col_i >= state.columns.len() {
+                    break;
+                }
+                let cell_text = if col_i == COUNTRY_COLUMN {
+                    ""
+                } else {
+                    &record.cells[col_i]
+                };
+                let cell_resp = data_grid_cell(
+                    &mut state.core,
+                    &state.layout,
+                    &grid_resp,
+                    state.grid_node,
+                    row_i,
+                    row_key,
+                    col_i,
+                    &state.columns,
+                    &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+                    cell_text,
+                    is_selected,
+                );
+                if col_i == COUNTRY_COLUMN {
+                    let text_id = state.layout.widget_id_keyed(state.grid_node, row_key)
+                        ^ state.columns[col_i].key
+                        ^ COUNTRY_PILL_DOMAIN;
+                    badge_pill(
+                        &mut state.core,
+                        cell_resp.rect,
+                        text_id,
+                        &record.cells[col_i],
+                        record.country_color,
+                        0xFFFFFFFF,
+                        &AKAR_THEME_DARK,
+                    );
+                }
+                if cell_resp.clicked {
+                    state.selected_key = Some(row_key);
+                    state.grid_state.active_row_key = row_key;
+                    state.grid_state.active_column_key = state.columns[col_i].key;
+                    state.grid_state.has_active_cell = true;
+                }
+            }
+        }
+        data_grid_body_end(&mut state.core);
+
+        data_grid_end(&mut state.core);
+
+        let kb_resp = data_grid_handle_keyboard(
+            &mut state.core,
+            &state.layout,
+            state.grid_node,
+            &mut state.grid_state,
+            state.records.len(),
+            &state.row_keys,
+            &state.columns,
+            &DataGridStyle::from_theme(&AKAR_THEME_DARK),
+        );
+        if kb_resp.cell_changed || kb_resp.activated {
+            state.selected_key = Some(state.grid_state.active_row_key);
+        }
+
+        let normal_capture = !self.screenshot_taken
+            && has_screenshot
+            && self
+                .start_time
+                .is_some_and(|t| t.elapsed() >= Duration::from_secs_f64(delay));
+        let is_capture_frame = normal_capture || script_capture_path.is_some();
+
+        if is_capture_frame {
+            state.core.request_screenshot();
+        }
+
+        let mut encoder = state
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+
+        {
+            let surface_view = output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            let render_view = if is_capture_frame {
+                state
+                    .core
+                    .capture_target_view(&state.device, size.width, size.height)
+                    .unwrap()
+            } else {
+                surface_view
+            };
+
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("main pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &render_view,
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
+        }
+
+        let is_standalone = !has_screenshot && self.script_runner.is_none();
+        let is_dump_frame =
+            dump_frame.is_some() && !self.dump_frame_written && (is_capture_frame || is_standalone);
+        if is_dump_frame {
+            let path = dump_frame.clone().unwrap();
+            let dump = serde_json::json!({
+                "recorded_calls": state.core.draw_list.recorded_calls(),
+                "labeled_rects": state.layout.labeled_rects(),
+            });
+            match std::fs::File::create(&path) {
+                Ok(file) => {
+                    if let Err(e) = serde_json::to_writer_pretty(file, &dump) {
+                        eprintln!("Failed to write frame dump '{path}': {e}");
+                        std::process::exit(1);
+                    }
+                    eprintln!("Frame dump written to {path}");
+                }
+                Err(e) => {
+                    eprintln!("Failed to create file '{path}': {e}");
+                    std::process::exit(1);
+                }
+            }
+            self.dump_frame_written = true;
+            state.core.draw_list.stop_recording();
+            if do_exit && is_standalone {
+                event_loop.exit();
+            }
+        }
+
+        if is_capture_frame {
+            let capture_path = if let Some(p) = &script_capture_path {
+                p.clone()
+            } else {
+                screenshot_path.clone().unwrap()
+            };
+            match state
+                .core
+                .take_screenshot(&state.device, &state.queue, encoder, &output)
+            {
+                Ok(frame) => match std::fs::File::create(&capture_path) {
+                    Ok(file) => {
+                        let mut png_encoder = png::Encoder::new(file, frame.width, frame.height);
+                        png_encoder.set_color(png::ColorType::Rgba);
+                        png_encoder.set_depth(png::BitDepth::Eight);
+                        match png_encoder.write_header() {
+                            Ok(mut writer) => {
+                                if let Err(e) = writer.write_image_data(&frame.rgba) {
+                                    eprintln!("Failed to write PNG data: {e}");
+                                    std::process::exit(1);
+                                }
+                                eprintln!("Screenshot saved to {capture_path}");
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to write PNG header: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to create file '{capture_path}': {e}");
+                        std::process::exit(1);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Screenshot failed: {e}");
+                    std::process::exit(1);
+                }
+            }
+            self.screenshot_taken = true;
+            if do_exit {
+                event_loop.exit();
+            }
+        } else {
+            state.queue.submit(std::iter::once(encoder.finish()));
+        }
+        output.present();
+    }
+}
+
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.state.is_some() {
@@ -452,376 +812,44 @@ impl ApplicationHandler for App {
             return;
         }
 
-        let has_screenshot = self.config.screenshot.is_some();
-        let screenshot_path = self.config.screenshot.clone();
-        let delay = self.config.delay;
-        let dump_frame = self.config.dump_frame.clone();
-        let do_exit = self.config.exit;
-        let do_dump_layout = self.config.dump_layout;
-
-        match event {
+        let mut redraw_now = false;
+        match &event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
-            WindowEvent::RedrawRequested => {
-                let size = state.window.inner_size();
-                if size.width == 0 || size.height == 0 {
-                    return;
-                }
-                let scale = state.window.scale_factor() as f32;
-
-                // Native resize events can lag behind the current window bounds.
-                if state.surface_config.width != size.width
-                    || state.surface_config.height != size.height
-                {
-                    state.surface_config.width = size.width;
-                    state.surface_config.height = size.height;
+            WindowEvent::Resized(new_size) => {
+                // CAMetalLayer resizes with the view immediately; reconfigure and present
+                // right away so stale old-size frames are not stretched to the new bounds.
+                if new_size.width > 0 && new_size.height > 0 {
+                    state.surface_config.width = new_size.width;
+                    state.surface_config.height = new_size.height;
                     state
                         .surface
                         .configure(&state.device, &state.surface_config);
+                    redraw_now = true;
                 }
-
-                let output = match state.surface.get_current_texture() {
-                    CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
-                    CurrentSurfaceTexture::Outdated | CurrentSurfaceTexture::Lost => {
-                        state.surface_config.width = size.width;
-                        state.surface_config.height = size.height;
-                        state
-                            .surface
-                            .configure(&state.device, &state.surface_config);
-                        state.window.request_redraw();
-                        return;
-                    }
-                    CurrentSurfaceTexture::Timeout
-                    | CurrentSurfaceTexture::Occluded
-                    | CurrentSurfaceTexture::Validation => {
-                        state.window.request_redraw();
-                        return;
-                    }
-                };
-                let size = output.texture.size();
-
-                state.core.begin_frame(size.width, size.height, scale);
-
-                if dump_frame.is_some() && !self.dump_frame_written {
-                    state.core.draw_list.start_recording();
-                }
-
-                let viewport_rect = [
-                    0.0,
-                    0.0,
-                    size.width as f32 / scale,
-                    size.height as f32 / scale,
-                ];
-
-                state.layout.compute(
-                    state.page.root,
-                    (Some(viewport_rect[2]), Some(viewport_rect[3])),
-                    |_, _, _, _, _| Size::ZERO,
-                );
-
-                if do_dump_layout && !self.dump_layout_written {
-                    self.dump_layout_written = true;
-                    for (name, rect) in state.layout.labeled_rects() {
-                        println!("{} {} {} {} {}", name, rect[0], rect[1], rect[2], rect[3]);
-                    }
-                    event_loop.exit();
-                    return;
-                }
-
-                let script_capture_path = if let Some(runner) = self.script_runner.as_mut() {
-                    runner.advance(
-                        &mut state.core.input,
-                        &mut state.core.text_edit_keybindings,
-                        &state.layout,
-                        Instant::now(),
-                    )
-                } else {
-                    None
-                };
-
-                let row_keys = &state.row_keys;
-                let selected_slice = if let Some(key) = state.selected_key {
-                    vec![key]
-                } else {
-                    vec![]
-                };
-
-                let grid_resp = data_grid_begin(
-                    &mut state.core,
-                    &state.layout,
-                    state.grid_node,
-                    &mut state.grid_state,
-                    state.records.len(),
-                    row_keys,
-                    32.0,
-                    36.0,
-                    &state.columns,
-                    &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                );
-
-                data_grid_header_begin(
-                    &mut state.core,
-                    &grid_resp,
-                    &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                );
-                for (col_i, col_name) in COLUMN_NAMES.iter().enumerate() {
-                    let sort = if state.sort_col == Some(col_i) {
-                        state.sort_dir
-                    } else {
-                        DataGridSortDirection::None
-                    };
-                    let hdr_resp = data_grid_header_cell(
-                        &mut state.core,
-                        &state.layout,
-                        &grid_resp,
-                        state.grid_node,
-                        col_i,
-                        &state.columns,
-                        &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                        col_name,
-                        sort,
-                    );
-                    if hdr_resp.clicked {
-                        if state.sort_col == Some(col_i) {
-                            state.sort_dir = match state.sort_dir {
-                                DataGridSortDirection::Ascending => {
-                                    DataGridSortDirection::Descending
-                                }
-                                DataGridSortDirection::Descending => DataGridSortDirection::None,
-                                DataGridSortDirection::None => DataGridSortDirection::Ascending,
-                            };
-                        } else {
-                            state.sort_col = Some(col_i);
-                            state.sort_dir = DataGridSortDirection::Ascending;
-                        }
-                        if state.sort_dir != DataGridSortDirection::None {
-                            let col = state.sort_col.unwrap();
-                            state.records.sort_by(|a, b| {
-                                compare_records(
-                                    a,
-                                    b,
-                                    col,
-                                    state.sort_dir == DataGridSortDirection::Ascending,
-                                )
-                            });
-                        } else {
-                            state.records.sort_by_key(|r| r.original_index);
-                        }
-                        state.row_keys = rebuild_row_keys(&state.records);
-                    }
-                }
-                data_grid_header_end(&mut state.core);
-
-                data_grid_body_begin(
-                    &mut state.core,
-                    &grid_resp,
-                    &state.row_keys,
-                    &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                    &selected_slice,
-                );
-                for row_i in grid_resp.visible_rows.clone() {
-                    if row_i >= state.records.len() {
-                        break;
-                    }
-                    let record = &state.records[row_i];
-                    let row_key = record.original_index as u64;
-                    let is_selected = state.selected_key == Some(row_key);
-                    for col_i in grid_resp.visible_columns.clone() {
-                        if col_i >= state.columns.len() {
-                            break;
-                        }
-                        let cell_text = if col_i == COUNTRY_COLUMN {
-                            ""
-                        } else {
-                            &record.cells[col_i]
-                        };
-                        let cell_resp = data_grid_cell(
-                            &mut state.core,
-                            &state.layout,
-                            &grid_resp,
-                            state.grid_node,
-                            row_i,
-                            row_key,
-                            col_i,
-                            &state.columns,
-                            &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                            cell_text,
-                            is_selected,
-                        );
-                        if col_i == COUNTRY_COLUMN {
-                            let text_id = state.layout.widget_id_keyed(state.grid_node, row_key)
-                                ^ state.columns[col_i].key
-                                ^ COUNTRY_PILL_DOMAIN;
-                            badge_pill(
-                                &mut state.core,
-                                cell_resp.rect,
-                                text_id,
-                                &record.cells[col_i],
-                                record.country_color,
-                                0xFFFFFFFF,
-                                &AKAR_THEME_DARK,
-                            );
-                        }
-                        if cell_resp.clicked {
-                            state.selected_key = Some(row_key);
-                            state.grid_state.active_row_key = row_key;
-                            state.grid_state.active_column_key = state.columns[col_i].key;
-                            state.grid_state.has_active_cell = true;
-                        }
-                    }
-                }
-                data_grid_body_end(&mut state.core);
-
-                data_grid_end(&mut state.core);
-
-                let kb_resp = data_grid_handle_keyboard(
-                    &mut state.core,
-                    &state.layout,
-                    state.grid_node,
-                    &mut state.grid_state,
-                    state.records.len(),
-                    &state.row_keys,
-                    &state.columns,
-                    &DataGridStyle::from_theme(&AKAR_THEME_DARK),
-                );
-                if kb_resp.cell_changed || kb_resp.activated {
-                    state.selected_key = Some(state.grid_state.active_row_key);
-                }
-
-                let normal_capture = !self.screenshot_taken
-                    && has_screenshot
-                    && self
-                        .start_time
-                        .is_some_and(|t| t.elapsed() >= Duration::from_secs_f64(delay));
-                let is_capture_frame = normal_capture || script_capture_path.is_some();
-
-                if is_capture_frame {
-                    state.core.request_screenshot();
-                }
-
-                let mut encoder = state
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-                {
-                    let surface_view = output
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
-                    let render_view = if is_capture_frame {
-                        state
-                            .core
-                            .capture_target_view(&state.device, size.width, size.height)
-                            .unwrap()
-                    } else {
-                        surface_view
-                    };
-
-                    let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("main pass"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &render_view,
-                            depth_slice: None,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    });
-                    let _ = state.core.end_frame(&state.device, &state.queue, &mut pass);
-                }
-
-                let is_standalone = !has_screenshot && self.script_runner.is_none();
-                let is_dump_frame = dump_frame.is_some()
-                    && !self.dump_frame_written
-                    && (is_capture_frame || is_standalone);
-                if is_dump_frame {
-                    let path = dump_frame.clone().unwrap();
-                    let dump = serde_json::json!({
-                        "recorded_calls": state.core.draw_list.recorded_calls(),
-                        "labeled_rects": state.layout.labeled_rects(),
-                    });
-                    match std::fs::File::create(&path) {
-                        Ok(file) => {
-                            if let Err(e) = serde_json::to_writer_pretty(file, &dump) {
-                                eprintln!("Failed to write frame dump '{path}': {e}");
-                                std::process::exit(1);
-                            }
-                            eprintln!("Frame dump written to {path}");
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to create file '{path}': {e}");
-                            std::process::exit(1);
-                        }
-                    }
-                    self.dump_frame_written = true;
-                    state.core.draw_list.stop_recording();
-                    if do_exit && is_standalone {
-                        event_loop.exit();
-                    }
-                }
-
-                if is_capture_frame {
-                    let capture_path = if let Some(p) = &script_capture_path {
-                        p.clone()
-                    } else {
-                        screenshot_path.clone().unwrap()
-                    };
-                    match state
-                        .core
-                        .take_screenshot(&state.device, &state.queue, encoder, &output)
-                    {
-                        Ok(frame) => match std::fs::File::create(&capture_path) {
-                            Ok(file) => {
-                                let mut png_encoder =
-                                    png::Encoder::new(file, frame.width, frame.height);
-                                png_encoder.set_color(png::ColorType::Rgba);
-                                png_encoder.set_depth(png::BitDepth::Eight);
-                                match png_encoder.write_header() {
-                                    Ok(mut writer) => {
-                                        if let Err(e) = writer.write_image_data(&frame.rgba) {
-                                            eprintln!("Failed to write PNG data: {e}");
-                                            std::process::exit(1);
-                                        }
-                                        eprintln!("Screenshot saved to {capture_path}");
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to write PNG header: {e}");
-                                        std::process::exit(1);
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to create file '{capture_path}': {e}");
-                                std::process::exit(1);
-                            }
-                        },
-                        Err(e) => {
-                            eprintln!("Screenshot failed: {e}");
-                            std::process::exit(1);
-                        }
-                    }
-                    self.screenshot_taken = true;
-                    if do_exit {
-                        event_loop.exit();
-                    }
-                } else {
-                    state.queue.submit(std::iter::once(encoder.finish()));
-                }
-                output.present();
             }
+            WindowEvent::RedrawRequested => redraw_now = true,
             _ => {}
+        }
+
+        let in_transaction = redraw_now && matches!(event, WindowEvent::Resized(_));
+        if in_transaction {
+            akar_winit::set_presents_with_transaction(&state.surface, true);
+        }
+        if redraw_now {
+            self.redraw(event_loop);
+        }
+        let Some(state) = &mut self.state else {
+            return;
+        };
+        if in_transaction {
+            akar_winit::set_presents_with_transaction(&state.surface, false);
         }
 
         process_window_event(&mut state.core.input, &event);
 
-        if let WindowEvent::RedrawRequested = event {
-        } else {
+        if !redraw_now {
             state.window.request_redraw();
         }
     }

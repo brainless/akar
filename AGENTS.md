@@ -157,7 +157,7 @@ Multi-capture in one run is expressed via multiple `screenshot` lines in a `--sc
 | `akar-layout` | taffy wrapper, flex tree → pixel rect resolution | Rendering, components |
 | `akar-components` | All UI components; calls core + layout | wgpu directly, windowing |
 | `akar-c-api` | `extern "C"` surface, `AkarCtx` opaque handle | Business logic (delegates to components) |
-| `akar-winit` | winit event → akar input bridge | Everything else |
+| `akar-winit` | winit event → akar input bridge; wgpu surface presentation helpers for winit windows (e.g. macOS resize presentation) | Components, layout, rendering |
 
 ## C ABI contract
 

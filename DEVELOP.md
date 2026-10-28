@@ -95,7 +95,7 @@ akar/
 │   ├── akar-layout/              # taffy wrapper; resolves flex trees to pixel rects
 │   ├── akar-components/          # all UI components (30+ components implemented)
 │   ├── akar-c-api/               # extern "C" bindings; produces libakar + akar.h
-│   └── akar-winit/               # optional: winit event → akar input bridge
+│   └── akar-winit/               # optional: winit event → akar input bridge, surface presentation helpers
 └── examples/
     ├── demo-rust/                # comprehensive demo of all components; CLI debug toolchain
     ├── canvas-basic-rust/        # canvas component example
@@ -150,6 +150,10 @@ The developer supplies a wgpu `Device + Queue + Surface` (or the C equivalent). 
 Rust hosts submit native drag events with `core.input.push_file_drag(FileDragInput::Enter { position, paths })`, `Move`, `Drop`, and `Leave`. Positions must be finite, window-local coordinates in the same space as `Layout::rect(node)` and ordinary pointer hit-testing. For a layout computed in logical pixels, convert a native physical-pixel position by dividing each axis by the window scale factor. Keep the drag event's own coordinates; the last ordinary mouse position may be stale during an OS drag. Submit events before rendering the frame that calls `file_drop_target(&mut core, &layout, node)`. A drop can carry multiple native `PathBuf`s; the application receives them without akar opening or inspecting them. `AkarCore::end_frame` clears completed drops after that frame.
 
 `akar-winit::process_window_event` uses winit 0.30, whose file events supply paths but no coordinates. It records each `DroppedFile` as an unpositioned window-level drop in `input.unpositioned_file_drops`. The application may handle those paths at window level, but `file_drop_target` cannot associate them with a node. `HoveredFile` cannot establish node hover without a position. A host with a native positioned drag hook should call `push_file_drag` directly with the native event's position and paths; do not derive the drop position from `CursorMoved` or `InputState::mouse_pos`. If the host also forwards winit's path-only events for the same drag, avoid submitting the same paths twice.
+
+### Window resize presentation
+
+When a winit window resizes, reconfigure the surface and render a frame synchronously from `WindowEvent::Resized`, rather than only requesting a redraw. Do not request another redraw for that event. On macOS, wrap that frame in `akar_winit::set_presents_with_transaction(&surface, true)` / `(…, false)`. Otherwise the layer takes the new bounds before the frame arrives and the compositor visibly scales stale frames, so text appears to stretch and shake. The helper is a no-op on other platforms. All examples follow this pattern; `examples/canvas-basic-rust` is the smallest.
 
 ### Immediate mode and large datasets
 
