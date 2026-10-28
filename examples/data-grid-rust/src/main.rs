@@ -26,6 +26,9 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+#[cfg(target_os = "macos")]
+mod activation;
+mod resize;
 mod script;
 use script::{parse_script, ScriptRunner};
 
@@ -251,6 +254,9 @@ fn parse_cli() -> CliConfig {
 
 struct AppState {
     window: Arc<Window>,
+    #[cfg(target_os = "macos")]
+    startup_activation: activation::StartupActivation,
+    resize_edges: resize::ResizeEdges,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
@@ -334,6 +340,7 @@ impl ApplicationHandler for App {
             .unwrap_or(LogicalSize::new(1280.0, 800.0));
         let window_attrs = WindowAttributes::default()
             .with_title("akar data grid")
+            .with_min_inner_size(resize::MIN_WINDOW_SIZE)
             .with_inner_size(initial_size);
         let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
 
@@ -387,12 +394,18 @@ impl ApplicationHandler for App {
         let row_keys = rebuild_row_keys(&records);
         let columns = columns();
 
+        resize::trace_window_ready(&window);
+        window.request_redraw();
+
         if self.config.screenshot.is_some() {
             self.start_time = Some(Instant::now());
         }
 
         self.state = Some(AppState {
             window,
+            #[cfg(target_os = "macos")]
+            startup_activation: activation::StartupActivation::default(),
+            resize_edges: resize::ResizeEdges::default(),
             device,
             queue,
             surface,
@@ -411,6 +424,14 @@ impl ApplicationHandler for App {
         });
     }
 
+    #[cfg(target_os = "macos")]
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        let Some(state) = &mut self.state else {
+            return;
+        };
+        state.startup_activation.drive(&state.window, event_loop);
+    }
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -421,6 +442,16 @@ impl ApplicationHandler for App {
             return;
         };
 
+        #[cfg(target_os = "macos")]
+        if matches!(event, WindowEvent::Focused(true)) {
+            state.startup_activation.focused(event_loop);
+        }
+
+        if state.resize_edges.process(&state.window, &event) {
+            state.window.request_redraw();
+            return;
+        }
+
         let has_screenshot = self.config.screenshot.is_some();
         let screenshot_path = self.config.screenshot.clone();
         let delay = self.config.delay;
@@ -429,15 +460,6 @@ impl ApplicationHandler for App {
         let do_dump_layout = self.config.dump_layout;
 
         match event {
-            WindowEvent::Resized(new_size) => {
-                if new_size.width > 0 && new_size.height > 0 {
-                    state.surface_config.width = new_size.width;
-                    state.surface_config.height = new_size.height;
-                    state
-                        .surface
-                        .configure(&state.device, &state.surface_config);
-                }
-            }
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
@@ -447,6 +469,17 @@ impl ApplicationHandler for App {
                     return;
                 }
                 let scale = state.window.scale_factor() as f32;
+
+                // Native resize events can lag behind the current window bounds.
+                if state.surface_config.width != size.width
+                    || state.surface_config.height != size.height
+                {
+                    state.surface_config.width = size.width;
+                    state.surface_config.height = size.height;
+                    state
+                        .surface
+                        .configure(&state.device, &state.surface_config);
+                }
 
                 let output = match state.surface.get_current_texture() {
                     CurrentSurfaceTexture::Success(t) | CurrentSurfaceTexture::Suboptimal(t) => t,
@@ -466,6 +499,7 @@ impl ApplicationHandler for App {
                         return;
                     }
                 };
+                let size = output.texture.size();
 
                 state.core.begin_frame(size.width, size.height, scale);
 
