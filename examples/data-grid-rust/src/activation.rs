@@ -4,6 +4,7 @@ use objc2::{available, MainThreadMarker};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationOptions, NSRunningApplication, NSWorkspace,
 };
+use objc2_foundation::ns_string;
 use winit::{
     event_loop::{ActiveEventLoop, ControlFlow},
     window::Window,
@@ -16,6 +17,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 enum Phase {
     #[default]
     Initial,
+    WaitingForDock,
     WaitingForApp,
     WaitingForWindow,
     Finished,
@@ -23,6 +25,7 @@ enum Phase {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Action {
+    ActivateDock,
     Activate,
     Focus,
     Wait,
@@ -50,13 +53,20 @@ impl StartupActivation {
             self.phase = Phase::Finished;
             return Action::Timeout;
         }
-        if app_active && matches!(self.phase, Phase::Initial | Phase::WaitingForApp) {
+        if app_active && self.phase != Phase::WaitingForWindow {
             self.phase = Phase::WaitingForWindow;
             return Action::Focus;
         }
-        if self.phase == Phase::Initial {
-            self.phase = Phase::WaitingForApp;
-            return Action::Activate;
+        match self.phase {
+            Phase::Initial => {
+                self.phase = Phase::WaitingForDock;
+                return Action::ActivateDock;
+            }
+            Phase::WaitingForDock => {
+                self.phase = Phase::WaitingForApp;
+                return Action::Activate;
+            }
+            _ => {}
         }
         Action::Wait
     }
@@ -76,6 +86,21 @@ impl StartupActivation {
             trace(&app, window, &action);
         }
         match action {
+            // A terminal-launched unbundled process can be reported frontmost while AppKit
+            // keeps it inactive, which leaves it without a key window and ignores cursor
+            // updates. Handing activation to the Dock first lets the self-activation succeed.
+            Action::ActivateDock => {
+                if let Some(dock) = NSRunningApplication::runningApplicationsWithBundleIdentifier(
+                    ns_string!("com.apple.dock"),
+                )
+                .firstObject()
+                {
+                    #[allow(deprecated)]
+                    dock.activateWithOptions(
+                        NSApplicationActivationOptions::ActivateIgnoringOtherApps,
+                    );
+                }
+            }
             Action::Activate => {
                 if available!(macos = 14.0) {
                     app.activate();
@@ -128,7 +153,11 @@ mod tests {
     fn waits_for_app_activation_before_requesting_window_focus_once() {
         let now = Instant::now();
         let mut activation = StartupActivation::default();
-        assert_eq!(activation.poll(now, false, false), Action::Activate);
+        assert_eq!(activation.poll(now, false, false), Action::ActivateDock);
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL / 2, false, false),
+            Action::Activate
+        );
         assert_eq!(
             activation.poll(now + POLL_INTERVAL, false, false),
             Action::Wait
@@ -155,7 +184,11 @@ mod tests {
     fn denied_activation_stops_at_deadline_without_further_requests() {
         let now = Instant::now();
         let mut activation = StartupActivation::default();
-        assert_eq!(activation.poll(now, false, false), Action::Activate);
+        assert_eq!(activation.poll(now, false, false), Action::ActivateDock);
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL, false, false),
+            Action::Activate
+        );
         assert_eq!(
             activation.poll(now + STARTUP_TIMEOUT, false, false),
             Action::Timeout
