@@ -431,3 +431,22 @@ At 100,000 rows, maximum RSS fell from 153.5 MiB to 125.4 MiB in debug and from
 ranges, RSS remained bounded at 129.1 MiB debug and 120.3 MiB release. The
 initial full-grid screenshot remained pixel-identical (0 of 1,024,000 pixels
 changed).
+
+## Post-completion native resize follow-up — 2026-10-28
+
+**Status:** Done.
+
+Removed the data-grid example's redundant client-side right/bottom/corner resize
+targets after manual native-only verification on macOS. The initial terminal
+launch and two quit/relaunch cycles (PIDs 74872, 74979, and 74999 in
+`/tmp/akar-native-resize.log`) each recorded width-only, height-only, and combined
+size changes. The user confirmed normal resize cursors throughout and no manual
+window or Dock activation before testing. The first launch briefly gained and
+lost focus, then recovered before dragging; immediate startup focus stability is
+not established by this check. Startup activation behavior remains unchanged.
+
+The minimum window size now belongs to the example's window configuration.
+Optional `AKAR_DEBUG_WINDOW` diagnostics live independently in `window_debug.rs`,
+so activation and resize events remain observable. Synchronous resize rendering
+and macOS transaction presentation are preserved. Native resizing is now the
+normal path; the temporary `--native-resize` verification flag was removed.

@@ -107,7 +107,7 @@ impl StartupActivation {
                 } else {
                     let accepted = NSRunningApplication::currentApplication()
                         .activateWithOptions(NSApplicationActivationOptions::ActivateAllWindows);
-                    if crate::resize::tracing_enabled() {
+                    if crate::window_debug::tracing_enabled() {
                         eprintln!("[window] activation-request accepted={accepted}");
                     }
                 }
@@ -132,7 +132,7 @@ impl StartupActivation {
 }
 
 fn trace(app: &NSApplication, window: &Window, action: &Action) {
-    if crate::resize::tracing_enabled() {
+    if crate::window_debug::tracing_enabled() {
         let frontmost_pid = NSWorkspace::sharedWorkspace()
             .frontmostApplication()
             .map(|application| application.processIdentifier());

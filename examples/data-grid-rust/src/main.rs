@@ -28,10 +28,11 @@ use winit::{
 
 #[cfg(target_os = "macos")]
 mod activation;
-mod resize;
 mod script;
+mod window_debug;
 use script::{parse_script, ScriptRunner};
 
+const MIN_WINDOW_SIZE: LogicalSize<f64> = LogicalSize::new(320.0, 240.0);
 const DEFAULT_ROWS: usize = 100_000;
 const DEFAULT_SEED: u64 = 42;
 const COUNTRY_COLUMN: usize = 5;
@@ -256,7 +257,7 @@ struct AppState {
     window: Arc<Window>,
     #[cfg(target_os = "macos")]
     startup_activation: activation::StartupActivation,
-    resize_edges: resize::ResizeEdges,
+    window_debug: window_debug::WindowDebug,
     device: wgpu::Device,
     queue: wgpu::Queue,
     surface: wgpu::Surface<'static>,
@@ -700,7 +701,7 @@ impl ApplicationHandler for App {
             .unwrap_or(LogicalSize::new(1280.0, 800.0));
         let window_attrs = WindowAttributes::default()
             .with_title("akar data grid")
-            .with_min_inner_size(resize::MIN_WINDOW_SIZE)
+            .with_min_inner_size(MIN_WINDOW_SIZE)
             .with_inner_size(initial_size);
         let window = Arc::new(event_loop.create_window(window_attrs).unwrap());
 
@@ -754,7 +755,7 @@ impl ApplicationHandler for App {
         let row_keys = rebuild_row_keys(&records);
         let columns = columns();
 
-        resize::trace_window_ready(&window);
+        let window_debug = window_debug::WindowDebug::new(&window);
         window.request_redraw();
 
         if self.config.screenshot.is_some() {
@@ -765,7 +766,7 @@ impl ApplicationHandler for App {
             window,
             #[cfg(target_os = "macos")]
             startup_activation: activation::StartupActivation::default(),
-            resize_edges: resize::ResizeEdges::default(),
+            window_debug,
             device,
             queue,
             surface,
@@ -807,10 +808,7 @@ impl ApplicationHandler for App {
             state.startup_activation.focused(event_loop);
         }
 
-        if state.resize_edges.process(&state.window, &event) {
-            state.window.request_redraw();
-            return;
-        }
+        state.window_debug.event(&state.window, &event);
 
         let mut redraw_now = false;
         match &event {
