@@ -12,6 +12,7 @@ use winit::{
 
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
+const FOCUS_SETTLE_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Default, Debug, PartialEq, Eq)]
 enum Phase {
@@ -37,6 +38,7 @@ enum Action {
 pub struct StartupActivation {
     phase: Phase,
     deadline: Option<Instant>,
+    focused_since: Option<Instant>,
 }
 
 impl StartupActivation {
@@ -44,29 +46,32 @@ impl StartupActivation {
         if self.phase == Phase::Finished {
             return Action::Finish;
         }
-        if window_focused {
-            self.phase = Phase::Finished;
-            return Action::Finish;
-        }
         let deadline = *self.deadline.get_or_insert(now + STARTUP_TIMEOUT);
         if now >= deadline {
             self.phase = Phase::Finished;
             return Action::Timeout;
         }
+        // Finish the Dock handoff even if its asynchronous transition briefly focuses us.
+        if self.phase == Phase::WaitingForDock {
+            self.phase = Phase::WaitingForApp;
+            return Action::Activate;
+        }
+        if app_active && window_focused {
+            let focused_since = *self.focused_since.get_or_insert(now);
+            if now.duration_since(focused_since) >= FOCUS_SETTLE_INTERVAL {
+                self.phase = Phase::Finished;
+                return Action::Finish;
+            }
+            return Action::Wait;
+        }
+        self.focused_since = None;
         if app_active && self.phase != Phase::WaitingForWindow {
             self.phase = Phase::WaitingForWindow;
             return Action::Focus;
         }
-        match self.phase {
-            Phase::Initial => {
-                self.phase = Phase::WaitingForDock;
-                return Action::ActivateDock;
-            }
-            Phase::WaitingForDock => {
-                self.phase = Phase::WaitingForApp;
-                return Action::Activate;
-            }
-            _ => {}
+        if self.phase == Phase::Initial {
+            self.phase = Phase::WaitingForDock;
+            return Action::ActivateDock;
         }
         Action::Wait
     }
@@ -122,13 +127,6 @@ impl StartupActivation {
         let next_poll = (now + POLL_INTERVAL).min(self.deadline.unwrap());
         event_loop.set_control_flow(ControlFlow::WaitUntil(next_poll));
     }
-
-    pub fn focused(&mut self, event_loop: &ActiveEventLoop) {
-        if self.phase != Phase::Finished {
-            self.phase = Phase::Finished;
-            event_loop.set_control_flow(ControlFlow::Wait);
-        }
-    }
 }
 
 fn trace(app: &NSApplication, window: &Window, action: &Action) {
@@ -172,10 +170,10 @@ mod tests {
         );
         assert_eq!(
             activation.poll(now + POLL_INTERVAL * 4, true, true),
-            Action::Finish
+            Action::Wait
         );
         assert_eq!(
-            activation.poll(now + POLL_INTERVAL * 5, false, false),
+            activation.poll(now + POLL_INTERVAL * 6, true, true),
             Action::Finish
         );
     }
@@ -203,5 +201,78 @@ mod tests {
     fn already_active_app_skips_activation_request() {
         let mut activation = StartupActivation::default();
         assert_eq!(activation.poll(Instant::now(), true, false), Action::Focus);
+    }
+
+    #[test]
+    fn transient_focus_during_dock_handoff_does_not_cancel_activation() {
+        let now = Instant::now();
+        let mut activation = StartupActivation::default();
+        assert_eq!(activation.poll(now, false, false), Action::ActivateDock);
+        assert_eq!(
+            activation.poll(now + Duration::from_millis(14), true, true),
+            Action::Activate
+        );
+        assert_eq!(
+            activation.poll(now + Duration::from_millis(25), false, false),
+            Action::Wait
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL, true, false),
+            Action::Focus
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 2, true, true),
+            Action::Wait
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 2 + FOCUS_SETTLE_INTERVAL, true, true),
+            Action::Finish
+        );
+        assert_eq!(
+            activation.poll(now + STARTUP_TIMEOUT * 2, false, false),
+            Action::Finish
+        );
+    }
+
+    #[test]
+    fn focus_must_remain_stable_while_application_is_active() {
+        let now = Instant::now();
+        let mut activation = StartupActivation::default();
+        assert_eq!(activation.poll(now, true, true), Action::Wait);
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL, true, false),
+            Action::Focus
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 2, true, true),
+            Action::Wait
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 3, false, true),
+            Action::Wait
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 4, true, true),
+            Action::Wait
+        );
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL * 4 + FOCUS_SETTLE_INTERVAL, true, true),
+            Action::Finish
+        );
+    }
+
+    #[test]
+    fn inactive_application_with_focused_window_still_requires_activation() {
+        let now = Instant::now();
+        let mut activation = StartupActivation::default();
+        assert_eq!(activation.poll(now, false, true), Action::ActivateDock);
+        assert_eq!(
+            activation.poll(now + POLL_INTERVAL, false, true),
+            Action::Activate
+        );
+        assert_eq!(
+            activation.poll(now + STARTUP_TIMEOUT, false, true),
+            Action::Timeout
+        );
     }
 }

@@ -20,4 +20,9 @@ quit/relaunch cycles. All three logs showed width-only, height-only, and combine
 size changes. The user confirmed normal resize cursors throughout and no manual
 window or Dock activation before testing. The initial launch briefly lost focus
 and recovered before dragging; these checks do not establish immediately stable
-startup focus. Startup activation behavior is unchanged.
+startup focus.
+
+Startup activation completes any pending Dock handoff and requires both an active
+application and a focused window for 100 ms before finishing, within a one-second
+startup deadline. A transient focus event does not cancel activation. After
+completion, later focus changes do not trigger another activation attempt.

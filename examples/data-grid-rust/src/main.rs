@@ -803,11 +803,6 @@ impl ApplicationHandler for App {
             return;
         };
 
-        #[cfg(target_os = "macos")]
-        if matches!(event, WindowEvent::Focused(true)) {
-            state.startup_activation.focused(event_loop);
-        }
-
         state.window_debug.event(&state.window, &event);
 
         let mut redraw_now = false;

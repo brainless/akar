@@ -450,3 +450,21 @@ Optional `AKAR_DEBUG_WINDOW` diagnostics live independently in `window_debug.rs`
 so activation and resize events remain observable. Synchronous resize rendering
 and macOS transaction presentation are preserved. Native resizing is now the
 normal path; the temporary `--native-resize` verification flag was removed.
+
+### Startup activation race follow-up
+
+A subsequent manual run required a click before native resize interaction. Logs
+showed a transient focus gain/loss during Dock handoff; the activation state
+machine previously finished on the first raw focus event and skipped its pending
+application activation. The prior native-only test mode and the removal both
+bypassed the helper, so the evidence does not establish helper deletion as the
+cause of that race.
+
+Startup activation now completes a pending Dock handoff and waits for both active
+application state and window focus to remain observed for 100 ms. The existing
+one-second timeout and terminal completion state prevent indefinite retries or
+reactivation after startup. Regression tests cover transient handoff focus,
+interrupted focus/application activity, and inactive-but-focused windows. The user
+confirmed that native resize interaction works without a preliminary focus click
+after this change. Workspace tests, focused strict Clippy, formatting, and diff
+checks pass.
