@@ -22,12 +22,10 @@ use winit::{
     application::ApplicationHandler,
     dpi::LogicalSize,
     event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoop},
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::{Window, WindowAttributes},
 };
 
-#[cfg(target_os = "macos")]
-mod activation;
 mod script;
 mod window_debug;
 use script::{parse_script, ScriptRunner};
@@ -255,8 +253,7 @@ fn parse_cli() -> CliConfig {
 
 struct AppState {
     window: Arc<Window>,
-    #[cfg(target_os = "macos")]
-    startup_activation: activation::StartupActivation,
+    startup_activation: akar_winit::StartupActivation,
     window_debug: window_debug::WindowDebug,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -277,6 +274,19 @@ struct AppState {
 
 fn rebuild_row_keys(records: &[Record]) -> Vec<u64> {
     records.iter().map(|r| r.original_index as u64).collect()
+}
+
+fn startup_schedule(host: ControlFlow, progress: akar_winit::ActivationProgress) -> ControlFlow {
+    match (host, progress) {
+        (ControlFlow::Poll, _) => ControlFlow::Poll,
+        (ControlFlow::WaitUntil(deadline), akar_winit::ActivationProgress::Pending { wake_at }) => {
+            ControlFlow::WaitUntil(deadline.min(wake_at))
+        }
+        (ControlFlow::Wait, akar_winit::ActivationProgress::Pending { wake_at }) => {
+            ControlFlow::WaitUntil(wake_at)
+        }
+        (host, _) => host,
+    }
 }
 
 fn main() {
@@ -764,8 +774,7 @@ impl ApplicationHandler for App {
 
         self.state = Some(AppState {
             window,
-            #[cfg(target_os = "macos")]
-            startup_activation: activation::StartupActivation::default(),
+            startup_activation: akar_winit::StartupActivation::for_unbundled_launch(),
             window_debug,
             device,
             queue,
@@ -785,12 +794,22 @@ impl ApplicationHandler for App {
         });
     }
 
-    #[cfg(target_os = "macos")]
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let Some(state) = &mut self.state else {
             return;
         };
-        state.startup_activation.drive(&state.window, event_loop);
+        if event_loop.exiting() {
+            state.startup_activation.cancel();
+            return;
+        }
+        let progress = state.startup_activation.poll(&state.window, Instant::now());
+        event_loop.set_control_flow(startup_schedule(ControlFlow::Wait, progress));
+    }
+
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(state) = &mut self.state {
+            state.startup_activation.cancel();
+        }
     }
 
     fn window_event(
@@ -808,6 +827,7 @@ impl ApplicationHandler for App {
         let mut redraw_now = false;
         match &event {
             WindowEvent::CloseRequested => {
+                state.startup_activation.cancel();
                 event_loop.exit();
             }
             WindowEvent::Resized(new_size) => {
@@ -850,6 +870,43 @@ impl ApplicationHandler for App {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn activation_deadline_preserves_host_schedule_and_disappears_when_finished() {
+        use super::{startup_schedule, ControlFlow, Instant};
+        use akar_winit::ActivationProgress;
+        use std::time::Duration;
+
+        let wake_at = Instant::now() + Duration::from_millis(50);
+        let pending = ActivationProgress::Pending { wake_at };
+        assert_eq!(
+            startup_schedule(ControlFlow::Poll, pending),
+            ControlFlow::Poll
+        );
+        for deadline in [
+            wake_at - Duration::from_millis(10),
+            wake_at + Duration::from_millis(10),
+        ] {
+            assert_eq!(
+                startup_schedule(ControlFlow::WaitUntil(deadline), pending),
+                ControlFlow::WaitUntil(deadline.min(wake_at))
+            );
+        }
+        assert_eq!(
+            startup_schedule(ControlFlow::Wait, pending),
+            ControlFlow::WaitUntil(wake_at)
+        );
+        for terminal in [
+            ActivationProgress::Focused,
+            ActivationProgress::TimedOut,
+            ActivationProgress::Skipped,
+        ] {
+            assert_eq!(
+                startup_schedule(ControlFlow::Wait, terminal),
+                ControlFlow::Wait
+            );
+        }
+    }
+
     use super::*;
 
     fn record(original_index: usize, amount: f64, name: &str) -> Record {

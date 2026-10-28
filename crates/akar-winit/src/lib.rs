@@ -3,6 +3,8 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 
 mod surface;
 pub use surface::set_presents_with_transaction;
+mod activation;
+pub use activation::{ActivationProgress, StartupActivation};
 
 fn is_committed_text_char(c: char) -> bool {
     !c.is_control()

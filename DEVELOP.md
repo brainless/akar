@@ -155,6 +155,34 @@ Rust hosts submit native drag events with `core.input.push_file_drag(FileDragInp
 
 When a winit window resizes, reconfigure the surface and render a frame synchronously from `WindowEvent::Resized`, rather than only requesting a redraw. Do not request another redraw for that event. On macOS, wrap that frame in `akar_winit::set_presents_with_transaction(&surface, true)` / `(…, false)`. Otherwise the layer takes the new bounds before the frame arrives and the compositor visibly scales stale frames, so text appears to stretch and shake. The helper is a no-op on other platforms. All examples follow this pattern; `examples/canvas-basic-rust` is the smallest.
 
+### Opt-in startup activation
+
+`akar_winit::StartupActivation::for_unbundled_launch()` enables bounded startup
+focus recovery for terminal-launched, unbundled macOS applications. It skips
+bundled applications, non-Regular activation policies (including accessory apps),
+invisible windows, and other platforms. Normal Finder/LaunchServices launches
+should use ordinary winit startup. The data-grid example explicitly opts in;
+other examples do not enable this workaround automatically.
+
+Create the helper after winit starts, then call `poll(&window, Instant::now())`
+on the main thread from `about_to_wait`. `Pending { wake_at }` asks the host to
+wake again; the helper never changes `ControlFlow`. Recompute the host's own
+schedule each callback, then merge this deadline: preserve `Poll`, use the earlier
+of `WaitUntil(deadline)` and `wake_at`, or replace `Wait` with
+`WaitUntil(wake_at)`. Terminal results `Focused`, `TimedOut`, and `Skipped` add no
+deadline. Do not reuse an expired helper deadline as the host's base schedule.
+`examples/data-grid-rust/src/main.rs` demonstrates this merge. A demo-rust
+integration would merge with its existing screenshot deadline in the same way.
+
+The helper is one-shot, throttles platform requests, and stops after one second
+or stable focus. Call `cancel()` when closing or abandoning startup; cancellation
+performs no activation, and terminal results remain stable. Intentional inactivity
+must be handled by the caller: do not opt in (or cancel before polling) when using
+`WindowAttributes::with_active(false)` or macOS
+`with_activate_ignoring_other_apps(false)`. winit exposes neither original
+preference through the resulting `Window`, so the helper cannot infer that intent.
+Debug messages use the `log` facade and the host's chosen logger.
+
 ### Immediate mode and large datasets
 
 Immediate mode does not conflict with virtualizing large lists or grids. The library provides:
