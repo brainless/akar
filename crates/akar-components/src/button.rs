@@ -3,7 +3,7 @@ use akar_core::{QuadCall, TextCall};
 use akar_layout::{Layout, NodeId};
 
 use crate::color::color_to_f32;
-use crate::text_style::TextStyle;
+use crate::text_style::{font_request_for_override, TextStyle};
 use crate::AkarTheme;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -135,12 +135,15 @@ pub fn button_styled(
         _pad: [0.0; 2],
     });
 
-    let buffer_id = core.text_pipeline.set_text(
+    // Only `font_family` and `font_weight` of `text_style` are honoured here;
+    // size and colour stay on the theme / `content_color`.
+    let buffer_id = core.text_pipeline.set_text_styled(
         Some(layout.widget_id(node_id)),
         label,
         glyphon::Metrics::new(theme.font_size_base, theme.font_size_base * 1.2),
         Some(rect[2]),
         None,
+        font_request_for_override(style.text_style.as_ref()),
         None,
     );
 
@@ -254,5 +257,61 @@ mod tests {
         assert!(!result.clicked);
         assert!(!result.hovered);
         assert!(!result.pressed);
+    }
+
+    /// Caret x at the end of the label shaped by `button_styled`.
+    fn label_end_x(style: &ButtonStyle) -> f32 {
+        let mut layout = Layout::new();
+        let node_id = layout.new_leaf(Style {
+            size: akar_layout::Size {
+                width: akar_layout::length(300.0_f32),
+                height: akar_layout::length(40.0_f32),
+            },
+            ..Default::default()
+        });
+        layout.compute(node_id, (Some(300.0), Some(100.0)), |_, _, _, _, _| {
+            akar_layout::Size::ZERO
+        });
+        let mut core = AkarCore::mock();
+        core.input.begin_frame();
+        core.draw_list.begin_frame(1.0);
+        let label = "Hamburgefonts";
+        button_styled(
+            &mut core,
+            &layout,
+            node_id,
+            label,
+            ButtonVariant::Solid,
+            style,
+            &AKAR_THEME_DARK,
+        );
+        core.text_pipeline
+            .geometry(layout.widget_id(node_id), label, label.len(), label.len())
+            .caret
+            .expect("caret is shaped")[0]
+    }
+
+    #[test]
+    fn text_style_default_label_is_unchanged() {
+        let plain = label_end_x(&ButtonStyle::empty());
+        let empty_style = ButtonStyle {
+            text_style: Some(TextStyle::empty()),
+            ..ButtonStyle::empty()
+        };
+        assert_eq!(plain, label_end_x(&empty_style));
+    }
+
+    #[test]
+    fn text_style_weight_and_family_reach_label_shaping() {
+        let plain = label_end_x(&ButtonStyle::empty());
+        let bold = ButtonStyle {
+            text_style: Some(TextStyle {
+                font_weight: Some(crate::FontWeight::Bold),
+                font_family: Some(crate::FontFamily::Serif),
+                ..TextStyle::empty()
+            }),
+            ..ButtonStyle::empty()
+        };
+        assert!(label_end_x(&bold) > plain);
     }
 }

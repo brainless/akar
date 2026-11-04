@@ -907,6 +907,25 @@ struct AkarTextAreaResponse akar_textarea(struct AkarCtx *ctx,
                                           uint8_t *copy_buf,
                                           uint32_t copy_capacity);
 
+/**
+ * Like `akar_textarea`, with an optional `AkarTextStyle` (NULL = defaults).
+ *
+ * Only the font family (including `font_family_name_handle`) and font
+ * weight are honoured; size, line height and colour stay on the theme.
+ */
+struct AkarTextAreaResponse akar_textarea_styled(struct AkarCtx *ctx,
+                                                 uint64_t node_id,
+                                                 uint8_t *value_buf,
+                                                 uint32_t *value_len,
+                                                 uint32_t value_capacity,
+                                                 struct AkarTextEditState *edit_state,
+                                                 float *scroll_y,
+                                                 const char *placeholder,
+                                                 bool cursor_visible,
+                                                 uint8_t *copy_buf,
+                                                 uint32_t copy_capacity,
+                                                 const struct AkarTextStyle *style);
+
 void akar_heading(struct AkarCtx *ctx,
                   uint64_t node_id,
                   const char *text,

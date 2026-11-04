@@ -127,6 +127,26 @@ pub(crate) fn resolved_to_font_request(rt: &ResolvedTextStyle) -> akar_core::Fon
     }
 }
 
+/// Font request for components that only expose an optional `TextStyle`
+/// override on top of the default face (regular-weight sans-serif).
+///
+/// Only `font_family` and `font_weight` are consulted; with `None` (or an empty
+/// style) the result equals `FontRequest::default()`, i.e. the same face
+/// `TextPipeline::set_text` shapes with.
+pub(crate) fn font_request_for_override(style: Option<&TextStyle>) -> akar_core::FontRequest {
+    let defaults = ResolvedTextStyle {
+        font_size: 0.0,
+        line_height: 0.0,
+        color: 0,
+        font_weight: FontWeight::Normal,
+        font_family: FontFamily::SansSerif,
+        align: TextAlign::Start,
+        wrap: false,
+    };
+    let theme = crate::AKAR_THEME_DARK;
+    resolved_to_font_request(&resolve_text_style(&theme, &defaults, style))
+}
+
 #[allow(dead_code)]
 pub(crate) fn resolved_to_metrics(rt: &ResolvedTextStyle) -> glyphon::Metrics {
     glyphon::Metrics::new(rt.font_size, rt.line_height)
@@ -378,6 +398,30 @@ mod tests {
         let resolved = resolve_text_style(&theme, &defaults, Some(&override_style));
 
         assert_eq!(resolved.font_family, FontFamily::Named(3));
+    }
+
+    #[test]
+    fn override_font_request_defaults_match_pipeline_default() {
+        assert_eq!(
+            font_request_for_override(None),
+            akar_core::FontRequest::default()
+        );
+        assert_eq!(
+            font_request_for_override(Some(&TextStyle::empty())),
+            akar_core::FontRequest::default()
+        );
+    }
+
+    #[test]
+    fn override_font_request_passes_named_family_and_weight() {
+        let style = TextStyle {
+            font_family: Some(FontFamily::Named(5)),
+            font_weight: Some(FontWeight::Bold),
+            ..TextStyle::empty()
+        };
+        let request = font_request_for_override(Some(&style));
+        assert_eq!(request.family, akar_core::FontSelection::Named(5));
+        assert_eq!(request.weight, glyphon::Weight::BOLD.0);
     }
 
     #[test]
