@@ -114,7 +114,9 @@ pub mod text_edit;
 pub use text_edit::TextEditState;
 
 pub mod textarea;
-pub use textarea::{textarea as akar_textarea, TextAreaResponse};
+pub use textarea::{
+    textarea as akar_textarea, textarea_styled as akar_textarea_styled, TextAreaResponse,
+};
 
 pub mod data_item;
 pub use data_item::{

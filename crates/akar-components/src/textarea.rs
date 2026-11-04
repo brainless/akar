@@ -6,6 +6,7 @@ use crate::text_edit::{
     apply_targeted_pastes, clipboard_shortcut, collapse_selection_visually, delete_selection,
     next_boundary, normalize_paste, previous_boundary, replace_selection, TextEditState,
 };
+use crate::text_style::{font_request_for_override, TextStyle};
 use crate::AkarTheme;
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -70,6 +71,39 @@ pub fn textarea(
     cursor_visible: bool,
     theme: &AkarTheme,
 ) -> TextAreaResponse {
+    textarea_styled(
+        core,
+        layout,
+        node_id,
+        value,
+        edit_state,
+        scroll_y,
+        placeholder,
+        cursor_visible,
+        None,
+        theme,
+    )
+}
+
+/// Like [`textarea`], with an optional `TextStyle` override.
+///
+/// Only `font_family` (including `FontFamily::Named`) and `font_weight` are
+/// honoured; size, line height and colour stay on the theme. The same font is
+/// used for rendering, caret/selection geometry and arrow-key motion.
+#[allow(clippy::too_many_arguments)]
+pub fn textarea_styled(
+    core: &mut AkarCore,
+    layout: &Layout,
+    node_id: NodeId,
+    value: &mut String,
+    edit_state: &mut TextEditState,
+    scroll_y: &mut f32,
+    placeholder: &str,
+    cursor_visible: bool,
+    text_style: Option<&TextStyle>,
+    theme: &AkarTheme,
+) -> TextAreaResponse {
+    let font = font_request_for_override(text_style);
     let rect = layout.rect(node_id);
 
     if rect[2] == 0.0 || rect[3] == 0.0 {
@@ -156,7 +190,7 @@ pub fn textarea(
                 match event.key {
                     Key::Left if edit_state.has_selection() => {
                         let buffer_id =
-                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                            reshape_for_motion(core, id_u64, value, metrics, font, max_text_width);
                         collapse_selection_visually(
                             &core.text_pipeline,
                             buffer_id,
@@ -166,7 +200,7 @@ pub fn textarea(
                     }
                     Key::Left => {
                         let buffer_id =
-                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                            reshape_for_motion(core, id_u64, value, metrics, font, max_text_width);
                         edit_state.cursor = core.text_pipeline.move_caret(
                             buffer_id,
                             edit_state.cursor,
@@ -175,7 +209,7 @@ pub fn textarea(
                     }
                     Key::Right if edit_state.has_selection() => {
                         let buffer_id =
-                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                            reshape_for_motion(core, id_u64, value, metrics, font, max_text_width);
                         collapse_selection_visually(
                             &core.text_pipeline,
                             buffer_id,
@@ -185,7 +219,7 @@ pub fn textarea(
                     }
                     Key::Right => {
                         let buffer_id =
-                            reshape_for_motion(core, id_u64, value, metrics, max_text_width);
+                            reshape_for_motion(core, id_u64, value, metrics, font, max_text_width);
                         edit_state.cursor = core.text_pipeline.move_caret(
                             buffer_id,
                             edit_state.cursor,
@@ -257,12 +291,13 @@ pub fn textarea(
         theme.base_content
     };
 
-    let buffer_id = core.text_pipeline.set_text(
+    let buffer_id = core.text_pipeline.set_text_styled(
         Some(id_u64),
         display_text,
         metrics,
         Some(max_text_width),
         None,
+        font,
         None,
     );
 
@@ -337,14 +372,16 @@ fn reshape_for_motion(
     id_u64: u64,
     value: &str,
     metrics: glyphon::Metrics,
+    font: akar_core::FontRequest,
     max_text_width: f32,
 ) -> u64 {
-    core.text_pipeline.set_text(
+    core.text_pipeline.set_text_styled(
         Some(id_u64),
         value,
         metrics,
         Some(max_text_width),
         None,
+        font,
         None,
     )
 }
@@ -663,5 +700,69 @@ mod tests {
         )
         .expect("partially visible");
         assert_eq!(quad.rect, [10.0, 0.0, 12.0, 5.0]);
+    }
+
+    /// Caret x at the end of `value` after one unfocused-cursor frame, with
+    /// `text_style` applied to render, geometry and motion.
+    fn end_caret_x(text_style: Option<&TextStyle>, load_named: bool) -> f32 {
+        let (mut core, layout, node_id, mut value, mut edit_state, mut scroll_y) =
+            focused_area("Hamburgefonts");
+        let style = match (text_style, load_named) {
+            (Some(s), true) => {
+                let handle = core
+                    .text_pipeline
+                    .load_font_bytes(
+                        include_bytes!("../../akar-core/assets/fonts/IBMPlexSans-Regular.ttf")
+                            .to_vec(),
+                    )
+                    .expect("bundled font loads");
+                Some(TextStyle {
+                    font_family: Some(crate::FontFamily::Named(handle)),
+                    ..*s
+                })
+            }
+            (s, _) => s.copied(),
+        };
+        core.input.begin_frame();
+        core.input.focused_id = Some(layout.widget_id(node_id));
+        textarea_styled(
+            &mut core,
+            &layout,
+            node_id,
+            &mut value,
+            &mut edit_state,
+            &mut scroll_y,
+            "",
+            true,
+            style.as_ref(),
+            &AKAR_THEME_DARK,
+        );
+        let id = layout.widget_id(node_id);
+        let geometry =
+            core.text_pipeline
+                .geometry(id, &value, edit_state.cursor, edit_state.cursor);
+        geometry.caret.expect("caret is shaped")[0]
+    }
+
+    #[test]
+    fn styled_none_and_empty_match_plain_textarea() {
+        let plain = end_caret_x(None, false);
+        let empty = end_caret_x(Some(&TextStyle::empty()), false);
+        assert_eq!(plain, empty);
+    }
+
+    #[test]
+    fn styled_weight_and_named_family_reach_shaping_and_geometry() {
+        let plain = end_caret_x(None, false);
+        let bold = TextStyle {
+            font_weight: Some(crate::FontWeight::Bold),
+            ..TextStyle::empty()
+        };
+        // Named family at regular weight is the same face as the default.
+        let named = end_caret_x(Some(&TextStyle::empty()), true);
+        assert_eq!(plain, named);
+        // Bold selects the wider SemiBold face, so geometry must differ.
+        let bold_named = end_caret_x(Some(&bold), true);
+        assert!(bold_named > plain, "{bold_named} vs {plain}");
     }
 }

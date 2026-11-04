@@ -3045,11 +3045,11 @@ pub unsafe extern "C" fn akar_data_grid_handle_keyboard(
     }
 }
 
-#[no_mangle]
 /// Edits a caller-owned multiline UTF-8 buffer.
 ///
 /// Buffer and copy-output semantics match `akar_text_input`.
-pub unsafe extern "C" fn akar_textarea(
+#[allow(clippy::too_many_arguments)]
+unsafe fn textarea_impl(
     ctx: *mut AkarCtx,
     node_id: u64,
     value_buf: *mut u8,
@@ -3061,6 +3061,7 @@ pub unsafe extern "C" fn akar_textarea(
     cursor_visible: bool,
     copy_buf: *mut u8,
     copy_capacity: u32,
+    text_style: Option<akar_components::TextStyle>,
 ) -> AkarTextAreaResponse {
     let Some(ctx) = (unsafe { ctx.as_mut() }) else {
         return empty_textarea_response();
@@ -3083,7 +3084,7 @@ pub unsafe extern "C" fn akar_textarea(
         anchor: ffi_state.anchor as usize,
     };
     let nid: akar_layout::NodeId = node_id.into();
-    let result = akar_components::akar_textarea(
+    let result = akar_components::akar_textarea_styled(
         &mut ctx.core,
         &ctx.layout,
         nid,
@@ -3092,6 +3093,7 @@ pub unsafe extern "C" fn akar_textarea(
         unsafe { &mut *scroll_y },
         placeholder_str,
         cursor_visible,
+        text_style.as_ref(),
         &ctx.theme,
     );
 
@@ -3110,6 +3112,78 @@ pub unsafe extern "C" fn akar_textarea(
         copy_len,
         copy_required_len,
         request_paste: result.request_paste,
+    }
+}
+
+#[no_mangle]
+/// Edits a caller-owned multiline UTF-8 buffer.
+///
+/// Buffer and copy-output semantics match `akar_text_input`.
+pub unsafe extern "C" fn akar_textarea(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value_buf: *mut u8,
+    value_len: *mut u32,
+    value_capacity: u32,
+    edit_state: *mut AkarTextEditState,
+    scroll_y: *mut f32,
+    placeholder: *const c_char,
+    cursor_visible: bool,
+    copy_buf: *mut u8,
+    copy_capacity: u32,
+) -> AkarTextAreaResponse {
+    unsafe {
+        textarea_impl(
+            ctx,
+            node_id,
+            value_buf,
+            value_len,
+            value_capacity,
+            edit_state,
+            scroll_y,
+            placeholder,
+            cursor_visible,
+            copy_buf,
+            copy_capacity,
+            None,
+        )
+    }
+}
+
+#[no_mangle]
+/// Like `akar_textarea`, with an optional `AkarTextStyle` (NULL = defaults).
+///
+/// Only the font family (including `font_family_name_handle`) and font
+/// weight are honoured; size, line height and colour stay on the theme.
+pub unsafe extern "C" fn akar_textarea_styled(
+    ctx: *mut AkarCtx,
+    node_id: u64,
+    value_buf: *mut u8,
+    value_len: *mut u32,
+    value_capacity: u32,
+    edit_state: *mut AkarTextEditState,
+    scroll_y: *mut f32,
+    placeholder: *const c_char,
+    cursor_visible: bool,
+    copy_buf: *mut u8,
+    copy_capacity: u32,
+    style: *const AkarTextStyle,
+) -> AkarTextAreaResponse {
+    unsafe {
+        textarea_impl(
+            ctx,
+            node_id,
+            value_buf,
+            value_len,
+            value_capacity,
+            edit_state,
+            scroll_y,
+            placeholder,
+            cursor_visible,
+            copy_buf,
+            copy_capacity,
+            c_text_style_to_rust(style),
+        )
     }
 }
 
